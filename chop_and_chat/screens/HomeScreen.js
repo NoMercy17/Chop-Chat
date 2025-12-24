@@ -26,7 +26,7 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#3b83f68a',
     paddingTop: Platform.OS === 'ios' ? 45 : StatusBar.currentHeight,
   },
   scrollView: {
