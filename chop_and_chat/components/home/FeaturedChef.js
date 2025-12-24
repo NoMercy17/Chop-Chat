@@ -1,13 +1,6 @@
 import { Text, View, StyleSheet, ScrollView, Pressable } from 'react-native';
 
-export default function FeaturedChef() {
-    const reviews = [
-        { id: 1, title: "This week", text: "Chef Ramsay's Disappointment", chef: "Gordon Ramsay" },
-        { id: 2, title: "Last week", text: "Gordon's Kitchen Nightmares", chef: "Gordon Ramsay" },
-        { id: 3, title: "2 weeks ago", text: "The Perfect Wellington", chef: "Gordon Ramsay" },
-        { id: 4, title: "A month ago", text: "Hell's Kitchen Fiasco", chef: "Gordon Ramsay" },
-        { id: 5, title: "2 months ago", text: "MasterChef Mayhem", chef: "Gordon Ramsay" },
-    ];
+export default function FeaturedChef(){
 
     return (
         <View style={styles.container}>

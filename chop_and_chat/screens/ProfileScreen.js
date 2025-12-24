@@ -3,31 +3,31 @@ import { View, Text, ScrollView, Pressable, Image, StyleSheet } from "react-nati
 import { Ionicons } from "@expo/vector-icons";
 
 export default function ProfileScreen({ navigation }) {
-    return (
-        <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-            {/* Profile Header */}
-            <View style={styles.header}>
-                <View style={styles.profileImageContainer}>
-                    <Image 
-                        source={require("../assets/favicon.png")}
-                        style={styles.profileImage}
-                    />
-                </View>
-                <Text style={styles.username}>Antonio</Text>
-                <Text style={styles.bio}>Food enthusiast</Text>
-            </View>
+  return (
+    <ScrollView style={styles.container}>
+      
+      {/* Profile Header */}
+      <View style={styles.header}>
+        <Image 
+          source={require("../assets/favicon.png")}
+          style={styles.profileImage}
+        />
+        <Text style={styles.username}>Antonio</Text>
+        <Text style={styles.bio}>Food enthusiast</Text>
+      </View>
 
-            {/* Stats Cards */}
-            <View style={styles.statsContainer}>
-                <View style={styles.statCard}>
-                    <Text style={styles.statNumber}>20</Text>
-                    <Text style={styles.statLabel}>Recipes searched</Text>
-                </View>
-                <View style={styles.statCard}>
-                    <Text style={styles.statNumber}>50</Text>
-                    <Text style={styles.statLabel}>Uploaded photos</Text>
-                </View>
-            </View>
+      {/* Stats Cards */}
+      <View style={styles.statsContainer}>
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>20</Text>
+          <Text style={styles.statLabel}>Recipes searched</Text>
+        </View>
+
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>50</Text>
+          <Text style={styles.statLabel}>Uploaded photos</Text>
+        </View>
+      </View>
 
             {/* Menu */}
             <View style={styles.menuContainer}>
@@ -47,38 +47,16 @@ export default function ProfileScreen({ navigation }) {
                     <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
                 </Pressable>
 
-                <Pressable 
-                    style={({ pressed }) => [
-                        styles.menuItem,
-                        pressed && styles.menuItemPressed
-                    ]}
-                    onPress={() => navigation.navigate("Home")}
-                >
-                    <View style={styles.menuItemLeft}>
-                        <View style={styles.iconContainer}>
-                            <Ionicons name="heart-outline" size={22} color="#EF4444" />
-                        </View>
-                        <Text style={styles.menuText}>Favorite Recipes</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-                </Pressable>
+        <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate("Home")}>
+          <Ionicons name="heart-outline" style={styles.icon} />
+          <Text style={styles.menuText}>Favorite Recipes</Text>
+        </TouchableOpacity>
 
-                <Pressable 
-                    style={({ pressed }) => [
-                        styles.menuItem,
-                        pressed && styles.menuItemPressed
-                    ]}
-                    onPress={() => navigation.navigate("Settings")}
-                >
-                    <View style={styles.menuItemLeft}>
-                        <View style={styles.iconContainer}>
-                            <Ionicons name="settings-outline" size={22} color="#6B7280" />
-                        </View>
-                        <Text style={styles.menuText}>Settings</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-                </Pressable>
-            </View>
+        <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate("Settings")}>
+          <Ionicons name="settings-outline" style={styles.icon} />
+          <Text style={styles.menuText}>Settings</Text>
+        </TouchableOpacity>
+      </View>
 
             {/* Logout */}
             <Pressable 
