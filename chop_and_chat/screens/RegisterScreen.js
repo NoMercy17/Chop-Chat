@@ -4,7 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 
-const BASE_URL = 'http://localhost:4000'; // change for emulator/device as noted above
+// Use your computer's IP for physical devices, localhost for iOS simulator
+const BASE_URL = 'http://192.168.0.107:4000';
 
 export default function RegisterScreen({ navigation }) {
   const [email, setEmail] = useState('');

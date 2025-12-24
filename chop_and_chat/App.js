@@ -1,14 +1,12 @@
-import React, { useEffect, useState, createContext, createRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
 import HomeScreen from './screens/HomeScreen';
 import ProfileScreen from './screens/ProfileScreen';
-import AuthStack from './screens/AuthStack';
+import AuthStack from './context/AuthStack';
+import { AuthContext, navigationRef } from './context/AuthContext';
 
-export const AuthContext = createContext();
-export const navigationRef = createRef(); // export ref for programmatic navigation
 const MainStack = createNativeStackNavigator();
 
 export default function App() {

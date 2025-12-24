@@ -1,5 +1,26 @@
 import { Text, View, StyleSheet, ScrollView, Pressable } from 'react-native';
 
+const reviews = [
+    {
+        id: 1,
+        title: "Quick & Easy",
+        text: "This recipe is perfect for busy weeknights. Simple ingredients, amazing results!",
+        chef: "Chef Gordon"
+    },
+    {
+        id: 2,
+        title: "Family Favorite",
+        text: "My kids absolutely love this dish. It's become our weekly staple.",
+        chef: "Chef Maria"
+    },
+    {
+        id: 3,
+        title: "Restaurant Quality",
+        text: "Impressed my dinner guests with this one. Tastes like fine dining!",
+        chef: "Chef Antoine"
+    }
+];
+
 export default function FeaturedChef(){
 
     return (
