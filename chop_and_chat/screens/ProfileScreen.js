@@ -1,8 +1,10 @@
-import React from "react";
+import React, { useContext } from "react";
 import { View, Text, ScrollView, Pressable, Image, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { AuthContext } from "../context/AuthContext";
 
 export default function ProfileScreen({ navigation }) {
+  const auth = useContext(AuthContext);
   return (
     <ScrollView style={styles.container}>
       
@@ -64,7 +66,7 @@ export default function ProfileScreen({ navigation }) {
                     styles.logoutButton,
                     pressed && styles.logoutButtonPressed
                 ]}
-                onPress={() => console.log('Logout pressed')}
+                onPress={() => auth.signOut()}
             >
                 <Text style={styles.logoutText}>Log out</Text>
             </Pressable>
