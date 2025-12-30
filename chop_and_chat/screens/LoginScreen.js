@@ -5,8 +5,8 @@ import { AuthContext, navigationRef } from '../context/AuthContext';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 
-// Use your computer's IP for physical devices, localhost for iOS simulator
-const BASE_URL = 'http://172.20.10.2:4000';
+// Use 10.0.2.2 for Android emulator, your IP for physical devices
+const BASE_URL = 'http://10.0.2.2:4000';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
