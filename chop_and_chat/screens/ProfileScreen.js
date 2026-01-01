@@ -39,7 +39,7 @@ export default function ProfileScreen({ navigation }) {
             styles.menuItem,
             pressed && styles.menuItemPressed
           ]}
-          onPress={() => navigation.navigate("Home")}
+          onPress={() => navigation.navigate("MyRecipes")}
         >
           <View style={styles.menuItemLeft}>
             <View style={styles.iconContainer}>
@@ -55,7 +55,7 @@ export default function ProfileScreen({ navigation }) {
             styles.menuItem,
             pressed && styles.menuItemPressed
           ]}
-          onPress={() => navigation.navigate("Home")}
+          onPress={() => navigation.navigate("FavoriteRecipes")}
         >
           <View style={styles.menuItemLeft}>
             <View style={styles.iconContainer}>

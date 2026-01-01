@@ -4,6 +4,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import HomeScreen from './screens/HomeScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import MyRecipes from './screens/MyRecipes';
+import FavoriteRecipes from './screens/FavoriteRecipes';
 import AuthStack from './context/AuthStack';
 import { AuthContext, navigationRef } from './context/AuthContext';
 
@@ -47,6 +49,8 @@ export default function App() {
           <MainStack.Navigator>
             <MainStack.Screen name="Home" component={HomeScreen} />
             <MainStack.Screen name="Profile" component={ProfileScreen} />
+            <MainStack.Screen name="MyRecipes" component={MyRecipes} options={{ title: 'My Recipes' }} />
+            <MainStack.Screen name="FavoriteRecipes" component={FavoriteRecipes} options={{ title: 'Favorites' }} />
           </MainStack.Navigator>
         ) : (
           <AuthStack />
