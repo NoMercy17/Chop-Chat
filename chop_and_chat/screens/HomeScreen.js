@@ -4,6 +4,7 @@ import FeaturedChef from "../components/home/FeaturedChef";
 import CommunityFeed from "../components/home/CommunityFeed"; 
 import { StyleSheet, Platform, View, ScrollView } from "react-native";
 import { StatusBar } from 'expo-status-bar';
+import { hp } from '../utils/responsive';
 
 export default function HomeScreen({ navigation }) { 
   return (
@@ -27,7 +28,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#3b83f68a',
-    paddingTop: Platform.OS === 'ios' ? 45 : StatusBar.currentHeight,
+    paddingTop: Platform.OS === 'ios' ? hp(25) : StatusBar.currentHeight,
   },
   scrollView: {
     flex: 1,

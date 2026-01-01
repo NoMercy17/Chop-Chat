@@ -1,4 +1,5 @@
 import { Text, View, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { wp, hp, fp, SPACING } from '../../utils/responsive';
 
 export default function CommunityFeed() {
     const posts = [
@@ -56,21 +57,21 @@ export default function CommunityFeed() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        paddingTop: 24,
+        paddingTop: SPACING.sectionGap,
     },
     header: {
-        paddingHorizontal: 20,
-        marginBottom: 16,
+        paddingHorizontal: SPACING.screenPadding,
+        marginBottom: SPACING.itemGap,
     },
     sectionTitle: {
-        fontSize: 22,
+        fontSize: fp(22),
         fontWeight: '700',
         color: '#FFFFFF',
-        marginBottom: 4,
+        marginBottom: hp(4),
         letterSpacing: -0.5,
     },
     sectionSubtitle: {
-        fontSize: 14,
+        fontSize: fp(14),
         color: '#BFDBFE',
         fontWeight: '400',
     },
@@ -78,18 +79,18 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        paddingHorizontal: 20,
-        paddingBottom: 32,
+        paddingHorizontal: SPACING.screenPadding,
+        paddingBottom: hp(32),
     },
     postCard: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        marginBottom: 16,
+        borderRadius: SPACING.radiusLarge,
+        marginBottom: SPACING.itemGap,
         overflow: 'hidden',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: hp(2) },
         shadowOpacity: 0.08,
-        shadowRadius: 12,
+        shadowRadius: wp(12),
         elevation: 3,
     },
     postCardPressed: {
@@ -98,52 +99,52 @@ const styles = StyleSheet.create({
     },
     dishImagePlaceholder: {
         width: '100%',
-        height: 180,
+        height: hp(180),
         backgroundColor: '#F3F4F6',
         justifyContent: 'center',
         alignItems: 'center',
     },
     imagePlaceholderText: {
-        fontSize: 14,
+        fontSize: fp(14),
         fontWeight: '600',
         color: '#9CA3AF',
         letterSpacing: 2,
     },
     postContent: {
-        padding: 16,
-        gap: 8,
+        padding: wp(16),
+        gap: hp(8),
     },
     postTitle: {
-        fontSize: 18,
+        fontSize: fp(18),
         fontWeight: '700',
         color: '#111827',
         letterSpacing: -0.3,
     },
     postDescription: {
-        fontSize: 14,
+        fontSize: fp(14),
         color: '#6B7280',
-        lineHeight: 20,
+        lineHeight: hp(20),
     },
     postMeta: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginTop: 8,
-        paddingTop: 12,
+        marginTop: hp(8),
+        paddingTop: hp(12),
         borderTopWidth: 1,
         borderTopColor: '#F3F4F6',
     },
     postAuthor: {
-        fontSize: 13,
+        fontSize: fp(13),
         color: '#9CA3AF',
         fontWeight: '500',
     },
     postStats: {
         flexDirection: 'row',
-        gap: 16,
+        gap: wp(16),
     },
     statText: {
-        fontSize: 13,
+        fontSize: fp(13),
         color: '#6B7280',
         fontWeight: '600',
     },

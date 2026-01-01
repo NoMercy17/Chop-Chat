@@ -1,5 +1,14 @@
 import { Text, View, StyleSheet, Pressable, Modal, ScrollView } from 'react-native';
 import { useState } from 'react';
+import { wp, hp, fp, SPACING } from '../../utils/responsive';
+
+const notifications = [
+    { id: 1, title: 'New Recipe Match', subtitle: 'Found 3 recipes for your ingredients', time: '2m ago', unread: true },
+    { id: 2, title: 'Chef Review Posted', subtitle: 'Your dish got reviewed by Chef Gordon', time: '1h ago', unread: true },
+    { id: 3, title: 'Popular Dish Alert', subtitle: 'Your pizza got 50 likes!', time: '3h ago', unread: false },
+    { id: 4, title: 'Trending Recipe', subtitle: 'Check out this week\'s most popular dish', time: '5h ago', unread: false },
+    { id: 5, title: 'Community Highlight', subtitle: 'You were featured in the feed', time: '1d ago', unread: true },
+];
 
 export default function Header({ navigation }) {
     const [modalVisible, setModalVisible] = useState(false);
@@ -43,13 +52,7 @@ export default function Header({ navigation }) {
                             style={styles.notificationList}
                             showsVerticalScrollIndicator={false}
                         >
-                            {[
-                                { id: 1, title: 'New Recipe Match', subtitle: 'Found 3 recipes for your ingredients', time: '2m ago', unread: true },
-                                { id: 2, title: 'Chef Review Posted', subtitle: 'Your dish got reviewed by Chef Gordon', time: '1h ago', unread: true },
-                                { id: 3, title: 'Popular Dish Alert', subtitle: 'Your pizza got 50 likes!', time: '3h ago', unread: false },
-                                { id: 4, title: 'Trending Recipe', subtitle: 'Check out this week\'s most popular dish', time: '5h ago', unread: false },
-                                { id: 5, title: 'Community Highlight', subtitle: 'You were featured in the feed', time: '1d ago', unread: false },
-                            ].map((notif) => (
+                            {notifications.map((notif) => (
                                 <Pressable
                                     key={notif.id}
                                     style={({ pressed }) => [
@@ -92,33 +95,33 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingVertical: 10,
+        paddingHorizontal: SPACING.screenPadding,
+        paddingVertical: hp(8),
         backgroundColor: '#F3F4F6',
         borderBottomWidth: 1,
         borderBottomColor: '#E5E7EB',
     },
     appName: {
-        fontSize: 24,
+        fontSize: fp(24),
         fontWeight: '700',
         color: '#111827',
         letterSpacing: -0.5,
     },
     rightButtons: {
         flexDirection: 'row',
-        gap: 12,
+        gap: wp(12),
     },
     button: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
+        width: wp(44),
+        height: wp(44),
+        borderRadius: wp(12),
         backgroundColor: '#3b83f68a',
         justifyContent: 'center',
         alignItems: 'center',
         shadowColor: '#3B82F6',
-        shadowOffset: { width: 0, height: 4 },
+        shadowOffset: { width: 0, height: hp(4) },
         shadowOpacity: 0.2,
-        shadowRadius: 8,
+        shadowRadius: wp(8),
         elevation: 4,
     },
     buttonPressed: {
@@ -126,7 +129,7 @@ const styles = StyleSheet.create({
         transform: [{ scale: 0.96 }],
     },
     buttonText: {
-        fontSize: 20,
+        fontSize: fp(20),
     },
 
     // Modal Styles
@@ -137,45 +140,45 @@ const styles = StyleSheet.create({
     },
     modalContainer: {
         backgroundColor: '#FFFFFF',
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
+        borderTopLeftRadius: wp(24),
+        borderTopRightRadius: wp(24),
         maxHeight: '85%',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: -4 },
+        shadowOffset: { width: 0, height: hp(-4) },
         shadowOpacity: 0.1,
-        shadowRadius: 12,
+        shadowRadius: wp(12),
         elevation: 8,
     },
     modalHeader: {
-        paddingHorizontal: 24,
-        paddingTop: 24,
-        paddingBottom: 16,
+        paddingHorizontal: wp(24),
+        paddingTop: hp(24),
+        paddingBottom: hp(16),
         borderBottomWidth: 1,
         borderBottomColor: '#F3F4F6',
     },
     modalTitle: {
-        fontSize: 28,
+        fontSize: fp(28),
         fontWeight: '700',
         color: '#111827',
-        marginBottom: 4,
+        marginBottom: hp(4),
     },
     modalSubtitle: {
-        fontSize: 14,
+        fontSize: fp(14),
         color: '#6B7280',
         fontWeight: '400',
     },
 
     // Notification List
     notificationList: {
-        paddingHorizontal: 24,
-        paddingTop: 16,
+        paddingHorizontal: wp(24),
+        paddingTop: hp(16),
     },
     notificationItem: {
         flexDirection: 'row',
         backgroundColor: '#F9FAFB',
-        padding: 16,
-        borderRadius: 16,
-        marginBottom: 12,
+        padding: wp(16),
+        borderRadius: wp(16),
+        marginBottom: hp(12),
         alignItems: 'center',
         borderWidth: 1,
         borderColor: '#F3F4F6',
@@ -198,37 +201,37 @@ const styles = StyleSheet.create({
         marginBottom: 6,
     },
     notificationTitle: {
-        fontSize: 16,
+        fontSize: fp(16),
         fontWeight: '600',
         color: '#111827',
         flex: 1,
     },
     notificationTime: {
-        fontSize: 12,
+        fontSize: fp(12),
         color: '#9CA3AF',
         fontWeight: '500',
-        marginLeft: 8,
+        marginLeft: wp(8),
     },
     notificationSubtitle: {
-        fontSize: 14,
+        fontSize: fp(14),
         color: '#6B7280',
-        lineHeight: 20,
+        lineHeight: hp(20),
     },
     unreadDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
+        width: wp(8),
+        height: wp(8),
+        borderRadius: wp(4),
         backgroundColor: '#3b83f6c2',
-        marginLeft: 12,
+        marginLeft: wp(12),
     },
 
     // Close Button
     closeButton: {
-        margin: 24,
-        marginTop: 16,
-        paddingVertical: 16,
+        margin: wp(24),
+        marginTop: hp(16),
+        paddingVertical: hp(16),
         backgroundColor: '#F3F4F6',
-        borderRadius: 12,
+        borderRadius: wp(12),
         alignItems: 'center',
     },
     closeButtonPressed: {
@@ -237,7 +240,7 @@ const styles = StyleSheet.create({
     },
     closeButtonText: {
         color: '#374151',
-        fontSize: 16,
+        fontSize: fp(16),
         fontWeight: '600',
     },
 });

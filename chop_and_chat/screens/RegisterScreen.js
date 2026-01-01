@@ -7,6 +7,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 // Use your computer's IP for physical devices, localhost for iOS simulator
 const BASE_URL = 'http://172.20.10.2:4000';
 
+//const BASE_URL_ANDROID = 'http://10.0.2.2:4000';
+
 export default function RegisterScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

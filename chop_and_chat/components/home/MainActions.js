@@ -1,4 +1,5 @@
 import { Text, View, StyleSheet, Pressable } from 'react-native';
+import { wp, hp, fp, SPACING } from '../../utils/responsive';
 
 export default function MainActions() {
     return (
@@ -40,20 +41,22 @@ export default function MainActions() {
 
 const styles = StyleSheet.create({
     container: {
-        padding: 20,
-        gap: 16,
+        paddingHorizontal: SPACING.screenPadding,
+        paddingTop: SPACING.sectionGap,
+        paddingBottom: hp(4),
+        gap: SPACING.itemGap,
     },
     card: {
         flexDirection: 'row',
         backgroundColor: '#FFFFFF',
-        padding: 20,
-        borderRadius: 16,
+        padding: SPACING.cardPadding,
+        borderRadius: SPACING.radiusLarge,
         alignItems: 'center',
         justifyContent: 'space-between',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: hp(2) },
         shadowOpacity: 0.08,
-        shadowRadius: 12,
+        shadowRadius: wp(12),
         elevation: 3,
     },
     cardPressed: {
@@ -62,31 +65,31 @@ const styles = StyleSheet.create({
     },
     textContainer: {
         flex: 1,
-        gap: 6,
+        gap: hp(6),
     },
     title: {
-        fontSize: 18,
+        fontSize: fp(18),
         fontWeight: '700',
         color: '#111827',
         letterSpacing: -0.3,
     },
     subtitle: {
-        fontSize: 14,
+        fontSize: fp(14),
         color: '#6B7280',
         fontWeight: '400',
-        lineHeight: 20,
+        lineHeight: hp(20),
     },
     iconContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 10,
+        width: wp(40),
+        height: wp(40),
+        borderRadius: wp(10),
         backgroundColor: '#F3F4F6',
         justifyContent: 'center',
         alignItems: 'center',
-        marginLeft: 16,
+        marginLeft: wp(16),
     },
     icon: {
-        fontSize: 20,
+        fontSize: fp(20),
         color: '#3B82F6',
         fontWeight: '600',
     },

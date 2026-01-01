@@ -1,4 +1,5 @@
 import { Text, View, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { wp, hp, fp, SPACING } from '../../utils/responsive';
 
 const reviews = [
     {
@@ -66,37 +67,38 @@ export default function FeaturedChef(){
 
 const styles = StyleSheet.create({
     container: {
-        paddingVertical: 24,
+        paddingTop: SPACING.sectionGap,
+        paddingBottom: hp(4),
     },
     header: {
-        paddingHorizontal: 20,
-        marginBottom: 16,
+        paddingHorizontal: SPACING.screenPadding,
+        marginBottom: SPACING.itemGap,
     },
     sectionTitle: {
-        fontSize: 22,
+        fontSize: fp(22),
         fontWeight: '700',
         color: '#FFFFFF',
-        marginBottom: 4,
+        marginBottom: hp(4),
         letterSpacing: -0.5,
     },
     sectionSubtitle: {
-        fontSize: 14,
+        fontSize: fp(14),
         color: '#BFDBFE',
         fontWeight: '400',
     },
     scrollContainer: {
-        paddingHorizontal: 20,
-        gap: 16,
+        paddingHorizontal: SPACING.screenPadding,
+        gap: SPACING.itemGap,
     },
     reviewCard: {
-        width: 280,
+        width: wp(280),
         backgroundColor: '#FFFFFF',
-        borderRadius: 16,
+        borderRadius: wp(16),
         overflow: 'hidden',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: hp(2) },
         shadowOpacity: 0.08,
-        shadowRadius: 12,
+        shadowRadius: wp(12),
         elevation: 3,
     },
     reviewCardPressed: {
@@ -105,26 +107,26 @@ const styles = StyleSheet.create({
     },
     cardHeader: {
         backgroundColor: '#F9FAFB',
-        padding: 16,
+        padding: wp(16),
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: wp(12),
     },
     chefAvatar: {
-        width: 56,
-        height: 56,
+        width: wp(56),
+        height: wp(56),
         backgroundColor: '#3B82F6',
-        borderRadius: 28,
+        borderRadius: wp(28),
         justifyContent: 'center',
         alignItems: 'center',
     },
     chefInitial: {
-        fontSize: 20,
+        fontSize: fp(20),
         fontWeight: '700',
         color: '#FFFFFF',
     },
     reviewTime: {
-        fontSize: 12,
+        fontSize: fp(12),
         color: '#9CA3AF',
         fontWeight: '600',
         textTransform: 'uppercase',
@@ -134,23 +136,23 @@ const styles = StyleSheet.create({
     divider: {
         height: 1,
         backgroundColor: '#E5E7EB',
-        marginHorizontal: 16,
+        marginHorizontal: wp(16),
     },
     reviewContent: {
-        padding: 16,
-        gap: 6,
+        padding: wp(16),
+        gap: hp(6),
         backgroundColor: '#FFFFFF',
     },
     reviewText: {
-        fontSize: 16,
+        fontSize: fp(16),
         fontWeight: '600',
         color: '#111827',
-        lineHeight: 22,
+        lineHeight: hp(22),
     },
     reviewChef: {
-        fontSize: 14,
+        fontSize: fp(14),
         color: '#6B7280',
         fontWeight: '400',
-        marginTop: 2,
+        marginTop: hp(2),
     },
 });
