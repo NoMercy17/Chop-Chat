@@ -1,14 +1,12 @@
 import React, { useState, useContext } from 'react';
-import { View, Text, TextInput, StyleSheet, Pressable, Alert, Platform } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthContext, navigationRef } from '../context/AuthContext';
 import { StatusBar } from 'expo-status-bar';
-import { LinearGradient } from 'expo-linear-gradient';
+import { wp, hp, fp } from '../utils/responsive';
 
 // Use your computer's IP for physical devices
-const BASE_URL = 'http://172.20.10.2:4000';
-
-//const BASE_URL_ANDROID = 'http://10.0.2.2:4000';
+const BASE_URL = 'http://192.168.1.138:4000';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -45,7 +43,6 @@ export default function LoginScreen({ navigation }) {
       await AsyncStorage.setItem('session_user', JSON.stringify(session));
       await auth.signIn(session);
 
-      // navigate to main app (Home). use navigationRef so we reset the whole nav stack.
       try {
         if (navigationRef && navigationRef.current && navigationRef.current.resetRoot) {
           navigationRef.current.resetRoot({ index: 0, routes: [{ name: 'Home' }] });
@@ -61,38 +58,47 @@ export default function LoginScreen({ navigation }) {
   };
 
   return (
-    <LinearGradient
-      colors={['#3B82F6', '#2563EB', '#1D4ED8']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.container}
-    >
-      <StatusBar style="light" />
+    <View style={styles.container}>
+      <StatusBar style="dark" />
       
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Login</Text>
-        </View>
+      {/* Header Section */}
+      <View style={styles.headerSection}>
+        <Text style={styles.appName}>Cook&Chat</Text>
+      </View>
 
-        <View style={styles.form}>
-          <TextInput
-            placeholder="Email"
-            placeholderTextColor="#6B7280"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            style={styles.input}
-          />
+      {/* Form Card */}
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.formSection}
+      >
+        <View style={styles.formCard}>
+          <Text style={styles.formTitle}>Welcome back</Text>
+          <Text style={styles.formSubtitle}>Sign in to continue</Text>
 
-          <TextInput
-            placeholder="Password"
-            placeholderTextColor="#6B7280"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            style={styles.input}
-          />
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Email</Text>
+            <TextInput
+              placeholder="your@email.com"
+              placeholderTextColor="#9CA3AF"
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              style={styles.input}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Password</Text>
+            <TextInput
+              placeholder="Enter your password"
+              placeholderTextColor="#9CA3AF"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              style={styles.input}
+            />
+          </View>
 
           <Pressable 
             style={({ pressed }) => [
@@ -101,92 +107,144 @@ export default function LoginScreen({ navigation }) {
             ]}
             onPress={onLogin}
           >
-            <Text style={styles.loginButtonText}>Login</Text>
+            <Text style={styles.loginButtonText}>Sign In</Text>
           </Pressable>
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
 
           <Pressable 
             style={({ pressed }) => [
               styles.createAccountButton,
-              pressed && styles.textButtonPressed
+              pressed && styles.secondaryButtonPressed
             ]}
             onPress={() => navigation.navigate('Register')}
           >
-            <Text style={styles.createAccountButtonText}>Create account</Text>
+            <Text style={styles.createAccountButtonText}>Create new account</Text>
           </Pressable>
         </View>
-      </View>
-    </LinearGradient>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: Platform.OS === 'ios' ? 60 : StatusBar.currentHeight + 20,
+    backgroundColor: '#93C5FD',
   },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 20,
+  headerSection: {
+    alignItems: 'center',
+    paddingTop: hp(80),
+    paddingBottom: hp(32),
   },
-  header: {
-    marginBottom: 32,
-  },
-  title: {
-    fontSize: 32,
+  appName: {
+    fontSize: fp(32),
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#1E40AF',
     letterSpacing: -0.5,
   },
-  form: {
-    gap: 20,
+  formSection: {
+    flex: 1,
+  },
+  formCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: wp(32),
+    borderTopRightRadius: wp(32),
+    paddingHorizontal: wp(24),
+    paddingTop: hp(32),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: hp(-4) },
+    shadowOpacity: 0.08,
+    shadowRadius: wp(16),
+    elevation: 8,
+  },
+  formTitle: {
+    fontSize: fp(24),
+    fontWeight: '700',
+    color: '#111827',
+    letterSpacing: -0.5,
+  },
+  formSubtitle: {
+    fontSize: fp(14),
+    color: '#6B7280',
+    marginTop: hp(4),
+    marginBottom: hp(24),
+  },
+  inputGroup: {
+    marginBottom: hp(16),
+  },
+  inputLabel: {
+    fontSize: fp(13),
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: hp(8),
   },
   input: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderRadius: 20,
-    fontSize: 16,
+    backgroundColor: '#F9FAFB',
+    paddingHorizontal: wp(16),
+    paddingVertical: hp(14),
+    borderRadius: wp(12),
+    fontSize: fp(16),
     color: '#111827',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   loginButton: {
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 16,
-    borderRadius: 20,
+    backgroundColor: '#3B82F6',
+    paddingVertical: hp(16),
+    borderRadius: wp(12),
     alignItems: 'center',
-    marginTop: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
+    marginTop: hp(8),
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: hp(4) },
+    shadowOpacity: 0.3,
+    shadowRadius: wp(8),
     elevation: 4,
   },
   loginButtonText: {
-    color: '#3B82F6',
-    fontSize: 16,
+    color: '#FFFFFF',
+    fontSize: fp(16),
     fontWeight: '700',
     letterSpacing: -0.3,
   },
+  buttonPressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.98 }],
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: hp(24),
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E5E7EB',
+  },
+  dividerText: {
+    paddingHorizontal: wp(16),
+    fontSize: fp(13),
+    color: '#9CA3AF',
+    fontWeight: '500',
+  },
   createAccountButton: {
-    backgroundColor: 'transparent',
-    paddingVertical: 16,
+    backgroundColor: '#F3F4F6',
+    paddingVertical: hp(16),
+    borderRadius: wp(12),
     alignItems: 'center',
   },
   createAccountButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+    color: '#3B82F6',
+    fontSize: fp(16),
     fontWeight: '600',
   },
-  buttonPressed: {
+  secondaryButtonPressed: {
     opacity: 0.8,
-    transform: [{ scale: 0.98 }],
-  },
-  textButtonPressed: {
-    opacity: 0.7,
+    backgroundColor: '#E5E7EB',
   },
 });

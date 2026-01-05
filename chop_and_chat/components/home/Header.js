@@ -98,6 +98,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: SPACING.screenPadding,
         paddingVertical: hp(8),
         backgroundColor: '#F3F4F6',
+        borderTopWidth: 1,
+        borderTopColor: '#D1D5DB',
         borderBottomWidth: 1,
         borderBottomColor: '#E5E7EB',
     },
