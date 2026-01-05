@@ -1,5 +1,7 @@
 import { Text, View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function CommunityFeed() {
     const posts = [
@@ -8,13 +10,30 @@ export default function CommunityFeed() {
         { id: 3, title: "Vegan Chocolate Cake", description: "Who said vegan desserts can't be delicious? This cake is amazing!", author: "Mike Johnson", likes: 89, comments: 15 },
         { id: 4, title: "Sunday Brunch Special", description: "Eggs benedict with hollandaise sauce - turned out better than expected.", author: "Sarah Lee", likes: 56, comments: 12 },
         { id: 5, title: "Thai Curry Adventure", description: "First time making green curry. The spice level is just right!", author: "Alex Brown", likes: 73, comments: 19 },
+        { id: 6, title: "Sourdough Bread Success", description: "After days of feeding the starter, the crust and crumb finally nailed it.", author: "Emily Carter", likes: 94, comments: 21 },
+        { id: 7, title: "Street-Style Tacos at Home", description: "Tried recreating authentic al pastor tacos with pineapple and cilantro.", author: "Carlos Rivera", likes: 118, comments: 27 },
+        { id: 8, title: "Quick Weeknight Stir Fry", description: "15-minute veggie stir fry with garlic soy sauce. Simple and satisfying.", author: "Lina Wong", likes: 61, comments: 9 },
+        { id: 9, title: "Classic French Omelette", description: "Focused on technique today—soft, buttery, and perfectly folded.", author: "Pierre Martin", likes: 85, comments: 14 },
+        { id: 10, title: "Homemade Ice Cream Experiment", description: "No-churn vanilla ice cream with a salted caramel swirl.", author: "Olivia Green", likes: 102, comments: 18 },
     ];
 
     return (
         <View style={styles.container}>
             <View style={styles.header}>
                 <Text style={styles.sectionTitle}>Community Feed</Text>
-                <Text style={styles.sectionSubtitle}>See what others are cooking</Text>
+
+                <Pressable 
+                   style={({ pressed }) => [
+                       styles.subtitleButton,
+                       pressed && styles.subtitleButtonPressed
+                   ]}
+                    onPress={() => console.log("See what others are cooking")}>
+                    <View style = {styles.subtitleContent}>
+                        <Text style={styles.sectionSubtitle}>See what others are cooking</Text>
+                        <Ionicons name="arrow-forward" size={fp(14)} color="#BFDBFE" />
+                    </View>
+                </Pressable>  
+
             </View>
 
             <ScrollView 
@@ -49,6 +68,22 @@ export default function CommunityFeed() {
                         </View>
                     </Pressable>
                 ))}
+                
+                {/* More Button */}
+                <Pressable 
+                    style={({ pressed }) => [
+                        styles.moreCard,
+                        pressed && styles.moreCardPressed
+                    ]}
+                    onPress={() => console.log('View all chef reviews')}
+                >
+                    <View style={styles.glassBackground}>
+                        <View style={styles.moreCardContent}>
+                            <Text style={styles.moreCardText}>More</Text>
+                        </View>
+                    </View>
+                </Pressable>
+
             </ScrollView>
         </View>
     );
@@ -69,6 +104,17 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         marginBottom: hp(4),
         letterSpacing: -0.5,
+    },
+    subtitleButton: {
+        alignSelf: 'flex-start',
+    },
+    subtitleButtonPressed: {
+        opacity: 0.7,
+    },
+    subtitleContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(3),
     },
     sectionSubtitle: {
         fontSize: fp(14),
@@ -147,5 +193,35 @@ const styles = StyleSheet.create({
         fontSize: fp(13),
         color: '#6B7280',
         fontWeight: '600',
+    },
+    moreCard: {
+        alignSelf: 'center',
+        width: wp(110),
+        marginTop: hp(8),
+        marginBottom: hp(16),
+        overflow: 'hidden',
+    },
+    moreCardPressed: {
+        opacity: 0.85,
+        transform: [{ scale: 0.96 }],
+    },
+    glassBackground: {
+        backgroundColor: 'rgba(255, 255, 255, 0.18)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.35)',
+        borderRadius: wp(25),
+    },
+    moreCardContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: hp(12),
+        paddingHorizontal: wp(24),
+    },
+    moreCardText: {
+        fontSize: fp(14),
+        fontWeight: '600',
+        color: '#FFFFFF',
+        letterSpacing: 0.3,
     },
 });

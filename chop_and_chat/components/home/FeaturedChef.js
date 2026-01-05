@@ -1,5 +1,6 @@
 import { Text, View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
+import { Ionicons } from '@expo/vector-icons';
 
 const reviews = [
     {
@@ -27,8 +28,20 @@ export default function FeaturedChef(){
     return (
         <View style={styles.container}>
             <View style={styles.header}>
-                <Text style={styles.sectionTitle}>Featured Chef Review</Text>
-                <Text style={styles.sectionSubtitle}>See what the pros think</Text>
+                <Text style={styles.sectionTitle}>From Chefs You Follow</Text>
+
+                <Pressable 
+                   style={({ pressed }) => [
+                       styles.subtitleButton,
+                       pressed && styles.subtitleButtonPressed
+                   ]}
+                    onPress={() => console.log("See what the pros think")}>
+                    <View style={styles.subtitleContent}>
+                        <Text style={styles.sectionSubtitle}>See what the pros think</Text>
+                        <Ionicons name="arrow-forward" size={fp(14)} color="#BFDBFE" />
+                    </View>
+                </Pressable>
+            
             </View>
             
             <ScrollView 
@@ -60,6 +73,21 @@ export default function FeaturedChef(){
                         </View>
                     </Pressable>
                 ))}
+                
+                {/* More Button */}
+                <Pressable 
+                    style={({ pressed }) => [
+                        styles.moreCard,
+                        pressed && styles.moreCardPressed
+                    ]}
+                    onPress={() => console.log('View all chef reviews')}
+                >
+                    <View style={styles.glassBackground}>
+                        <View style={styles.moreCardContent}>
+                            <Text style={styles.moreCardText}>More</Text>
+                        </View>
+                    </View>
+                </Pressable>
             </ScrollView>
         </View>
     );
@@ -80,6 +108,17 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         marginBottom: hp(4),
         letterSpacing: -0.5,
+    },
+    subtitleButton: {
+        alignSelf: 'flex-start',
+    },
+    subtitleButtonPressed: {
+        opacity: 0.7,
+    },
+    subtitleContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(3),
     },
     sectionSubtitle: {
         fontSize: fp(14),
@@ -154,5 +193,34 @@ const styles = StyleSheet.create({
         color: '#6B7280',
         fontWeight: '400',
         marginTop: hp(2),
+    },
+    moreCard: {
+        alignSelf: 'center',
+        width: wp(110),
+        overflow: 'hidden',
+        marginLeft: wp(4),
+    },
+    moreCardPressed: {
+        opacity: 0.85,
+        transform: [{ scale: 0.96 }],
+    },
+    glassBackground: {
+        backgroundColor: 'rgba(255, 255, 255, 0.18)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.35)',
+        borderRadius: wp(25),
+    },
+    moreCardContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: hp(12),
+        paddingHorizontal: wp(24),
+    },
+    moreCardText: {
+        fontSize: fp(14),
+        fontWeight: '600',
+        color: '#FFFFFF',
+        letterSpacing: 0.3,
     },
 });
