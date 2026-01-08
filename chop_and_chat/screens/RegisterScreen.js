@@ -3,8 +3,10 @@ import { View, Text, TextInput, StyleSheet, Pressable, Alert, KeyboardAvoidingVi
 import { StatusBar } from 'expo-status-bar';
 import { wp, hp, fp } from '../utils/responsive';
 
-// Use your computer's IP for physical devices
+// Use your computer's IP for physical devices, localhost for iOS simulator
 const BASE_URL = 'http://192.168.1.138:4000';
+
+//const BASE_URL_ANDROID = 'http://10.0.2.2:4000';
 
 export default function RegisterScreen({ navigation }) {
   const [email, setEmail] = useState('');

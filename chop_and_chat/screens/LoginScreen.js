@@ -8,6 +8,8 @@ import { wp, hp, fp } from '../utils/responsive';
 // Use your computer's IP for physical devices
 const BASE_URL = 'http://192.168.1.138:4000';
 
+//const BASE_URL_ANDROID = 'http://10.0.2.2:4000';
+
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
