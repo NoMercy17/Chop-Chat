@@ -1,21 +1,42 @@
+import { useState } from 'react';
 import { Text, View, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+
+const initialPosts = [
+    { id: 1, title: "Homemade Pizza Margherita", description: "Just made my first pizza from scratch! The dough came out perfect.", author: "John Doe", likes: 42, comments: 8, liked: false },
+    { id: 2, title: "Grandma's Secret Pasta Recipe", description: "Finally convinced grandma to share her famous carbonara recipe.", author: "Jane Smith", likes: 127, comments: 23, liked: false },
+    { id: 3, title: "Vegan Chocolate Cake", description: "Who said vegan desserts can't be delicious? This cake is amazing!", author: "Mike Johnson", likes: 89, comments: 15, liked: false },
+    { id: 4, title: "Sunday Brunch Special", description: "Eggs benedict with hollandaise sauce - turned out better than expected.", author: "Sarah Lee", likes: 56, comments: 12, liked: false },
+    { id: 5, title: "Thai Curry Adventure", description: "First time making green curry. The spice level is just right!", author: "Alex Brown", likes: 73, comments: 19, liked: false },
+    { id: 6, title: "Sourdough Bread Success", description: "After days of feeding the starter, the crust and crumb finally nailed it.", author: "Emily Carter", likes: 94, comments: 21, liked: false },
+    { id: 7, title: "Street-Style Tacos at Home", description: "Tried recreating authentic al pastor tacos with pineapple and cilantro.", author: "Carlos Rivera", likes: 118, comments: 27, liked: false },
+    { id: 8, title: "Quick Weeknight Stir Fry", description: "15-minute veggie stir fry with garlic soy sauce. Simple and satisfying.", author: "Lina Wong", likes: 61, comments: 9, liked: false },
+    { id: 9, title: "Classic French Omelette", description: "Focused on technique today—soft, buttery, and perfectly folded.", author: "Pierre Martin", likes: 85, comments: 14, liked: false },
+    { id: 10, title: "Homemade Ice Cream Experiment", description: "No-churn vanilla ice cream with a salted caramel swirl.", author: "Olivia Green", likes: 102, comments: 18, liked: false },
+];
 
 export default function CommunityFeed() {
-    const posts = [
-        { id: 1, title: "Homemade Pizza Margherita", description: "Just made my first pizza from scratch! The dough came out perfect.", author: "John Doe", likes: 42, comments: 8 },
-        { id: 2, title: "Grandma's Secret Pasta Recipe", description: "Finally convinced grandma to share her famous carbonara recipe.", author: "Jane Smith", likes: 127, comments: 23 },
-        { id: 3, title: "Vegan Chocolate Cake", description: "Who said vegan desserts can't be delicious? This cake is amazing!", author: "Mike Johnson", likes: 89, comments: 15 },
-        { id: 4, title: "Sunday Brunch Special", description: "Eggs benedict with hollandaise sauce - turned out better than expected.", author: "Sarah Lee", likes: 56, comments: 12 },
-        { id: 5, title: "Thai Curry Adventure", description: "First time making green curry. The spice level is just right!", author: "Alex Brown", likes: 73, comments: 19 },
-        { id: 6, title: "Sourdough Bread Success", description: "After days of feeding the starter, the crust and crumb finally nailed it.", author: "Emily Carter", likes: 94, comments: 21 },
-        { id: 7, title: "Street-Style Tacos at Home", description: "Tried recreating authentic al pastor tacos with pineapple and cilantro.", author: "Carlos Rivera", likes: 118, comments: 27 },
-        { id: 8, title: "Quick Weeknight Stir Fry", description: "15-minute veggie stir fry with garlic soy sauce. Simple and satisfying.", author: "Lina Wong", likes: 61, comments: 9 },
-        { id: 9, title: "Classic French Omelette", description: "Focused on technique today—soft, buttery, and perfectly folded.", author: "Pierre Martin", likes: 85, comments: 14 },
-        { id: 10, title: "Homemade Ice Cream Experiment", description: "No-churn vanilla ice cream with a salted caramel swirl.", author: "Olivia Green", likes: 102, comments: 18 },
-    ];
+    const navigation = useNavigation();
+    const [posts, setPosts] = useState(initialPosts);
+
+    const handleLike = (postId) => {
+        setPosts(posts.map(post => {
+            if (post.id === postId) {
+                return {
+                    ...post,
+                    likes: post.liked ? post.likes - 1 : post.likes + 1,
+                    liked: !post.liked
+                };
+            }
+            return post;
+        }));
+    };
+
+    const handleComment = (postId) => {
+        console.log('Open comments for post:', postId);
+    };
 
     return (
         <View style={styles.container}>
@@ -61,8 +82,33 @@ export default function CommunityFeed() {
                             <View style={styles.postMeta}>
                                 <Text style={styles.postAuthor}>by {post.author}</Text>
                                 <View style={styles.postStats}>
-                                    <Text style={styles.statText}>♥ {post.likes}</Text>
-                                    <Text style={styles.statText}>💬 {post.comments}</Text>
+                                    <Pressable 
+                                        style={({ pressed }) => [
+                                            styles.statButton,
+                                            pressed && styles.statButtonPressed
+                                        ]}
+                                        onPress={() => handleLike(post.id)}
+                                    >
+                                        <Ionicons 
+                                            name={post.liked ? "heart" : "heart-outline"} 
+                                            size={fp(16)} 
+                                            color={post.liked ? "#EF4444" : "#6B7280"} 
+                                        />
+                                        <Text style={[styles.statText, post.liked && styles.statTextLiked]}>
+                                            {post.likes}
+                                        </Text>
+                                    </Pressable>
+
+                                    <Pressable 
+                                        style={({ pressed }) => [
+                                            styles.statButton,
+                                            pressed && styles.statButtonPressed
+                                        ]}
+                                        onPress={() => handleComment(post.id)}
+                                    >
+                                        <Ionicons name="chatbubble-outline" size={fp(15)} color="#6B7280" />
+                                        <Text style={styles.statText}>{post.comments}</Text>
+                                    </Pressable>
                                 </View>
                             </View>
                         </View>
@@ -75,7 +121,7 @@ export default function CommunityFeed() {
                         styles.moreCard,
                         pressed && styles.moreCardPressed
                     ]}
-                    onPress={() => console.log('View all chef reviews')}
+                    onPress={() => navigation.navigate('AllCommunityPosts')}
                 >
                     <View style={styles.glassBackground}>
                         <View style={styles.moreCardContent}>
@@ -157,8 +203,8 @@ const styles = StyleSheet.create({
         letterSpacing: 2,
     },
     postContent: {
-        padding: wp(16),
-        gap: hp(8),
+        padding: wp(14),
+        gap: hp(6),
     },
     postTitle: {
         fontSize: fp(18),
@@ -169,14 +215,14 @@ const styles = StyleSheet.create({
     postDescription: {
         fontSize: fp(14),
         color: '#6B7280',
-        lineHeight: hp(20),
+        lineHeight: hp(18),
     },
     postMeta: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginTop: hp(8),
-        paddingTop: hp(12),
+        marginTop: hp(4),
+        paddingTop: hp(6),
         borderTopWidth: 1,
         borderTopColor: '#F3F4F6',
     },
@@ -189,10 +235,21 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         gap: wp(16),
     },
+    statButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(4),
+    },
+    statButtonPressed: {
+        opacity: 0.6,
+    },
     statText: {
         fontSize: fp(13),
         color: '#6B7280',
         fontWeight: '600',
+    },
+    statTextLiked: {
+        color: '#EF4444',
     },
     moreCard: {
         alignSelf: 'center',

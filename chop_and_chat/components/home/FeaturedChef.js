@@ -1,4 +1,5 @@
 import { Text, View, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -7,23 +8,34 @@ const reviews = [
         id: 1,
         title: "Quick & Easy",
         text: "This recipe is perfect for busy weeknights. Simple ingredients, amazing results!",
-        chef: "Chef Gordon"
+        chef: "Chef Gordon",
+        initials: "GR"
     },
     {
         id: 2,
         title: "Family Favorite",
         text: "My kids absolutely love this dish. It's become our weekly staple.",
-        chef: "Chef Maria"
+        chef: "Chef Maria",
+        initials: "MG"
     },
     {
         id: 3,
         title: "Restaurant Quality",
         text: "Impressed my dinner guests with this one. Tastes like fine dining!",
-        chef: "Chef Antoine"
+        chef: "Chef Antoine",
+        initials: "AS"
+    },
+    {
+        id: 4,
+        title: "Healthy & Delicious",
+        text: "A nutritious meal that doesn't compromise on flavor. Highly recommend!",
+        chef: "Chef Linda",
+        initials: "LB"
     }
 ];
 
 export default function FeaturedChef(){
+    const navigation = useNavigation();
 
     return (
         <View style={styles.container}>
@@ -60,7 +72,7 @@ export default function FeaturedChef(){
                     >
                         <View style={styles.cardHeader}>
                             <View style={styles.chefAvatar}>
-                                <Text style={styles.chefInitial}>GR</Text>
+                                <Text style={styles.chefInitial}>{review.initials}</Text>
                             </View>
                             <Text style={styles.reviewTime}>{review.title}</Text>
                         </View>
@@ -80,7 +92,7 @@ export default function FeaturedChef(){
                         styles.moreCard,
                         pressed && styles.moreCardPressed
                     ]}
-                    onPress={() => console.log('View all chef reviews')}
+                    onPress={() => navigation.navigate('AllChefReviews')}
                 >
                     <View style={styles.glassBackground}>
                         <View style={styles.moreCardContent}>
