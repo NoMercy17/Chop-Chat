@@ -5,11 +5,16 @@ import { wp, hp, fp, SPACING } from '../utils/responsive';
 
 // Sample data - will be replaced with real data later
 const SAMPLE_FAVORITES = [
-  { id: 1, title: 'Pasta Carbonara', cookTime: 30, difficulty: 'easy', author: 'Chef Maria', rating: 4.8, image: null },
-  { id: 2, title: 'Thai Green Curry', cookTime: 45, difficulty: 'medium', author: 'Chef Antoine', rating: 4.5, image: null },
-  { id: 3, title: 'Beef Wellington', cookTime: 120, difficulty: 'hard', author: 'Chef Gordon', rating: 4.9, image: null },
-  { id: 4, title: 'Caesar Salad', cookTime: 15, difficulty: 'easy', author: 'Chef Maria', rating: 4.2, image: null },
-  { id: 5, title: 'Sushi Rolls', cookTime: 60, difficulty: 'hard', author: 'Chef Kenji', rating: 4.7, image: null },
+  { id: 1, title: 'Pasta Carbonara', cookTime: 30, difficulty: 'easy', author: 'Chef Maria', rating: 4.8, image: null, ingredients: ['pasta', 'eggs', 'pancetta', 'parmesan', 'black pepper'] },
+  { id: 2, title: 'Thai Green Curry', cookTime: 45, difficulty: 'medium', author: 'Chef Antoine', rating: 4.5, image: null, ingredients: ['chicken', 'coconut milk', 'green curry paste', 'basil', 'bamboo shoots'] },
+  { id: 3, title: 'Beef Wellington', cookTime: 120, difficulty: 'hard', author: 'Chef Gordon', rating: 4.9, image: null, ingredients: ['beef tenderloin', 'mushrooms', 'puff pastry', 'prosciutto', 'mustard'] },
+  { id: 4, title: 'Caesar Salad', cookTime: 15, difficulty: 'easy', author: 'Carmen', rating: 4.2, image: null, ingredients: ['romaine lettuce', 'croutons', 'parmesan', 'caesar dressing', 'anchovies'] },
+  { id: 5, title: 'Sushi Rolls', cookTime: 60, difficulty: 'hard', author: 'Marcel', rating: 4.7, image: null, ingredients: ['sushi rice', 'nori', 'salmon', 'avocado', 'cucumber'] },
+  { id: 6, title: 'Tiramisu', cookTime: 40, difficulty: 'medium', author: 'Sofia', rating: 4.9, image: null, ingredients: ['mascarpone', 'espresso', 'ladyfingers', 'cocoa powder', 'eggs'] },
+  { id: 7, title: 'Chicken Tacos', cookTime: 25, difficulty: 'easy', author: 'Diego', rating: 4.4, image: null, ingredients: ['chicken', 'tortillas', 'salsa', 'avocado', 'lime', 'cilantro'] },
+  { id: 8, title: 'Mushroom Risotto', cookTime: 50, difficulty: 'medium', author: 'Elena', rating: 4.6, image: null, ingredients: ['arborio rice', 'mushrooms', 'white wine', 'parmesan', 'butter'] },
+  { id: 9, title: 'Chocolate Lava Cake', cookTime: 20, difficulty: 'medium', author: 'Chef Maria', rating: 4.8, image: null, ingredients: ['dark chocolate', 'butter', 'eggs', 'flour', 'sugar'] },
+  { id: 10, title: 'Greek Salad', cookTime: 10, difficulty: 'easy', author: 'Nikos', rating: 4.3, image: null, ingredients: ['tomatoes', 'cucumber', 'feta', 'olives', 'olive oil', 'oregano'] },
 ];
 
 const DIFFICULTIES = ['All', 'Easy', 'Medium', 'Hard'];
@@ -20,8 +25,11 @@ export default function FavoriteRecipes({ navigation }) {
   const [favorites, setFavorites] = useState(SAMPLE_FAVORITES);
 
   const filteredFavorites = favorites.filter(recipe => {
+    const query = searchQuery.toLowerCase();
     const matchesSearch = searchQuery === '' || 
-      recipe.author.toLowerCase().includes(searchQuery.toLowerCase());
+      recipe.title.toLowerCase().includes(query) ||
+      recipe.author.toLowerCase().includes(query) ||
+      recipe.ingredients.some(ingredient => ingredient.toLowerCase().includes(query));
     const matchesDifficulty = selectedDifficulty === 'All' || 
       recipe.difficulty.toLowerCase() === selectedDifficulty.toLowerCase();
     return matchesSearch && matchesDifficulty;
@@ -42,13 +50,13 @@ export default function FavoriteRecipes({ navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* Search by Author */}
+      {/* Search by Keyword */}
       <View style={styles.searchContainer}>
         <View style={styles.searchInputWrapper}>
           <Ionicons name="search-outline" size={fp(20)} color="#9CA3AF" />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search by chef name..."
+            placeholder="Search by keyword..."
             placeholderTextColor="#9CA3AF"
             value={searchQuery}
             onChangeText={setSearchQuery}

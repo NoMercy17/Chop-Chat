@@ -100,7 +100,7 @@ export default function ProfileScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: "#F3F4F6",
   },
   header: {
     alignItems: "center",
@@ -137,15 +137,17 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F8FAFB",
     padding: wp(24),
     borderRadius: SPACING.radiusLarge,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: hp(2) },
+    shadowColor: "#3B82F6",
+    shadowOffset: { width: 0, height: hp(4) },
     shadowOpacity: 0.08,
-    shadowRadius: wp(12),
-    elevation: 3,
+    shadowRadius: wp(16),
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
   },
   statNumber: {
     fontSize: fp(32),
@@ -163,14 +165,16 @@ const styles = StyleSheet.create({
   menuContainer: {
     marginTop: SPACING.sectionGap,
     marginHorizontal: SPACING.screenPadding,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F8FAFB",
     borderRadius: SPACING.radiusLarge,
     overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: hp(2) },
+    shadowColor: "#3B82F6",
+    shadowOffset: { width: 0, height: hp(4) },
     shadowOpacity: 0.08,
-    shadowRadius: wp(12),
-    elevation: 3,
+    shadowRadius: wp(16),
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
   },
   menuItem: {
     flexDirection: "row",
@@ -182,7 +186,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#F3F4F6",
   },
   menuItemPressed: {
-    backgroundColor: "#F9FAFB",
+    backgroundColor: "#EFF6FF",
   },
   menuItemLeft: {
     flexDirection: "row",
@@ -193,7 +197,7 @@ const styles = StyleSheet.create({
     width: wp(40),
     height: wp(40),
     borderRadius: SPACING.radiusSmall,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: "#EFF6FF",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -218,7 +222,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.98 }],
   },
   logoutText: {
-    color: "#DC2626",
+    color: "#dc2626c5",
     fontSize: fp(16),
     fontWeight: "700",
   },

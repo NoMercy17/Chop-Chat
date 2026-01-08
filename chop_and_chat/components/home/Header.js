@@ -1,6 +1,7 @@
 import { Text, View, StyleSheet, Pressable, Modal, ScrollView } from 'react-native';
 import { useState } from 'react';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
+import { Ionicons } from '@expo/vector-icons';
 
 const notifications = [
     { id: 1, title: 'New Recipe Match', subtitle: 'Found 3 recipes for your ingredients', time: '2m ago', unread: true },
@@ -25,7 +26,7 @@ export default function Header({ navigation }) {
                     ]}
                     onPress={() => setModalVisible(true)}
                 >
-                    <Text style={styles.buttonText}>🔔</Text>
+                    <Ionicons name="notifications" size={fp(22)} color='#F3F4F6' />
                 </Pressable>
 
                 <Pressable 
@@ -35,7 +36,7 @@ export default function Header({ navigation }) {
                     ]}
                     onPress={() => navigation.navigate('Profile')}
                 >
-                    <Text style={styles.buttonText}>👤</Text>
+                    <Ionicons name="person" size={fp(22)} color='#F3F4F6' />
                 </Pressable>
             </View>
 
@@ -45,7 +46,6 @@ export default function Header({ navigation }) {
                     <View style={styles.modalContainer}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>Notifications</Text>
-                            <Text style={styles.modalSubtitle}>Stay updated with your activity</Text>
                         </View>
                         
                         <ScrollView 
@@ -114,9 +114,9 @@ const styles = StyleSheet.create({
         gap: wp(12),
     },
     button: {
-        width: wp(44),
-        height: wp(44),
-        borderRadius: wp(12),
+        width: wp(36),
+        height: wp(36),
+        borderRadius: wp(10),
         backgroundColor: '#3b83f68a',
         justifyContent: 'center',
         alignItems: 'center',
@@ -162,18 +162,12 @@ const styles = StyleSheet.create({
         fontSize: fp(28),
         fontWeight: '700',
         color: '#111827',
-        marginBottom: hp(4),
-    },
-    modalSubtitle: {
-        fontSize: fp(14),
-        color: '#6B7280',
-        fontWeight: '400',
     },
 
     // Notification List
     notificationList: {
-        paddingHorizontal: wp(24),
-        paddingTop: hp(16),
+        paddingHorizontal: wp(25),
+        paddingTop: hp(12),
     },
     notificationItem: {
         flexDirection: 'row',

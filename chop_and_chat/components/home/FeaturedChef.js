@@ -40,17 +40,18 @@ export default function FeaturedChef(){
     return (
         <View style={styles.container}>
             <View style={styles.header}>
-                <Text style={styles.sectionTitle}>From Chefs You Follow</Text>
+                <Text style={styles.sectionTitle}>Chef Spotlight</Text>
 
                 <Pressable 
                    style={({ pressed }) => [
                        styles.subtitleButton,
                        pressed && styles.subtitleButtonPressed
                    ]}
-                    onPress={() => console.log("See what the pros think")}>
+                    onPress={() => navigation.navigate('AllChefReviews')}
+                    >
                     <View style={styles.subtitleContent}>
-                        <Text style={styles.sectionSubtitle}>See what the pros think</Text>
-                        <Ionicons name="arrow-forward" size={fp(14)} color="#BFDBFE" />
+                        <Text style={styles.sectionSubtitle}>See what pros think</Text>
+                        <Ionicons name="arrow-forward" size={fp(14)} color="#E0F2FE" />
                     </View>
                 </Pressable>
             
@@ -74,13 +75,13 @@ export default function FeaturedChef(){
                             <View style={styles.chefAvatar}>
                                 <Text style={styles.chefInitial}>{review.initials}</Text>
                             </View>
-                            <Text style={styles.reviewTime}>{review.title}</Text>
+                            <Text style={styles.reviewImage}>{review.title}</Text>
                         </View>
                         
                         <View style={styles.divider} />
                         
                         <View style={styles.reviewContent}>
-                            <Text style={styles.reviewText}>{review.text}</Text>
+                            <Text style={styles.reviewText} numberOfLines={3}>{review.text}</Text>
                             <Text style={styles.reviewChef}>{review.chef}</Text>
                         </View>
                     </Pressable>
@@ -134,8 +135,9 @@ const styles = StyleSheet.create({
     },
     sectionSubtitle: {
         fontSize: fp(14),
-        color: '#BFDBFE',
-        fontWeight: '400',
+        color: '#c7e1f1ff',
+        fontWeight: '500',
+        fontStyle: 'italic',
     },
     scrollContainer: {
         paddingHorizontal: SPACING.screenPadding,
@@ -176,7 +178,7 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#FFFFFF',
     },
-    reviewTime: {
+    reviewImage: {
         fontSize: fp(12),
         color: '#9CA3AF',
         fontWeight: '600',
@@ -190,20 +192,21 @@ const styles = StyleSheet.create({
         marginHorizontal: wp(16),
     },
     reviewContent: {
-        padding: wp(16),
-        gap: hp(6),
+        padding: wp(10),
         backgroundColor: '#FFFFFF',
+        height: hp(110),
+        justifyContent: 'space-between',
     },
     reviewText: {
         fontSize: fp(16),
-        fontWeight: '600',
+        fontWeight: '500',
         color: '#111827',
         lineHeight: hp(22),
     },
     reviewChef: {
         fontSize: fp(14),
         color: '#6B7280',
-        fontWeight: '400',
+        fontWeight: '300',
         marginTop: hp(2),
     },
     moreCard: {
@@ -225,7 +228,6 @@ const styles = StyleSheet.create({
     moreCardContent: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
         paddingVertical: hp(12),
         paddingHorizontal: wp(24),
     },
