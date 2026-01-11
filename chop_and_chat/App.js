@@ -11,6 +11,8 @@ import AllChefReviews from './screens/AllChefReviews';
 import AllCommunityPosts from './screens/AllCommunityPosts';
 import AuthStack from './context/AuthStack';
 import { AuthContext, navigationRef } from './context/AuthContext';
+import { PostsProvider } from './context/PostsContext';
+import { ChefFeedProvider } from './context/ChefFeedContext';
 
 
 const MainStack = createNativeStackNavigator();
@@ -49,26 +51,30 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AuthContext.Provider value={auth}>
-        <NavigationContainer ref={navigationRef}>
-          {user ? (
-            <MainStack.Navigator
-              screenOptions={{
-                headerStyle: { backgroundColor: '#F3F4F6' },
-                headerShadowVisible: false,
-                contentStyle: { backgroundColor: '#F3F4F6' },
-              }}
-            >
-              <MainStack.Screen name="Home" component={HomeScreen} />
-              <MainStack.Screen name="Profile" component={ProfileScreen} />
-              <MainStack.Screen name="MyRecipes" component={MyRecipes} options={{ title: 'My Recipes' }} />
-              <MainStack.Screen name="FavoriteRecipes" component={FavoriteRecipes} options={{ title: 'Favorites' }} />
-              <MainStack.Screen name="AllChefReviews" component={AllChefReviews} options={{ title: 'Chef Reviews' }} />
-              <MainStack.Screen name="AllCommunityPosts" component={AllCommunityPosts} options={{ title: 'Community' }} />
-            </MainStack.Navigator>
-          ) : (
-            <AuthStack />
-          )}
-        </NavigationContainer>
+        <PostsProvider>
+          <ChefFeedProvider>
+            <NavigationContainer ref={navigationRef}>
+              {user ? (
+              <MainStack.Navigator
+                screenOptions={{
+                  headerStyle: { backgroundColor: '#F3F4F6' },
+                  headerShadowVisible: false,
+                  contentStyle: { backgroundColor: '#F3F4F6' },
+                }}
+              >
+                <MainStack.Screen name="Home" component={HomeScreen} />
+                <MainStack.Screen name="Profile" component={ProfileScreen} />
+                <MainStack.Screen name="MyRecipes" component={MyRecipes} options={{ title: 'My Recipes' }} />
+                <MainStack.Screen name="FavoriteRecipes" component={FavoriteRecipes} options={{ title: 'Favorites' }} />
+                <MainStack.Screen name="AllChefReviews" component={AllChefReviews} options={{ title: 'Chef Reviews' }} />
+                <MainStack.Screen name="AllCommunityPosts" component={AllCommunityPosts} options={{ title: 'Community' }} />
+              </MainStack.Navigator>
+              ) : (
+                <AuthStack />
+              )}
+            </NavigationContainer>
+          </ChefFeedProvider>
+        </PostsProvider>
       </AuthContext.Provider>
     </SafeAreaProvider>
   );

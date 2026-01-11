@@ -3,6 +3,7 @@
 # dependencies
 node_modules/
 
+.docker_db.txt
 # Expo
 .expo/
 dist/

@@ -292,9 +292,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: wp(8),
     backgroundColor: '#3B82F6',
-    paddingHorizontal: wp(24),
+    paddingHorizontal: wp(16),
     paddingVertical: hp(14),
-    borderRadius: SPACING.radiusMedium,
+    borderRadius: SPACING.radiusLarge,
   },
   addButtonPressed: {
     opacity: 0.8,

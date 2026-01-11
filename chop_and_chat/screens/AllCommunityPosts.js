@@ -1,42 +1,36 @@
-import { useState, useMemo } from 'react';
-import { Text, View, StyleSheet, ScrollView, Pressable, Modal, TextInput, KeyboardAvoidingView, Platform, TouchableWithoutFeedback } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { wp, hp, fp, SPACING } from '../../utils/responsive';
+import { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, Modal, TextInput, KeyboardAvoidingView, Platform, TouchableWithoutFeedback } from 'react-native';
+import { wp, hp, fp, SPACING } from '../utils/responsive';
+import { commentsData } from '../data/postsData';
 import { Ionicons } from '@expo/vector-icons';
-import { usePosts } from '../../context/PostsContext';
-import { commentsData } from '../../data/postsData';
+import { usePosts } from '../context/PostsContext';
 
-// Helper function to randomly select n post IDs
-const getRandomPostIds = (posts, count) => {
-    const shuffled = [...posts].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, count).map(post => post.id);
-};
 
-export default function CommunityFeed() {
-    const navigation = useNavigation();
-    const { posts: allPosts, handleLike, handleSave, updateCommentCount } = usePosts();
-    
-    // Generate 7 random post IDs on component mount
-    const randomPostIds = useMemo(() => getRandomPostIds(allPosts, 7), []);
-    
-    // Get the actual posts from context based on random IDs
-    const posts = allPosts.filter(post => randomPostIds.includes(post.id));
-    
+const CATEGORIES = ['Following', 'All'];
+
+// Sample list of followed user IDs - in a real app this would come from your backend/context
+const FOLLOWED_AUTHORS = ['John Doe', 'Jane Smith', 'Emily Carter', 'Carlos Rivera'];
+
+export default function AllCommunityPosts() {
+    const { posts, handleLike, handleSave, updateCommentCount } = usePosts();
+    const [selectedCategory, setSelectedCategory] = useState('All');
     const [commentsModalVisible, setCommentsModalVisible] = useState(false);
     const [selectedPost, setSelectedPost] = useState(null);
     const [newComment, setNewComment] = useState('');
-
+    
+    // Filter posts based on selected category
+    const filteredPosts = selectedCategory === 'All' 
+        ? posts 
+        : posts.filter(post => FOLLOWED_AUTHORS.includes(post.author));
+    
     const handleComment = (post) => {
-        // Set the selected post and open the modal
         setSelectedPost(post);
         setCommentsModalVisible(true);
     };
 
     const handleAddComment = () => {
         if (newComment.trim() && selectedPost) {
-            // send this to your backend
             console.log('New comment for post', selectedPost.id, ':', newComment);
-            // Update the comment count using context
             updateCommentCount(selectedPost.id);
             setNewComment('');
         }
@@ -48,48 +42,50 @@ export default function CommunityFeed() {
 
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.sectionTitle}>Community Feed</Text>
-
-                <Pressable 
-                   style={({ pressed }) => [
-                       styles.subtitleButton,
-                       pressed && styles.subtitleButtonPressed
-                   ]}
-                    onPress={() => navigation.navigate('AllCommunityPosts')}
-                    >
-                    <View style = {styles.subtitleContent}>
-                        <Text style={styles.sectionSubtitle}>See what others are cooking</Text>
-                        <Ionicons name="arrow-forward" size={fp(14)} color="#E0F2FE" />
-                    </View>
-                </Pressable>  
-
+            {/* Category Tabs */}
+            <View style={styles.categoryWrapper}>
+                <View style={styles.categoryContainer}>
+                    {CATEGORIES.map((category) => (
+                        <Pressable
+                            key={category}
+                            style={({ pressed }) => [
+                                styles.categoryTab,
+                                selectedCategory === category && styles.categoryTabActive,
+                                pressed && styles.categoryTabPressed
+                            ]}
+                            onPress={() => setSelectedCategory(category)}
+                        >
+                            <Text style={[
+                                styles.categoryText,
+                                selectedCategory === category && styles.categoryTextActive
+                            ]}>
+                                {category}
+                            </Text>
+                        </Pressable>
+                    ))}
+                </View>
             </View>
 
-            <ScrollView 
-                style={styles.scrollContainer}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.scrollContent}
-            >
-                {posts.map((post) => (
-                    <Pressable 
-                        key={post.id} 
-                        style={({ pressed }) => [
-                            styles.postCard,
-                            pressed && styles.postCardPressed
-                        ]}
-                        onPress={() => console.log('Post pressed:', post.id)}
-                    >
-                        <View style={styles.dishImagePlaceholder}>
-                            <Text style={styles.imagePlaceholderText}>IMAGE</Text>
-                        </View>
-
-                        <View style={styles.postContent}>
-                            <Text style={styles.postTitle}>{post.title}</Text>
-                            <Text style={styles.postDescription}>{post.description}</Text>
-                            
-                            <View style={styles.postMeta}>
-                                <Text style={styles.postAuthor}>by {post.author}</Text>
+            <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.content}>
+                {filteredPosts.length > 0 ? filteredPosts.map((post) => (
+                <Pressable
+                    key={post.id}
+                    style={({ pressed }) => [
+                        styles.postCard,
+                        pressed && styles.postCardPressed
+                    ]}
+                    onPress={() => console.log('Post pressed:', post.id)}
+                >
+                    <View style={styles.imageplaceholder}>
+                        <Text style={styles.imagePlaceholderText}>IMAGE</Text>
+                    </View>
+                    
+                    <View style={styles.postContent}>
+                        <Text style={styles.postTitle}>{post.title}</Text>
+                        <Text style={styles.postDescription}>{post.description}</Text>
+                        
+                        <View style={styles.postMeta}>
+                            <Text style={styles.postAuthor}>by {post.author}</Text>
                                 <View style={styles.postStats}>
                                     <Pressable 
                                         style={({ pressed }) => [
@@ -98,16 +94,16 @@ export default function CommunityFeed() {
                                         ]}
                                         onPress={() => handleLike(post.id)}
                                     >
-                                        <Ionicons 
-                                            name={post.liked ? "heart" : "heart-outline"} 
-                                            size={fp(16)} 
-                                            color={post.liked ? "#b90808ff" : "#6B7280"} 
-                                        />
+                                    <Ionicons 
+                                        name={post.liked ? "heart" : "heart-outline"} 
+                                        size={fp(16)} 
+                                        color={post.liked ? "#b90808ff" : "#6B7280"} 
+                                    />
                                         <Text style={[styles.statText, post.liked && styles.statTextLiked]}>
                                             {post.likes}
                                         </Text>
                                     </Pressable>
-
+                        
                                     <Pressable 
                                         style={({ pressed }) => [
                                             styles.statButton,
@@ -133,27 +129,16 @@ export default function CommunityFeed() {
                                         />
                                     </Pressable>
                                 </View>
-                            </View>
-                        </View>
-                    </Pressable>
-                ))}
-                
-                {/* More Button */}
-                <Pressable 
-                    style={({ pressed }) => [
-                        styles.moreCard,
-                        pressed && styles.moreCardPressed
-                    ]}
-                    onPress={() => navigation.navigate('AllCommunityPosts')}
-                >
-                    <View style={styles.glassBackground}>
-                        <View style={styles.moreCardContent}>
-                            <Text style={styles.moreCardText}>More</Text>
                         </View>
                     </View>
                 </Pressable>
-
-            </ScrollView>
+            )) : (
+                <View style={styles.emptyState}>
+                    <Ionicons name="people-outline" size={fp(48)} color="#9CA3AF" />
+                    <Text style={styles.emptyStateTitle}>No posts from followed users</Text>
+                    <Text style={styles.emptyStateSubtitle}>Follow some chefs to see their posts here!</Text>
+                </View>
+            )}
 
             {/* Comments Modal */}
             <Modal 
@@ -188,12 +173,10 @@ export default function CommunityFeed() {
                         >
                             {selectedPost && getCommentsForPost(selectedPost.id).map((comment) => (
                                 <View key={comment.id} style={styles.commentItem}>
-                                    {/* initials */}
                                     <View style={styles.commentAvatar}>
                                         <Text style={styles.commentAvatarText}>{comment.initials}</Text>
                                     </View>
                                     
-                                    {/* Comment */}
                                     <View style={styles.commentContent}>
                                         <View style={styles.commentHeader}>
                                             <Text style={styles.commentAuthor}>{comment.author}</Text>
@@ -204,7 +187,6 @@ export default function CommunityFeed() {
                                 </View>
                             ))}
                             
-                            {/* Empty state when no comments */}
                             {selectedPost && getCommentsForPost(selectedPost.id).length === 0 && (
                                 <View style={styles.emptyComments}>
                                     <Ionicons name="chatbubble-outline" size={fp(38)} color='#9CA3AF' />
@@ -214,7 +196,6 @@ export default function CommunityFeed() {
                             )}
                         </ScrollView>
 
-                        {/* Add new comment */}
                         <View style={styles.addCommentContainer}>
                             <TextInput
                                 style={styles.commentInput}
@@ -241,7 +222,6 @@ export default function CommunityFeed() {
                             </Pressable>
                         </View>
 
-                        {/* Close Button */}
                         <Pressable 
                             onPress={() => {
                                 setCommentsModalVisible(false);
@@ -261,6 +241,7 @@ export default function CommunityFeed() {
                     </View>
                 </TouchableWithoutFeedback>
             </Modal>
+            </ScrollView>
         </View>
     );
 }
@@ -268,46 +249,75 @@ export default function CommunityFeed() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        paddingTop: SPACING.sectionGap,
+        backgroundColor: '#93C5FD',
     },
-    header: {
+    
+    // Category Tabs
+    categoryWrapper: {
+        backgroundColor: '#93C5FD',
+        paddingTop: hp(8),
+    },
+    categoryContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
         paddingHorizontal: SPACING.screenPadding,
-        marginBottom: SPACING.itemGap,
+        gap: wp(40),
     },
-    sectionTitle: {
-        fontSize: fp(22),
-        fontWeight: '700',
-        color: '#FFFFFF',
-        marginBottom: hp(4),
-        letterSpacing: -0.5,
+    categoryTab: {
+        paddingVertical: hp(12),
+        paddingHorizontal: wp(8),
+        borderBottomWidth: 2,
+        borderBottomColor: 'transparent',
     },
-    subtitleButton: {
-        alignSelf: 'flex-start',
+    categoryTabActive: {
+        borderBottomColor: '#c7e1f1ff',
     },
-    subtitleButtonPressed: {
+    categoryTabPressed: {
         opacity: 0.7,
     },
-    subtitleContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: wp(3),
+    categoryText: {
+        fontSize: fp(16),
+        fontWeight: '600',
+        color: 'rgba(255, 255, 255, 0.6)',
     },
-    sectionSubtitle: {
-        fontSize: fp(14),
-        color: '#c7e1f1ff',
-        fontWeight: '500',
-        fontStyle: 'italic',
+    categoryTextActive: {
+        color: '#FFFFFF',
     },
+    
     scrollContainer: {
         flex: 1,
     },
-    scrollContent: {
-        paddingHorizontal: SPACING.screenPadding,
+    content: {
+        padding: SPACING.screenPadding,
         paddingBottom: hp(32),
     },
+    
+    // Empty State
+    emptyState: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: hp(80),
+        paddingHorizontal: SPACING.screenPadding,
+    },
+    emptyStateTitle: {
+        fontSize: fp(18),
+        fontWeight: '600',
+        color: '#374151',
+        marginTop: hp(16),
+        textAlign: 'center',
+    },
+    emptyStateSubtitle: {
+        fontSize: fp(14),
+        color: '#6B7280',
+        marginTop: hp(8),
+        textAlign: 'center',
+    },
+    
     postCard: {
         backgroundColor: '#FFFFFF',
-        borderRadius: SPACING.radiusLarge,
+        borderRadius: wp(16),
         marginBottom: SPACING.itemGap,
         overflow: 'hidden',
         shadowColor: '#000',
@@ -320,9 +330,9 @@ const styles = StyleSheet.create({
         opacity: 0.95,
         transform: [{ scale: 0.99 }],
     },
-    dishImagePlaceholder: {
+    imageplaceholder: {
         width: '100%',
-        height: hp(140),
+        height: hp(200),
         backgroundColor: '#F3F4F6',
         justifyContent: 'center',
         alignItems: 'center',
@@ -334,8 +344,7 @@ const styles = StyleSheet.create({
         letterSpacing: 2,
     },
     postContent: {
-        padding: wp(14),
-        gap: hp(4),
+        padding: wp(16),
     },
     postTitle: {
         fontSize: fp(18),
@@ -346,14 +355,15 @@ const styles = StyleSheet.create({
     postDescription: {
         fontSize: fp(14),
         color: '#6B7280',
-        lineHeight: hp(18),
+        lineHeight: hp(20),
+        marginTop: hp(6),
     },
     postMeta: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginTop: hp(4),
-        paddingTop: hp(6),
+        marginTop: hp(12),
+        paddingTop: hp(12),
         borderTopWidth: 1,
         borderTopColor: '#F3F4F6',
     },
@@ -381,37 +391,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     statTextLiked: {
-        color: "#b90808ff",
-    },
-    moreCard: {
-        alignSelf: 'center',
-        width: wp(110),
-        marginTop: hp(8),
-        marginBottom: hp(16),
-        overflow: 'hidden',
-    },
-    moreCardPressed: {
-        opacity: 0.85,
-        transform: [{ scale: 0.96 }],
-    },
-    glassBackground: {
-        backgroundColor: 'rgba(255, 255, 255, 0.18)',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.35)',
-        borderRadius: wp(25),
-    },
-    moreCardContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: hp(12),
-        paddingHorizontal: wp(24),
-    },
-    moreCardText: {
-        fontSize: fp(14),
-        fontWeight: '600',
-        color: '#FFFFFF',
-        letterSpacing: 0.3,
+        color: '#b90808ff',
     },
     
     // Modal Styles 

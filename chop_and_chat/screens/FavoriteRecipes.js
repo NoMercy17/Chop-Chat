@@ -154,7 +154,7 @@ export default function FavoriteRecipes({ navigation }) {
                 style={styles.heartButton}
                 onPress={() => removeFavorite(recipe.id)}
               >
-                <Ionicons name="heart" size={fp(24)} color="#EF4444" />
+                <Ionicons name="bookmark" size={fp(24)} color="#EF4444" />
               </Pressable>
             </Pressable>
           ))}
@@ -163,7 +163,7 @@ export default function FavoriteRecipes({ navigation }) {
         /* Empty State */
         <View style={styles.emptyState}>
           <View style={styles.emptyIconContainer}>
-            <Ionicons name="heart-outline" size={fp(48)} color="#9CA3AF" />
+            <Ionicons name="bookmark-outline" size={fp(48)} color="#9CA3AF" />
           </View>
           <Text style={styles.emptyTitle}>No favorites found</Text>
           <Text style={styles.emptySubtitle}>

@@ -1,41 +1,77 @@
+import { useMemo } from 'react';
 import { Text, View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
+import { chefFeedItems } from '../../data/chefFeedData';
 
-const reviews = [
-    {
-        id: 1,
-        title: "Quick & Easy",
-        text: "This recipe is perfect for busy weeknights. Simple ingredients, amazing results!",
-        chef: "Chef Gordon",
-        initials: "GR"
-    },
-    {
-        id: 2,
-        title: "Family Favorite",
-        text: "My kids absolutely love this dish. It's become our weekly staple.",
-        chef: "Chef Maria",
-        initials: "MG"
-    },
-    {
-        id: 3,
-        title: "Restaurant Quality",
-        text: "Impressed my dinner guests with this one. Tastes like fine dining!",
-        chef: "Chef Antoine",
-        initials: "AS"
-    },
-    {
-        id: 4,
-        title: "Healthy & Delicious",
-        text: "A nutritious meal that doesn't compromise on flavor. Highly recommend!",
-        chef: "Chef Linda",
-        initials: "LB"
-    }
-];
+// Get 4 random items for the quick menu
+const getRandomFeedItems = (items, count) => {
+    const shuffled = [...items].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, count);
+};
 
-export default function FeaturedChef(){
+export default function FeaturedChef() {
     const navigation = useNavigation();
+    
+    // Select 4 random feed items on mount
+    const feedItems = useMemo(() => getRandomFeedItems(chefFeedItems, 4), []);
+
+    // Render card based on content type
+    const renderQuickCard = (item) => {
+        const isReaction = item.contentType === 'reaction';
+        const isOwnReaction = isReaction && item.reaction?.targetAuthor?.id === item.chef.id;
+        
+        // Get the title to display
+        const displayTitle = isReaction 
+            ? item.reaction.targetPost?.title 
+            : item.post?.title;
+        
+        // Get the text content
+        const displayText = isReaction 
+            ? item.reaction.text 
+            : item.post?.caption;
+
+        return (
+            <Pressable 
+                key={item.id} 
+                style={({ pressed }) => [
+                    styles.reviewCard,
+                    pressed && styles.reviewCardPressed
+                ]}
+                onPress={() => console.log('Feed item pressed:', item.id)}
+            >
+                <View style={styles.cardHeader}>
+                    <View style={styles.chefAvatar}>
+                        <Text style={styles.chefInitial}>{item.chef.avatar}</Text>
+                    </View>
+                    <View style={styles.headerInfo}>
+                        <Text style={styles.reviewTitle} numberOfLines={1}>{displayTitle}</Text>
+                        {isReaction && !isOwnReaction && (
+                            <Text style={styles.reactionTarget} numberOfLines={1}>
+                                on @{item.reaction.targetAuthor.name}'s post
+                            </Text>
+                        )}
+                        {isOwnReaction && (
+                            <Text style={styles.reactionTarget} numberOfLines={1}>
+                                replied to own post
+                            </Text>
+                        )}
+                    </View>
+                </View>
+                
+                <View style={styles.divider} />
+                
+                <View style={styles.reviewContent}>
+                    <Text style={styles.reviewText} numberOfLines={3}>{displayText}</Text>
+                    <View style={styles.cardFooter}>
+                        <Text style={styles.reviewChef}>{item.chef.name}</Text>
+                        
+                    </View>
+                </View>
+            </Pressable>
+        );
+    };
 
     return (
         <View style={styles.container}>
@@ -62,30 +98,7 @@ export default function FeaturedChef(){
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContainer}
             >
-                {reviews.map((review) => (
-                    <Pressable 
-                        key={review.id} 
-                        style={({ pressed }) => [
-                            styles.reviewCard,
-                            pressed && styles.reviewCardPressed
-                        ]}
-                        onPress={() => console.log('Review pressed:', review.id)}
-                    >
-                        <View style={styles.cardHeader}>
-                            <View style={styles.chefAvatar}>
-                                <Text style={styles.chefInitial}>{review.initials}</Text>
-                            </View>
-                            <Text style={styles.reviewImage}>{review.title}</Text>
-                        </View>
-                        
-                        <View style={styles.divider} />
-                        
-                        <View style={styles.reviewContent}>
-                            <Text style={styles.reviewText} numberOfLines={3}>{review.text}</Text>
-                            <Text style={styles.reviewChef}>{review.chef}</Text>
-                        </View>
-                    </Pressable>
-                ))}
+                {feedItems.map((item) => renderQuickCard(item))}
                 
                 {/* More Button */}
                 <Pressable 
@@ -166,25 +179,30 @@ const styles = StyleSheet.create({
         gap: wp(12),
     },
     chefAvatar: {
-        width: wp(56),
-        height: wp(56),
+        width: wp(48),
+        height: wp(48),
         backgroundColor: '#3B82F6',
-        borderRadius: wp(28),
+        borderRadius: wp(24),
         justifyContent: 'center',
         alignItems: 'center',
     },
     chefInitial: {
-        fontSize: fp(20),
+        fontSize: fp(18),
         fontWeight: '700',
         color: '#FFFFFF',
     },
-    reviewImage: {
-        fontSize: fp(12),
-        color: '#9CA3AF',
-        fontWeight: '600',
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
+    headerInfo: {
         flex: 1,
+    },
+    reviewTitle: {
+        fontSize: fp(14),
+        fontWeight: '700',
+        color: '#111827',
+    },
+    reactionTarget: {
+        fontSize: fp(11),
+        color: '#9CA3AF',
+        marginTop: hp(2),
     },
     divider: {
         height: 1,
@@ -192,22 +210,32 @@ const styles = StyleSheet.create({
         marginHorizontal: wp(16),
     },
     reviewContent: {
-        padding: wp(10),
+        padding: wp(12),
         backgroundColor: '#FFFFFF',
-        height: hp(110),
+        height: hp(100),
         justifyContent: 'space-between',
     },
     reviewText: {
-        fontSize: fp(16),
+        fontSize: fp(14),
         fontWeight: '500',
-        color: '#111827',
-        lineHeight: hp(22),
+        color: '#374151',
+        lineHeight: hp(20),
+    },
+    cardFooter: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
     },
     reviewChef: {
-        fontSize: fp(14),
+        fontSize: fp(13),
         color: '#6B7280',
-        fontWeight: '300',
-        marginTop: hp(2),
+        fontWeight: '500',
+    },
+    reactionBadge: {
+        backgroundColor: '#E0F2FE',
+        paddingHorizontal: wp(6),
+        paddingVertical: hp(3),
+        borderRadius: wp(8),
     },
     moreCard: {
         alignSelf: 'center',
