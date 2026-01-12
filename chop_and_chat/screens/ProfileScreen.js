@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     borderColor: "#FEE2E2",
   },
   logoutButtonPressed: {
-    opacity: 0.8,
+    opacity: 0.7,
     transform: [{ scale: 0.98 }],
   },
   logoutText: {
