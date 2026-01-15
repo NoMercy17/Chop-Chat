@@ -13,11 +13,14 @@ import AuthStack from './context/AuthStack';
 import { AuthContext, navigationRef } from './context/AuthContext';
 import { PostsProvider } from './context/PostsContext';
 import { ChefFeedProvider } from './context/ChefFeedContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 
 
 const MainStack = createNativeStackNavigator();
 
-export default function App() {
+// Separate component to use theme hook inside ThemeProvider
+function AppContent() {
+  const { theme, isLoading: themeLoading } = useTheme();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -46,36 +49,45 @@ export default function App() {
     },
   };
 
-  if (loading) return null;
+  if (loading || themeLoading) return null;
 
   return (
+    <AuthContext.Provider value={auth}>
+      <PostsProvider>
+        <ChefFeedProvider>
+          <NavigationContainer ref={navigationRef}>
+            {user ? (
+            <MainStack.Navigator
+              screenOptions={{
+                headerStyle: { backgroundColor: theme.background },
+                headerShadowVisible: false,
+                contentStyle: { backgroundColor: theme.background },
+                headerTintColor: theme.textPrimary,
+              }}
+            >
+              <MainStack.Screen name="Home" component={HomeScreen} />
+              <MainStack.Screen name="Profile" component={ProfileScreen} />
+              <MainStack.Screen name="MyRecipes" component={MyRecipes} options={{ title: 'My Recipes' }} />
+              <MainStack.Screen name="FavoriteRecipes" component={FavoriteRecipes} options={{ title: 'Favorites' }} />
+              <MainStack.Screen name="AllChefReviews" component={AllChefReviews} options={{ title: 'Chef Reviews' }} />
+              <MainStack.Screen name="AllCommunityPosts" component={AllCommunityPosts} options={{ title: 'Community' }} />
+            </MainStack.Navigator>
+            ) : (
+              <AuthStack />
+            )}
+          </NavigationContainer>
+        </ChefFeedProvider>
+      </PostsProvider>
+    </AuthContext.Provider>
+  );
+}
+
+export default function App() {
+  return (
     <SafeAreaProvider>
-      <AuthContext.Provider value={auth}>
-        <PostsProvider>
-          <ChefFeedProvider>
-            <NavigationContainer ref={navigationRef}>
-              {user ? (
-              <MainStack.Navigator
-                screenOptions={{
-                  headerStyle: { backgroundColor: '#F3F4F6' },
-                  headerShadowVisible: false,
-                  contentStyle: { backgroundColor: '#F3F4F6' },
-                }}
-              >
-                <MainStack.Screen name="Home" component={HomeScreen} />
-                <MainStack.Screen name="Profile" component={ProfileScreen} />
-                <MainStack.Screen name="MyRecipes" component={MyRecipes} options={{ title: 'My Recipes' }} />
-                <MainStack.Screen name="FavoriteRecipes" component={FavoriteRecipes} options={{ title: 'Favorites' }} />
-                <MainStack.Screen name="AllChefReviews" component={AllChefReviews} options={{ title: 'Chef Reviews' }} />
-                <MainStack.Screen name="AllCommunityPosts" component={AllCommunityPosts} options={{ title: 'Community' }} />
-              </MainStack.Navigator>
-              ) : (
-                <AuthStack />
-              )}
-            </NavigationContainer>
-          </ChefFeedProvider>
-        </PostsProvider>
-      </AuthContext.Provider>
+      <ThemeProvider>
+        <AppContent />
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
