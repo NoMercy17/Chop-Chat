@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Modal, TextInput, Keyboa
 import { wp, hp, fp, SPACING } from '../utils/responsive';
 import { commentsData } from '../data/postsData';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../context/ThemeContext';
 import { usePosts } from '../context/PostsContext';
 
 
@@ -12,6 +13,7 @@ const CATEGORIES = ['Following', 'All'];
 const FOLLOWED_AUTHORS = ['John Doe', 'Jane Smith', 'Emily Carter', 'Carlos Rivera'];
 
 export default function AllCommunityPosts() {
+    const { theme } = useTheme();
     const { posts, handleLike, handleSave, updateCommentCount } = usePosts();
     const [selectedCategory, setSelectedCategory] = useState('All');
     const [commentsModalVisible, setCommentsModalVisible] = useState(false);
@@ -41,9 +43,9 @@ export default function AllCommunityPosts() {
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: theme.headerBackground }]}>
             {/* Category Tabs */}
-            <View style={styles.categoryWrapper}>
+            <View style={[styles.categoryWrapper, { backgroundColor: theme.headerBackground }]}>
                 <View style={styles.categoryContainer}>
                     {CATEGORIES.map((category) => (
                         <Pressable
@@ -72,20 +74,21 @@ export default function AllCommunityPosts() {
                     key={post.id}
                     style={({ pressed }) => [
                         styles.postCard,
+                        { backgroundColor: theme.postCardBackground },
                         pressed && styles.postCardPressed
                     ]}
                     onPress={() => console.log('Post pressed:', post.id)}
                 >
-                    <View style={styles.imageplaceholder}>
-                        <Text style={styles.imagePlaceholderText}>IMAGE</Text>
+                    <View style={[styles.imageplaceholder, { backgroundColor: theme.imageBackground }]}>
+                        <Text style={[styles.imagePlaceholderText, { color: theme.textTertiary }]}>IMAGE</Text>
                     </View>
                     
-                    <View style={styles.postContent}>
-                        <Text style={styles.postTitle}>{post.title}</Text>
-                        <Text style={styles.postDescription}>{post.description}</Text>
+                    <View style={[styles.postContent, { backgroundColor: theme.postContentBackground }]}>
+                        <Text style={[styles.postTitle, { color: theme.textPrimary }]}>{post.title}</Text>
+                        <Text style={[styles.postDescription, { color: theme.textPrimary }]}>{post.description}</Text>
                         
-                        <View style={styles.postMeta}>
-                            <Text style={styles.postAuthor}>by {post.author}</Text>
+                        <View style={[styles.postMeta, { backgroundColor: theme.postContentBackground }]}>
+                            <Text style={[styles.postAuthor, { color: theme.textSecondary }]}>by {post.author}</Text>
                                 <View style={styles.postStats}>
                                     <Pressable 
                                         style={({ pressed }) => [
@@ -97,9 +100,9 @@ export default function AllCommunityPosts() {
                                     <Ionicons 
                                         name={post.liked ? "heart" : "heart-outline"} 
                                         size={fp(16)} 
-                                        color={post.liked ? "#b90808ff" : "#6B7280"} 
+                                        color={post.liked ? theme.likeColor : theme.textSecondary} 
                                     />
-                                        <Text style={[styles.statText, post.liked && styles.statTextLiked]}>
+                                        <Text style={[styles.statText, { color: theme.textSecondary }, post.liked && { color: theme.likeColor }]}>
                                             {post.likes}
                                         </Text>
                                     </Pressable>
@@ -111,8 +114,8 @@ export default function AllCommunityPosts() {
                                         ]}
                                         onPress={() => handleComment(post)}
                                     >
-                                        <Ionicons name="chatbubble-outline" size={fp(15)} color="#6B7280" />
-                                        <Text style={styles.statText}>{post.comments}</Text>
+                                        <Ionicons name="chatbubble-outline" size={fp(15)} color={theme.textSecondary} />
+                                        <Text style={[styles.statText, { color: theme.textSecondary }]}>{post.comments}</Text>
                                     </Pressable>
                                     
                                     <Pressable 
@@ -125,7 +128,7 @@ export default function AllCommunityPosts() {
                                         <Ionicons 
                                             name={post.saved ? "bookmark" : "bookmark-outline"} 
                                             size={fp(16)} 
-                                            color={post.saved ? "#b90808ff" : "#6B7280"} 
+                                            color={post.saved ? theme.saveColor : theme.textSecondary} 
                                         />
                                     </Pressable>
                                 </View>
@@ -134,9 +137,9 @@ export default function AllCommunityPosts() {
                 </Pressable>
             )) : (
                 <View style={styles.emptyState}>
-                    <Ionicons name="people-outline" size={fp(48)} color="#9CA3AF" />
-                    <Text style={styles.emptyStateTitle}>No posts from followed users</Text>
-                    <Text style={styles.emptyStateSubtitle}>Follow some chefs to see their posts here!</Text>
+                    <Ionicons name="people-outline" size={fp(48)} color={theme.textTertiary} />
+                    <Text style={[styles.emptyStateTitle, { color: theme.textPrimary }]}>No posts from followed users</Text>
+                    <Text style={[styles.emptyStateSubtitle, { color: theme.textSecondary }]}>Follow some chefs to see their posts here!</Text>
                 </View>
             )}
 
@@ -159,48 +162,48 @@ export default function AllCommunityPosts() {
                             style={styles.modalKeyboardView}
                         >
                             <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-                                <View style={styles.modalContainer}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Comments</Text>
-                            <Text style={styles.modalSubtitle} numberOfLines={1}>
+                                <View style={[styles.modalContainer, { backgroundColor: theme.modalBackground }]}>
+                        <View style={[styles.modalHeader, { backgroundColor: theme.headerBackground }]}>
+                            <Text style={[styles.modalTitle, { color: '#FFFFFF' }]}>Comments</Text>
+                            <Text style={[styles.modalSubtitle, { color: 'rgba(255,255,255,0.8)' }]} numberOfLines={1}>
                                 {selectedPost?.title}
                             </Text>
                         </View>
                         
                         <ScrollView 
-                            style={styles.commentsList}
+                            style={[styles.commentsList, { backgroundColor: theme.commentSectionBg }]}
                             showsVerticalScrollIndicator={false}
                         >
                             {selectedPost && getCommentsForPost(selectedPost.id).map((comment) => (
-                                <View key={comment.id} style={styles.commentItem}>
-                                    <View style={styles.commentAvatar}>
+                                <View key={comment.id} style={[styles.commentItem, { backgroundColor: theme.cardBackgroundAlt }]}>
+                                    <View style={[styles.commentAvatar, { backgroundColor: theme.primary }]}>
                                         <Text style={styles.commentAvatarText}>{comment.initials}</Text>
                                     </View>
                                     
                                     <View style={styles.commentContent}>
                                         <View style={styles.commentHeader}>
-                                            <Text style={styles.commentAuthor}>{comment.author}</Text>
-                                            <Text style={styles.commentTime}>{comment.timestamp}</Text>
+                                            <Text style={[styles.commentAuthor, { color: theme.textPrimary }]}>{comment.author}</Text>
+                                            <Text style={[styles.commentTime, { color: theme.textTertiary }]}>{comment.timestamp}</Text>
                                         </View>
-                                        <Text style={styles.commentText}>{comment.text}</Text>
+                                        <Text style={[styles.commentText, { color: theme.textSecondary }]}>{comment.text}</Text>
                                     </View>
                                 </View>
                             ))}
                             
                             {selectedPost && getCommentsForPost(selectedPost.id).length === 0 && (
                                 <View style={styles.emptyComments}>
-                                    <Ionicons name="chatbubble-outline" size={fp(38)} color='#9CA3AF' />
-                                    <Text style={styles.emptyCommentsText}>No comments yet</Text>
-                                    <Text style={styles.emptyCommentsSubtext}>Be the first to comment!</Text>
+                                    <Ionicons name="chatbubble-outline" size={fp(38)} color={theme.textTertiary} />
+                                    <Text style={[styles.emptyCommentsText, { color: theme.textSecondary }]}>No comments yet</Text>
+                                    <Text style={[styles.emptyCommentsSubtext, { color: theme.textTertiary }]}>Be the first to comment!</Text>
                                 </View>
                             )}
                         </ScrollView>
 
-                        <View style={styles.addCommentContainer}>
+                        <View style={[styles.addCommentContainer, { backgroundColor: theme.cardBackground, borderTopColor: theme.border }]}>
                             <TextInput
-                                style={styles.commentInput}
+                                style={[styles.commentInput, { backgroundColor: theme.inputBackground, color: theme.textPrimary }]}
                                 placeholder="Write a comment..."
-                                placeholderTextColor="#9CA3AF"
+                                placeholderTextColor={theme.textTertiary}
                                 value={newComment}
                                 onChangeText={setNewComment}
                                 multiline
@@ -208,6 +211,7 @@ export default function AllCommunityPosts() {
                             <Pressable 
                                 style={({ pressed }) => [
                                     styles.sendButton,
+                                    { backgroundColor: theme.primary },
                                     pressed && styles.sendButtonPressed,
                                     !newComment.trim() && styles.sendButtonDisabled
                                 ]}
@@ -217,7 +221,7 @@ export default function AllCommunityPosts() {
                                 <Ionicons 
                                     name="send" 
                                     size={fp(20)} 
-                                    color={newComment.trim() ? "#FFFFFF" : "#9CA3AF"} 
+                                    color={newComment.trim() ? "#FFFFFF" : theme.textTertiary} 
                                 />
                             </Pressable>
                         </View>
@@ -230,10 +234,11 @@ export default function AllCommunityPosts() {
                             }} 
                             style={({ pressed }) => [
                                 styles.closeButton,
+                                { backgroundColor: theme.border },
                                 pressed && styles.closeButtonPressed
                             ]}
                         >
-                            <Text style={styles.closeButtonText}>Close</Text>
+                            <Text style={[styles.closeButtonText, { color: theme.textSecondary }]}>Close</Text>
                         </Pressable>
                                 </View>
                             </TouchableWithoutFeedback>

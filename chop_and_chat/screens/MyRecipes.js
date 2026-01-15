@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { wp, hp, fp, SPACING } from '../utils/responsive';
+import { useTheme } from '../context/ThemeContext';
 
 // Sample data 
 const SAMPLE_RECIPES = [
@@ -14,6 +15,7 @@ const SAMPLE_RECIPES = [
 const CATEGORIES = ['All', 'Breakfast', 'Lunch', 'Dinner', 'Dessert'];
 
 export default function MyRecipes({ navigation }) {
+  const { theme } = useTheme();
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [recipes, setRecipes] = useState(SAMPLE_RECIPES);
 

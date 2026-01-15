@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { wp, hp, fp, SPACING } from '../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../context/ThemeContext';
 import { FOLLOWED_CHEF_IDS } from '../data/chefFeedData';
 import { useChefFeed } from '../context/ChefFeedContext';
 
 const CATEGORIES = ['Following', 'All'];
 
 export default function AllChefReviews() {
+    const { theme } = useTheme();
     const { feedItems, handleLike, handleSave } = useChefFeed();
     const [selectedCategory, setSelectedCategory] = useState('All');
     
@@ -34,29 +36,29 @@ export default function AllChefReviews() {
         return (
             <View
                 key={item.id}
-                style={styles.feedCard}
+                style={[styles.feedCard, { backgroundColor: theme.chefCardBackground }]}
             >
                 {/* Chef Header */}
-                <View style={styles.cardHeader}>
-                    <View style={styles.chefAvatar}>
+                <View style={[styles.cardHeader, { backgroundColor: theme.chefCardHeaderBg }]}>
+                    <View style={[styles.chefAvatar, { backgroundColor: theme.primary }]}>
                         <Text style={styles.chefInitial}>{item.chef.avatar}</Text>
                     </View>
                     <View style={styles.headerText}>
-                        <Text style={styles.chefName}>{item.chef.name}</Text>
+                        <Text style={[styles.chefName, { color: theme.textPrimary }]}>{item.chef.name}</Text>
                         {isReaction && !isOwnReaction && (
                             <View style={styles.reactionContextRow}>
-                                <Text style={styles.reactionContext}>reacted to </Text>
+                                <Text style={[styles.reactionContext, { color: theme.textSecondary }]}>reacted to </Text>
                                 <Pressable 
                                     onPress={() => console.log('Navigate to user:', item.reaction.targetAuthor.id)}
                                     style={({ pressed }) => pressed && styles.targetAuthorPressed}
                                 >
-                                    <Text style={styles.targetAuthor}>@{item.reaction.targetAuthor.name}</Text>
+                                    <Text style={[styles.targetAuthor, { color: theme.primary }]}>@{item.reaction.targetAuthor.name}</Text>
                                 </Pressable>
-                                <Text style={styles.reactionContext}>'s post</Text>
+                                <Text style={[styles.reactionContext, { color: theme.textSecondary }]}>'s post</Text>
                             </View>
                         )}
                         {isOwnReaction && (
-                            <Text style={styles.reactionContext}>
+                            <Text style={[styles.reactionContext, { color: theme.textSecondary }]}>
                                 replied to their own post
                             </Text>
                         )}
@@ -64,19 +66,19 @@ export default function AllChefReviews() {
                 </View>
 
                 {/* Content */}
-                <View style={styles.cardContent}>
-                    <Text style={styles.contentTitle}>{displayTitle}</Text>
-                    <Text style={styles.contentText}>{displayText}</Text>
+                <View style={[styles.cardContent, { backgroundColor: theme.chefCardContentBg }]}>
+                    <Text style={[styles.contentTitle, { color: theme.textPrimary }]}>{displayTitle}</Text>
+                    <Text style={[styles.contentText, { color: theme.textPrimary }]}>{displayText}</Text>
                 </View>
 
                 {/* Target Post Preview (for reactions) */}
                 {isReaction && (
-                    <View style={styles.targetPostPreview}>
+                    <View style={[styles.targetPostPreview, { backgroundColor: theme.chefCardHeaderBg, borderColor: theme.border }]}>
                         <View style={styles.targetPostHeader}>
-                            <View style={styles.targetAvatarSmall}>
+                            <View style={[styles.targetAvatarSmall, { backgroundColor: theme.primary }]}>
                                 <Text style={styles.targetInitialSmall}>{item.reaction.targetAuthor.avatar}</Text>
                             </View>
-                            <Text style={styles.targetPostTitle} numberOfLines={1}>
+                            <Text style={[styles.targetPostTitle, { color: theme.textSecondary }]} numberOfLines={1}>
                                 {item.reaction.targetPost?.title}
                             </Text>
                         </View>
@@ -84,7 +86,7 @@ export default function AllChefReviews() {
                 )}
 
                 {/* Engagement Stats - These belong to the FEED ITEM, not the original post */}
-                <View style={styles.engagementBar}>
+                <View style={[styles.engagementBar, { backgroundColor: theme.chefCardContentBg }]}>
                     <View style={styles.leftStats}>
                         <Pressable 
                             style={({ pressed }) => [
@@ -96,9 +98,9 @@ export default function AllChefReviews() {
                             <Ionicons 
                                 name={item.liked ? "heart" : "heart-outline"} 
                                 size={fp(18)} 
-                                color={item.liked ? "#b90808ff" : "#6B7280"} 
+                                color={item.liked ? theme.likeColor : theme.textSecondary} 
                             />
-                            <Text style={[styles.statText, item.liked && styles.statTextLiked]}>
+                            <Text style={[styles.statText, { color: theme.textSecondary }, item.liked && { color: theme.likeColor }]}>
                                 {item.likes}
                             </Text>
                         </Pressable>
@@ -110,8 +112,8 @@ export default function AllChefReviews() {
                             ]}
                             onPress={() => console.log('Comments pressed:', item.id)}
                         >
-                            <Ionicons name="chatbubble-outline" size={fp(17)} color="#6B7280" />
-                            <Text style={styles.statText}>{item.comments}</Text>
+                            <Ionicons name="chatbubble-outline" size={fp(17)} color={theme.textSecondary} />
+                            <Text style={[styles.statText, { color: theme.textSecondary }]}>{item.comments}</Text>
                         </Pressable>
                     </View>
                     
@@ -125,7 +127,7 @@ export default function AllChefReviews() {
                         <Ionicons 
                             name={item.saved ? "bookmark" : "bookmark-outline"} 
                             size={fp(18)} 
-                            color={item.saved ? "#b90808ff" : "#6B7280"} 
+                            color={item.saved ? theme.saveColor : theme.textSecondary} 
                         />
                     </Pressable>
                 </View>
@@ -134,9 +136,9 @@ export default function AllChefReviews() {
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: theme.headerBackground }]}>
             {/* Category Tabs */}
-            <View style={styles.categoryWrapper}>
+            <View style={[styles.categoryWrapper, { backgroundColor: theme.headerBackground }]}>
                 <View style={styles.categoryContainer}>
                     {CATEGORIES.map((category) => (
                         <Pressable

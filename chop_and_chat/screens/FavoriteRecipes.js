@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { wp, hp, fp, SPACING } from '../utils/responsive';
+import { useTheme } from '../context/ThemeContext';
 
 // Sample data - will be replaced with real data later
 const SAMPLE_FAVORITES = [
@@ -20,6 +21,7 @@ const SAMPLE_FAVORITES = [
 const DIFFICULTIES = ['All', 'Easy', 'Medium', 'Hard'];
 
 export default function FavoriteRecipes({ navigation }) {
+  const { theme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState('All');
   const [favorites, setFavorites] = useState(SAMPLE_FAVORITES);

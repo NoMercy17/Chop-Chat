@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { Text, View, StyleSheet, Pressable, Modal } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
+import { useTheme } from '../../context/ThemeContext';
 import CameraScreen, { uploadImage } from '../../utils/photoHandling';
 
 export default function MainActions() {
+    const { theme } = useTheme();
     const [sourceModalVisible, setSourceModalVisible] = useState(false);
     const [cameraModalVisible, setCameraModalVisible] = useState(false);
     const [nextStepModalVisible, setNextStepModalVisible] = useState(false);
@@ -83,32 +86,34 @@ export default function MainActions() {
             <Pressable 
                 style={({ pressed }) => [
                     styles.card,
+                    { backgroundColor: theme.cardBackgroundLight, shadowColor: theme.shadowColor },
                     pressed && styles.cardPressed
                 ]}
                 onPress={() => console.log('Find Recipe pressed')}
             >
                 <View style={styles.textContainer}>
-                    <Text style={styles.title}>Find a Recipe</Text>
-                    <Text style={styles.subtitle}>Turn leftovers into something edible</Text>
+                    <Text style={[styles.title, { color: theme.textPrimary }]}>Find a Recipe</Text>
+                    <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Turn leftovers into something edible</Text>
                 </View>
-                <View style={styles.iconContainer}>
-                    <Text style={styles.icon}>→</Text>
+                <View style={[styles.iconContainer, { backgroundColor: theme.cardBackgroundAlt }]}>
+                    <Ionicons name="arrow-forward" size={fp(20)} color={theme.primary} />
                 </View>
             </Pressable>
 
             <Pressable 
                 style={({ pressed }) => [
                     styles.card,
+                    { backgroundColor: theme.cardBackgroundLight, shadowColor: theme.shadowColor },
                     pressed && styles.cardPressed
                 ]}
                 onPress={handleUploadDish}
             >
                 <View style={styles.textContainer}>
-                    <Text style={styles.title}>Upload Your Dish</Text>
-                    <Text style={styles.subtitle}>Ready to be judged?</Text>
+                    <Text style={[styles.title, { color: theme.textPrimary }]}>Upload Your Dish</Text>
+                    <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Ready to be judged?</Text>
                 </View>
-                <View style={styles.iconContainer}>
-                    <Text style={styles.icon}>+</Text>
+                <View style={[styles.iconContainer, { backgroundColor: theme.cardBackgroundAlt }]}>
+                    <Ionicons name="add" size={fp(20)} color={theme.primary} />
                 </View>
             </Pressable>
 
@@ -120,10 +125,10 @@ export default function MainActions() {
                 onRequestClose={() => setSourceModalVisible(false)}
             >
                 <Pressable 
-                    style={styles.actionModalOverlay}
+                    style={[styles.actionModalOverlay, { backgroundColor: theme.overlayBackgroundDark }]}
                     onPress={() => setSourceModalVisible(false)}
                 >
-                    <Pressable style={styles.actionModalCard}>
+                    <Pressable style={[styles.actionModalCard, { backgroundColor: theme.cardBackground }]}>
                         <View style={styles.actionModalHeader}>
                             <Text style={styles.actionModalTitle}>Upload Your Dish</Text>
                             <Text style={styles.actionModalSubtitle}>Choose how to add your photo</Text>

@@ -3,6 +3,7 @@ import { Text, View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../../context/ThemeContext';
 import { chefFeedItems } from '../../data/chefFeedData';
 
 // Get 4 random items for the quick menu
@@ -13,6 +14,7 @@ const getRandomFeedItems = (items, count) => {
 
 export default function FeaturedChef() {
     const navigation = useNavigation();
+    const { theme } = useTheme();
     
     // Select 4 random feed items on mount
     const feedItems = useMemo(() => getRandomFeedItems(chefFeedItems, 4), []);
@@ -37,35 +39,36 @@ export default function FeaturedChef() {
                 key={item.id} 
                 style={({ pressed }) => [
                     styles.reviewCard,
+                    { backgroundColor: theme.chefCardBackground },
                     pressed && styles.reviewCardPressed
                 ]}
                 onPress={() => console.log('Feed item pressed:', item.id)}
             >
-                <View style={styles.cardHeader}>
-                    <View style={styles.chefAvatar}>
-                        <Text style={styles.chefInitial}>{item.chef.avatar}</Text>
+                <View style={[styles.cardHeader, { backgroundColor: theme.chefCardHeaderBg }]}>
+                    <View style={[styles.chefAvatar, { backgroundColor: theme.primary }]}>
+                        <Text style={[styles.chefInitial, { color: theme.textInverse }]}>{item.chef.avatar}</Text>
                     </View>
                     <View style={styles.headerInfo}>
-                        <Text style={styles.reviewTitle} numberOfLines={1}>{displayTitle}</Text>
+                        <Text style={[styles.reviewTitle, { color: theme.textPrimary }]} numberOfLines={1}>{displayTitle}</Text>
                         {isReaction && !isOwnReaction && (
-                            <Text style={styles.reactionTarget} numberOfLines={1}>
+                            <Text style={[styles.reactionTarget, { color: theme.textSecondary }]} numberOfLines={1}>
                                 on @{item.reaction.targetAuthor.name}'s post
                             </Text>
                         )}
                         {isOwnReaction && (
-                            <Text style={styles.reactionTarget} numberOfLines={1}>
+                            <Text style={[styles.reactionTarget, { color: theme.textSecondary }]} numberOfLines={1}>
                                 replied to own post
                             </Text>
                         )}
                     </View>
                 </View>
                 
-                <View style={styles.divider} />
+                <View style={[styles.divider, { backgroundColor: theme.border }]} />
                 
-                <View style={styles.reviewContent}>
-                    <Text style={styles.reviewText} numberOfLines={3}>{displayText}</Text>
+                <View style={[styles.reviewContent, { backgroundColor: theme.chefCardContentBg }]}>
+                    <Text style={[styles.reviewText, { color: theme.textPrimary }]} numberOfLines={3}>{displayText}</Text>
                     <View style={styles.cardFooter}>
-                        <Text style={styles.reviewChef}>{item.chef.name}</Text>
+                        <Text style={[styles.reviewChef, { color: theme.textSecondary }]}>{item.chef.name}</Text>
                         
                     </View>
                 </View>

@@ -4,14 +4,17 @@ import FeaturedChef from "../components/home/FeaturedChef";
 import CommunityFeed from "../components/home/CommunityFeed"; 
 import { StyleSheet, View, ScrollView } from "react-native";
 import { StatusBar } from 'expo-status-bar';
+import { useTheme } from "../context/ThemeContext";
 
 export default function HomeScreen({ navigation }) { 
+  const { isDarkMode, theme } = useTheme();
+  
   return (
-    <View style={styles.container}>
-      <StatusBar style="dark" />
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <StatusBar style={isDarkMode ? "light" : "dark"} />
       <Header navigation={navigation} />
       <ScrollView
-        style={styles.scrollView}
+        style={[styles.scrollView, { backgroundColor: theme.primaryLight }]}
         showsVerticalScrollIndicator={false}
       >
         <MainActions /> 
@@ -26,10 +29,8 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
   },
   scrollView: {
     flex: 1,
-    backgroundColor: '#93C5FD',
   },
 });

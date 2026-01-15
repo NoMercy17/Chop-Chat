@@ -2,6 +2,7 @@ import { Text, View, StyleSheet, Pressable, Modal, ScrollView } from 'react-nati
 import { useState } from 'react';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../../context/ThemeContext';
 
 const notifications = [
     { id: 1, title: 'New Recipe Match', subtitle: 'Found 3 recipes for your ingredients', time: '2m ago', unread: true },
@@ -13,10 +14,11 @@ const notifications = [
 
 export default function Header({ navigation }) {
     const [modalVisible, setModalVisible] = useState(false);
+    const { theme } = useTheme();
 
     return (
-        <View style={styles.container}>
-            <Text style={styles.appName}>Cook&Chat</Text>
+        <View style={[styles.container, { backgroundColor: theme.primary }]}>
+            <Text style={[styles.appName, { color: theme.textInverse }]}>Cook&Chat</Text>
 
             <View style={styles.rightButtons}>
                 <Pressable 
@@ -26,7 +28,7 @@ export default function Header({ navigation }) {
                     ]}
                     onPress={() => setModalVisible(true)}
                 >
-                    <Ionicons name="notifications" size={fp(22)} color='#F3F4F6' />
+                    <Ionicons name="notifications" size={fp(22)} color={theme.textInverse} />
                 </Pressable>
 
                 <Pressable 
@@ -36,16 +38,16 @@ export default function Header({ navigation }) {
                     ]}
                     onPress={() => navigation.navigate('Profile')}
                 >
-                    <Ionicons name="person" size={fp(22)} color='#F3F4F6' />
+                    <Ionicons name="person" size={fp(22)} color={theme.textInverse} />
                 </Pressable>
             </View>
 
             {/* Notifications Modal */}
             <Modal visible={modalVisible} transparent={true} animationType='slide'>
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContainer}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Notifications</Text>
+                <View style={[styles.modalOverlay, { backgroundColor: theme.overlayBackground }]}>
+                    <View style={[styles.modalContainer, { backgroundColor: theme.modalBackground }]}>
+                        <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
+                            <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Notifications</Text>
                         </View>
                         
                         <ScrollView 
@@ -57,19 +59,20 @@ export default function Header({ navigation }) {
                                     key={notif.id}
                                     style={({ pressed }) => [
                                         styles.notificationItem,
-                                        notif.unread && styles.notificationUnread,
+                                        { backgroundColor: theme.cardBackgroundAlt, borderColor: theme.borderLight },
+                                        notif.unread && [styles.notificationUnread, { backgroundColor: theme.primaryLightest, borderColor: theme.primaryLighter }],
                                         pressed && styles.notificationPressed
                                     ]}
                                     onPress={() => console.log('Notification pressed:', notif.id)}
                                 >
                                     <View style={styles.notificationContent}>
                                         <View style={styles.notificationHeader}>
-                                            <Text style={styles.notificationTitle}>{notif.title}</Text>
-                                            <Text style={styles.notificationTime}>{notif.time}</Text>
+                                            <Text style={[styles.notificationTitle, { color: theme.textPrimary }]}>{notif.title}</Text>
+                                            <Text style={[styles.notificationTime, { color: theme.textTertiary }]}>{notif.time}</Text>
                                         </View>
-                                        <Text style={styles.notificationSubtitle}>{notif.subtitle}</Text>
+                                        <Text style={[styles.notificationSubtitle, { color: theme.textSecondary }]}>{notif.subtitle}</Text>
                                     </View>
-                                    {notif.unread && <View style={styles.unreadDot} />}
+                                    {notif.unread && <View style={[styles.unreadDot, { backgroundColor: theme.primary }]} />}
                                 </Pressable>
                             ))}
                         </ScrollView>
@@ -78,10 +81,11 @@ export default function Header({ navigation }) {
                             onPress={() => setModalVisible(false)} 
                             style={({ pressed }) => [
                                 styles.closeButton,
+                                { backgroundColor: theme.background },
                                 pressed && styles.closeButtonPressed
                             ]}
                         >
-                            <Text style={styles.closeButtonText}>Close</Text>
+                            <Text style={[styles.closeButtonText, { color: theme.textMuted }]}>Close</Text>
                         </Pressable>
                     </View>
                 </View>
@@ -97,11 +101,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: SPACING.screenPadding,
         paddingVertical: hp(8),
-        backgroundColor: '#F3F4F6',
-        borderTopWidth: 1,
-        borderTopColor: '#D1D5DB',
-        borderBottomWidth: 1,
-        borderBottomColor: '#E5E7EB',
     },
     appName: {
         fontSize: fp(24),
