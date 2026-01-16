@@ -7,7 +7,7 @@ export const lightTheme = {
   background: '#F3F4F6',
   backgroundSecondary: '#F8FAFB',
   backgroundTertiary: '#FFFFFF',
-  headerBackground: '#5B9CF6',
+  screenBackground: '#93C5FD',  // Light blue for Home/Community/Chef screens
   
   // Cards & Surfaces
   cardBackground: '#FFFFFF',
@@ -80,6 +80,19 @@ export const lightTheme = {
   likeColor: '#b90808ff',
   saveColor: '#b90808ff',
   
+  // Profile specific
+  profileImageBorder: '#E0EFFE',
+  profileTextPrimary: '#FFFFFF',
+  profileTextSecondary: '#E0EFFE',
+  
+  // Modal action button backgrounds (light mode)
+  takePhotoButtonBg: '#F0FDF4',
+  galleryButtonBg: '#EEF2FF',
+  postFeedButtonBg: '#EFF6FF',
+  aiRatingButtonBg: '#FFFBEB',
+  chefReviewButtonBg: '#f7e9faff',
+  cancelButtonBg: '#FEF2F2',
+  
   // Chef/Community card specific
   chefCardBackground: '#FFFFFF',
   chefCardHeaderBg: '#FFFFFF',  // Header section
@@ -93,7 +106,7 @@ export const darkTheme = {
   background: '#0F172A',
   backgroundSecondary: '#1E293B',
   backgroundTertiary: '#334155',
-  headerBackground: '#2563EB',  
+  screenBackground: '#1a3a52',  // Darker blue
   
   // Cards & Surfaces
   cardBackground: '#1E293B',
@@ -108,13 +121,13 @@ export const darkTheme = {
   postContentBackground: '#3D4A5C',  // Lighter grey for content/comments section
   postMetaBackground: '#3D4A5C',  
   postHeaderBackground: '#1E293B',  // Darker for "reacted to" header section
-  imageBackground: '#F9FAFB',  // Keep image placeholder light
+  imageBackground: '#F9FAFB',  
   
   // Text Colors
-  textPrimary: '#F1F5F9',
-  textSecondary: '#CBD5E1', 
+  textPrimary: '#f1f5f9ee',
+  textSecondary: '#cbd5e1d0', 
   textTertiary: '#94A3B8',  
-  textInverse: '#0F172A',
+  textInverse: '#f1f5f9ee',
   textMuted: '#CBD5E1',
   
   // Primary Colors 
@@ -165,6 +178,19 @@ export const darkTheme = {
   // Specific Component Colors
   likeColor: '#F87171',
   saveColor: '#F87171',
+  
+  // Profile specific
+  profileImageBorder: '#334155',
+  profileTextPrimary: 'rgba(255, 255, 255, 0.85)',
+  profileTextSecondary: 'rgba(255, 255, 255, 0.6)',
+  
+  // Modal action button backgrounds (dark mode)
+  takePhotoButtonBg: '#1E3A2E',
+  galleryButtonBg: '#1E2A4A',
+  postFeedButtonBg: '#1E3A5F',
+  aiRatingButtonBg: '#3D3520',
+  chefReviewButtonBg: '#2E2535',
+  cancelButtonBg: '#3D2020',
   
   // Chef/Community card specific 
   chefCardBackground: '#1E293B',  

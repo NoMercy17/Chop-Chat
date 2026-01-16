@@ -59,18 +59,16 @@ function AppContent() {
             {user ? (
             <MainStack.Navigator
               screenOptions={{
-                headerStyle: { backgroundColor: theme.background },
-                headerShadowVisible: false,
+                headerShown: false,
                 contentStyle: { backgroundColor: theme.background },
-                headerTintColor: theme.textPrimary,
               }}
             >
               <MainStack.Screen name="Home" component={HomeScreen} />
               <MainStack.Screen name="Profile" component={ProfileScreen} />
-              <MainStack.Screen name="MyRecipes" component={MyRecipes} options={{ title: 'My Recipes' }} />
-              <MainStack.Screen name="FavoriteRecipes" component={FavoriteRecipes} options={{ title: 'Favorites' }} />
-              <MainStack.Screen name="AllChefReviews" component={AllChefReviews} options={{ title: 'Chef Reviews' }} />
-              <MainStack.Screen name="AllCommunityPosts" component={AllCommunityPosts} options={{ title: 'Community' }} />
+              <MainStack.Screen name="MyRecipes" component={MyRecipes} />
+              <MainStack.Screen name="FavoriteRecipes" component={FavoriteRecipes} />
+              <MainStack.Screen name="AllChefReviews" component={AllChefReviews} />
+              <MainStack.Screen name="AllCommunityPosts" component={AllCommunityPosts} />
             </MainStack.Navigator>
             ) : (
               <AuthStack />

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Modal, TextInput, Keyboa
 import { wp, hp, fp, SPACING } from '../utils/responsive';
 import { commentsData } from '../data/postsData';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { usePosts } from '../context/PostsContext';
 
@@ -12,8 +13,9 @@ const CATEGORIES = ['Following', 'All'];
 // Sample list of followed user IDs - in a real app this would come from your backend/context
 const FOLLOWED_AUTHORS = ['John Doe', 'Jane Smith', 'Emily Carter', 'Carlos Rivera'];
 
-export default function AllCommunityPosts() {
+export default function AllCommunityPosts({ navigation }) {
     const { theme } = useTheme();
+    const insets = useSafeAreaInsets();
     const { posts, handleLike, handleSave, updateCommentCount } = usePosts();
     const [selectedCategory, setSelectedCategory] = useState('All');
     const [commentsModalVisible, setCommentsModalVisible] = useState(false);
@@ -43,9 +45,18 @@ export default function AllCommunityPosts() {
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: theme.headerBackground }]}>
-            {/* Category Tabs */}
-            <View style={[styles.categoryWrapper, { backgroundColor: theme.headerBackground }]}>
+        <View style={[styles.container, { backgroundColor: theme.screenBackground, paddingTop: insets.top }]}>
+            {/* Category Tabs with Back Button */}
+            <View style={[styles.categoryWrapper, { backgroundColor: theme.screenBackground }]}>
+                <Pressable 
+                    style={({ pressed }) => [
+                        styles.backButton,
+                        pressed && styles.backButtonPressed
+                    ]}
+                    onPress={() => navigation.goBack()}
+                >
+                    <Ionicons name="arrow-back" size={fp(24)} color="rgba(255, 255, 255, 0.85)" />
+                </Pressable>
                 <View style={styles.categoryContainer}>
                     {CATEGORIES.map((category) => (
                         <Pressable
@@ -261,8 +272,23 @@ const styles = StyleSheet.create({
     categoryWrapper: {
         backgroundColor: '#93C5FD',
         paddingTop: hp(8),
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    backButton: {
+        width: wp(40),
+        height: wp(40),
+        borderRadius: wp(20),
+        backgroundColor: 'rgba(0, 0, 0, 0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginLeft: wp(12),
+    },
+    backButtonPressed: {
+        backgroundColor: 'rgba(0, 0, 0, 0.25)',
     },
     categoryContainer: {
+        flex: 1,
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',

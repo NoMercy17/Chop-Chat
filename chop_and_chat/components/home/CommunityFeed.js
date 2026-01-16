@@ -51,7 +51,7 @@ export default function CommunityFeed() {
     return (
         <View style={styles.container}>
             <View style={styles.header}>
-                <Text style={styles.sectionTitle}>Community Feed</Text>
+                <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Community Feed</Text>
 
                 <Pressable 
                    style={({ pressed }) => [
@@ -61,8 +61,8 @@ export default function CommunityFeed() {
                     onPress={() => navigation.navigate('AllCommunityPosts')}
                     >
                     <View style = {styles.subtitleContent}>
-                        <Text style={styles.sectionSubtitle}>See what others are cooking</Text>
-                        <Ionicons name="arrow-forward" size={fp(14)} color="#E0F2FE" />
+                        <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>See what others are cooking</Text>
+                        <Ionicons name="arrow-forward" size={fp(14)} color={theme.textSecondary} />
                     </View>
                 </Pressable>  
 
@@ -281,7 +281,6 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: fp(22),
         fontWeight: '700',
-        color: '#FFFFFF',
         marginBottom: hp(4),
         letterSpacing: -0.5,
     },
@@ -298,7 +297,6 @@ const styles = StyleSheet.create({
     },
     sectionSubtitle: {
         fontSize: fp(14),
-        color: '#c7e1f1ff',
         fontWeight: '500',
         fontStyle: 'italic',
     },

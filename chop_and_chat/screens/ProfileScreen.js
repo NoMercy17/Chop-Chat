@@ -1,6 +1,7 @@
 import React, { useContext, useState } from "react";
 import { View, Text, ScrollView, Pressable, Image, StyleSheet, Modal, TextInput, Switch, Alert, TouchableWithoutFeedback, KeyboardAvoidingView, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { wp, hp, fp, SPACING } from "../utils/responsive";
@@ -9,6 +10,7 @@ import CameraScreen, { uploadImage } from "../utils/photoHandling";
 export default function ProfileScreen({ navigation }) {
   const auth = useContext(AuthContext);
   const { isDarkMode, toggleTheme, theme } = useTheme();
+  const insets = useSafeAreaInsets();
   
   // Settings Modal State
   const [settingsVisible, setSettingsVisible] = useState(false);
@@ -405,14 +407,25 @@ export default function ProfileScreen({ navigation }) {
   };
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
+    <ScrollView style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
       
       {/* Profile Header */}
-      <View style={[styles.header, { backgroundColor: theme.primaryLight }]}>
+      <View style={[styles.header, { backgroundColor: theme.screenBackground }]}>
+        {/* Back Button */}
+        <Pressable 
+          style={({ pressed }) => [
+            styles.backButton,
+            pressed && styles.backButtonPressed
+          ]}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={fp(24)} color="rgba(255, 255, 255, 0.85)" />
+        </Pressable>
+        
         <View style={styles.profileImageContainer}>
           <Image 
             source={profileImage ? { uri: profileImage } : require("../assets/favicon.png")}
-            style={[styles.profileImage, { borderColor: theme.accentLight }]}
+            style={[styles.profileImage, { borderColor: theme.profileImageBorder }]}
           />
           <Pressable 
             style={[styles.editImageBadge, { backgroundColor: theme.primary }]}
@@ -421,8 +434,8 @@ export default function ProfileScreen({ navigation }) {
             <Ionicons name="add" size={fp(16)} color={theme.textInverse} />
           </Pressable>
         </View>
-        <Text style={[styles.username, { color: theme.textInverse }]}>Antonio</Text>
-        <Text style={[styles.bio, { color: theme.accentLight }]} numberOfLines={1} ellipsizeMode="tail">
+        <Text style={[styles.username, { color: theme.profileTextPrimary }]}>Antonio</Text>
+        <Text style={[styles.bio, { color: theme.profileTextSecondary }]} numberOfLines={1} ellipsizeMode="tail">
           {bio}
         </Text>
       </View>
@@ -624,6 +637,21 @@ const styles = StyleSheet.create({
     paddingBottom: hp(28),
     borderBottomRightRadius: wp(24),
     borderBottomLeftRadius: wp(24),
+  },
+  backButton: {
+    position: 'absolute',
+    top: hp(15),
+    left: wp(15),
+    width: wp(40),
+    height: wp(40),
+    borderRadius: wp(20),
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  backButtonPressed: {
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
   },
   profileImageContainer: {
     position: "relative",

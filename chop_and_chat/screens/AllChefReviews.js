@@ -2,14 +2,16 @@ import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { wp, hp, fp, SPACING } from '../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { FOLLOWED_CHEF_IDS } from '../data/chefFeedData';
 import { useChefFeed } from '../context/ChefFeedContext';
 
 const CATEGORIES = ['Following', 'All'];
 
-export default function AllChefReviews() {
+export default function AllChefReviews({ navigation }) {
     const { theme } = useTheme();
+    const insets = useSafeAreaInsets();
     const { feedItems, handleLike, handleSave } = useChefFeed();
     const [selectedCategory, setSelectedCategory] = useState('All');
     
@@ -68,7 +70,7 @@ export default function AllChefReviews() {
                 {/* Content */}
                 <View style={[styles.cardContent, { backgroundColor: theme.chefCardContentBg }]}>
                     <Text style={[styles.contentTitle, { color: theme.textPrimary }]}>{displayTitle}</Text>
-                    <Text style={[styles.contentText, { color: theme.textPrimary }]}>{displayText}</Text>
+                    <Text style={[styles.contentText, { color: theme.textSecondary }]}>{displayText}</Text>
                 </View>
 
                 {/* Target Post Preview (for reactions) */}
@@ -78,7 +80,7 @@ export default function AllChefReviews() {
                             <View style={[styles.targetAvatarSmall, { backgroundColor: theme.primary }]}>
                                 <Text style={styles.targetInitialSmall}>{item.reaction.targetAuthor.avatar}</Text>
                             </View>
-                            <Text style={[styles.targetPostTitle, { color: theme.textSecondary }]} numberOfLines={1}>
+                            <Text style={[styles.targetPostTitle, { color: theme.textPrimary }]} numberOfLines={1}>
                                 {item.reaction.targetPost?.title}
                             </Text>
                         </View>
@@ -136,9 +138,18 @@ export default function AllChefReviews() {
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: theme.headerBackground }]}>
-            {/* Category Tabs */}
-            <View style={[styles.categoryWrapper, { backgroundColor: theme.headerBackground }]}>
+        <View style={[styles.container, { backgroundColor: theme.screenBackground, paddingTop: insets.top }]}>
+            {/* Category Tabs with Back Button */}
+            <View style={[styles.categoryWrapper, { backgroundColor: theme.screenBackground }]}>
+                <Pressable 
+                    style={({ pressed }) => [
+                        styles.backButton,
+                        pressed && styles.backButtonPressed
+                    ]}
+                    onPress={() => navigation.goBack()}
+                >
+                    <Ionicons name="arrow-back" size={fp(24)} color="rgba(255, 255, 255, 0.85)" />
+                </Pressable>
                 <View style={styles.categoryContainer}>
                     {CATEGORIES.map((category) => (
                         <Pressable
@@ -184,8 +195,23 @@ const styles = StyleSheet.create({
     categoryWrapper: {
         backgroundColor: '#93C5FD',
         paddingTop: hp(8),
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    backButton: {
+        width: wp(40),
+        height: wp(40),
+        borderRadius: wp(20),
+        backgroundColor: 'rgba(0, 0, 0, 0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginLeft: wp(12),
+    },
+    backButtonPressed: {
+        backgroundColor: 'rgba(0, 0, 0, 0.25)',
     },
     categoryContainer: {
+        flex: 1,
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
