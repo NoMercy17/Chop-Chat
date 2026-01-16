@@ -85,6 +85,12 @@ export const lightTheme = {
   profileTextPrimary: '#FFFFFF',
   profileTextSecondary: '#E0EFFE',
   
+  // Header title color (screen titles)
+  headerTitleColor: '#111827',
+  
+  // Recipe info background
+  recipeInfoBackground: '#FFFFFF',
+  
   // Modal action button backgrounds (light mode)
   takePhotoButtonBg: '#F0FDF4',
   galleryButtonBg: '#EEF2FF',
@@ -105,12 +111,12 @@ export const darkTheme = {
   // Backgrounds
   background: '#0F172A',
   backgroundSecondary: '#1E293B',
-  backgroundTertiary: '#334155',
+  backgroundTertiary: '#3D4A5C',
   screenBackground: '#1a3a52',  // Darker blue
   
   // Cards & Surfaces
   cardBackground: '#1E293B',
-  cardBackgroundAlt: '#334155',
+  cardBackgroundAlt: '#3D4A5C',
   cardBackgroundLight: '#2D3A4F',  
   modalBackground: '#1E293B',
   overlayBackground: 'rgba(0, 0, 0, 0.7)',
@@ -183,6 +189,12 @@ export const darkTheme = {
   profileImageBorder: '#334155',
   profileTextPrimary: 'rgba(255, 255, 255, 0.85)',
   profileTextSecondary: 'rgba(255, 255, 255, 0.6)',
+  
+  // Header title color (screen titles)
+  headerTitleColor: '#f1f5f9ee',
+  
+  // Recipe info background
+  recipeInfoBackground: '#3D4A5C',
   
   // Modal action button backgrounds (dark mode)
   takePhotoButtonBg: '#1E3A2E',

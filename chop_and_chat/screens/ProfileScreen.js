@@ -1,11 +1,15 @@
-import React, { useContext, useState } from "react";
-import { View, Text, ScrollView, Pressable, Image, StyleSheet, Modal, TextInput, Switch, Alert, TouchableWithoutFeedback, KeyboardAvoidingView, Platform } from "react-native";
+import React, { useContext, useState, useEffect } from "react";
+import { View, Text, ScrollView, Pressable, Image, StyleSheet, Modal, TextInput, Switch, Alert, TouchableWithoutFeedback, KeyboardAvoidingView, Platform, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthContext } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { wp, hp, fp, SPACING } from "../utils/responsive";
 import CameraScreen, { uploadImage } from "../utils/photoHandling";
+import { uploadToCloudinary } from "../utils/cloudinaryUploads";
+import { env } from "../utils/env";
 
 export default function ProfileScreen({ navigation }) {
   const auth = useContext(AuthContext);
@@ -20,6 +24,7 @@ export default function ProfileScreen({ navigation }) {
   const [imageSourceModalVisible, setImageSourceModalVisible] = useState(false);
   const [cameraModalVisible, setCameraModalVisible] = useState(false);
   const [profileImage, setProfileImage] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
   
   // Bio editing
   const [bio, setBio] = useState("Food enthusiast");
@@ -38,6 +43,64 @@ export default function ProfileScreen({ navigation }) {
     newFollowers: false,
   });
 
+  // Load user data on mount
+  useEffect(() => {
+    loadUserProfile();
+  }, []);
+
+  // Reload profile whenever this screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      loadUserProfile();
+    }, [])
+  );
+
+  const loadUserProfile = async () => {
+    try {
+      let token = await AsyncStorage.getItem('userToken');
+      // Fallback to session_user if userToken is not set (compatibility with LoginScreen)
+      if (!token) {
+        const session = await AsyncStorage.getItem('session_user');
+        if (session) {
+          token = JSON.parse(session).token;
+        }
+      }
+
+      if (!token) {
+        console.log('❌ No token found');
+        return;
+      }
+
+      console.log('📥 Loading user profile...');
+      const response = await fetch(`${env.API_URL}/users/me`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Profile loaded:', data.user);
+        
+        if (data.user.profile_photo) {
+          console.log('📸 Profile photo URL:', data.user.profile_photo);
+          setProfileImage(data.user.profile_photo);
+        } else {
+          console.log('⚠️ No profile photo');
+          setProfileImage(null);
+        }
+        
+        if (data.user.bio) {
+          setBio(data.user.bio);
+        }
+      } else {
+        console.error('❌ Failed to load profile, status:', response.status);
+      }
+    } catch (error) {
+      console.error('❌ Failed to load profile:', error);
+    }
+  };
+
   const openSettings = () => {
     setSettingsVisible(true);
     setActiveSettingTab(null);
@@ -51,10 +114,35 @@ export default function ProfileScreen({ navigation }) {
     setConfirmPassword("");
   };
 
-  const handleSaveBio = () => {
-    setBio(tempBio);
-    setActiveSettingTab(null);
-    // TODO: API call to update bio
+  const handleSaveBio = async () => {
+    try {
+      let token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        const session = await AsyncStorage.getItem('session_user');
+        if (session) token = JSON.parse(session).token;
+      }
+
+      const response = await fetch(`${env.API_URL}/users/bio`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ bio: tempBio })
+      });
+
+      if (response.ok) {
+        setBio(tempBio);
+        setActiveSettingTab(null);
+        Alert.alert("Success", "Bio updated successfully");
+      } else {
+        const data = await response.json();
+        Alert.alert("Error", data.error || "Failed to update bio");
+      }
+    } catch (error) {
+      console.error('Error updating bio:', error);
+      Alert.alert("Error", "Something went wrong");
+    }
   };
 
   const handleChangePassword = () => {
@@ -116,11 +204,13 @@ export default function ProfileScreen({ navigation }) {
     }, 300);
   };
 
-  const handlePhotoTaken = (uri) => {
+  const handlePhotoTaken = async (uri) => {
     console.log('Profile photo captured:', uri);
-    setProfileImage(uri);
+    setProfileImage(uri); // Show local image immediately
     setCameraModalVisible(false);
-    // TODO: API call to upload profile image
+    
+    // Upload to Cloudinary and save to backend
+    await uploadProfilePhoto(uri);
   };
 
   const handleAccessGallery = async () => {
@@ -128,8 +218,61 @@ export default function ProfileScreen({ navigation }) {
     setImageSourceModalVisible(false);
     
     if (uri) {
-      setProfileImage(uri);
-      // TODO: API call to upload profile image
+      setProfileImage(uri); // Show local image immediately
+      await uploadProfilePhoto(uri);
+    }
+  };
+
+  const uploadProfilePhoto = async (localUri) => {
+    try {
+      setIsUploading(true);
+      
+      // Step 1: Upload to Cloudinary
+      console.log('📤 Uploading to Cloudinary...');
+      const cloudinaryUrl = await uploadToCloudinary(localUri, 'profile_photos');
+      
+      if (!cloudinaryUrl) {
+        Alert.alert('Error', 'Failed to upload photo');
+        setIsUploading(false);
+        return;
+      }
+      
+      // Step 2: Save URL to backend
+      console.log('💾 Saving to database...');
+      let token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        const session = await AsyncStorage.getItem('session_user');
+        if (session) token = JSON.parse(session).token;
+      }
+      
+      const response = await fetch(`${env.API_URL}/users/profile-photo`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          photo_url: cloudinaryUrl
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        console.log('✅ Profile photo saved!');
+        setProfileImage(cloudinaryUrl); // Update to use Cloudinary URL
+        Alert.alert('Success', 'Profile photo updated!');
+        
+        // Step 3: Reload profile to ensure data persists
+        await loadUserProfile();
+      } else {
+        Alert.alert('Error', data.error || 'Failed to save photo');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      Alert.alert('Error', 'Something went wrong');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -423,6 +566,11 @@ export default function ProfileScreen({ navigation }) {
         </Pressable>
         
         <View style={styles.profileImageContainer}>
+          {isUploading && (
+            <View style={styles.uploadingOverlay}>
+              <ActivityIndicator size="large" color="#FFFFFF" />
+            </View>
+          )}
           <Image 
             source={profileImage ? { uri: profileImage } : require("../assets/favicon.png")}
             style={[styles.profileImage, { borderColor: theme.profileImageBorder }]}
@@ -430,6 +578,7 @@ export default function ProfileScreen({ navigation }) {
           <Pressable 
             style={[styles.editImageBadge, { backgroundColor: theme.primary }]}
             onPress={handleChangeProfileImage}
+            disabled={isUploading}
           >
             <Ionicons name="add" size={fp(16)} color={theme.textInverse} />
           </Pressable>
@@ -655,6 +804,18 @@ const styles = StyleSheet.create({
   },
   profileImageContainer: {
     position: "relative",
+  },
+  uploadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: wp(45),
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
   profileImage: {
     width: wp(90),

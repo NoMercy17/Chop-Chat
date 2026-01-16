@@ -9,16 +9,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.get('/health', async (req, res) => {
-  try {
-    const { rows } = await pool.query('SELECT 1 AS ok');
-    res.json({ ok: rows[0].ok === 1 });
-  } catch (err) {
-    console.error('DB health check failed', err);
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
 const PORT = process.env.PORT || 4000;
 const JWT_SECRET = process.env.JWT_SECRET || 'change_me';
 
@@ -35,22 +25,32 @@ function authenticateToken(req, res, next) {
   });
 }
 
+// Health check
+app.get('/health', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT 1 AS ok');
+    res.json({ ok: rows[0].ok === 1 });
+  } catch (err) {
+    console.error('DB health check failed', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // Register
 app.post('/register', async (req, res) => {
   try {
     const { email, password, name } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'email and password required' });
-
+    
     const lower = email.toLowerCase();
     const { rows } = await pool.query('SELECT id FROM users WHERE email = $1', [lower]);
     if (rows.length) return res.status(409).json({ error: 'user exists' });
-
+    
     const hashed = await bcrypt.hash(password, 10);
     const insert = await pool.query(
       'INSERT INTO users (email, password, name) VALUES ($1, $2, $3) RETURNING id, email, name, created_at',
       [lower, hashed, name || null]
     );
-
     const user = insert.rows[0];
     return res.status(201).json({ user });
   } catch (err) {
@@ -64,27 +64,128 @@ app.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'email and password required' });
-
+    
     const lower = email.toLowerCase();
-    const { rows } = await pool.query('SELECT id, email, password, name FROM users WHERE email = $1', [lower]);
+    const { rows } = await pool.query(
+      'SELECT id, email, password, name, profile_photo FROM users WHERE email = $1', 
+      [lower]
+    );
     const user = rows[0];
     if (!user) return res.status(401).json({ error: 'invalid credentials' });
-
+    
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).json({ error: 'invalid credentials' });
-
+    
     const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
-    return res.json({ token, user: { id: user.id, email: user.email, name: user.name } });
+    return res.json({ 
+      token, 
+      user: { 
+        id: user.id, 
+        email: user.email, 
+        name: user.name,
+        profile_photo: user.profile_photo 
+      } 
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'server error' });
   }
 });
 
-// Protected: list users (for debug/admin)
+// Get current user info (NEW)
+app.get('/users/me', authenticateToken, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT id, email, name, profile_photo, created_at FROM users WHERE id = $1',
+      [req.user.id]
+    );
+    
+    if (!rows.length) {
+      return res.status(404).json({ error: 'user not found' });
+    }
+    
+    res.json({ user: rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// Update profile photo (NEW)
+app.patch('/users/profile-photo', authenticateToken, async (req, res) => {
+  try {
+    const { photo_url } = req.body;
+    const userId = req.user.id;
+    
+    console.log('📸 Profile photo update request:');
+    console.log('  User ID:', userId);
+    console.log('  Photo URL:', photo_url);
+    
+    if (!photo_url) {
+      return res.status(400).json({ error: 'photo_url is required' });
+    }
+    
+    const query = `
+      UPDATE users 
+      SET profile_photo = $1 
+      WHERE id = $2 
+      RETURNING id, email, name, profile_photo, created_at
+    `;
+    
+    const { rows } = await pool.query(query, [photo_url, userId]);
+    
+    console.log('  Updated rows:', rows.length);
+    
+    if (!rows.length) {
+      console.log('  ❌ User not found');
+      return res.status(404).json({ error: 'user not found' });
+    }
+    
+    console.log('  ✅ Profile photo saved successfully');
+    res.json({ user: rows[0] });
+  } catch (err) {
+    console.error('❌ Error updating profile photo:', err.message);
+    console.error('  Full error:', err);
+    res.status(500).json({ error: 'server error', details: err.message });
+  }
+});
+
+// Update bio (NEW)
+app.patch('/users/bio', authenticateToken, async (req, res) => {
+  try {
+    const { bio } = req.body;
+    const userId = req.user.id;
+    
+    if (bio === undefined) {
+      return res.status(400).json({ error: 'bio is required' });
+    }
+    
+    const query = `
+      UPDATE users 
+      SET bio = $1 
+      WHERE id = $2 
+      RETURNING id, email, name, bio, profile_photo, created_at
+    `;
+    
+    const { rows } = await pool.query(query, [bio, userId]);
+    
+    if (!rows.length) {
+      return res.status(404).json({ error: 'user not found' });
+    }
+    
+    res.json({ user: rows[0] });
+  } catch (err) {
+    console.error('Error updating bio:', err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// Protected: list users 
 app.get('/users', authenticateToken, async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT id, email, name, created_at FROM users ORDER BY id DESC LIMIT 100');
+    const { rows } = await pool.query(
+      'SELECT id, email, name, profile_photo, created_at FROM users ORDER BY id DESC LIMIT 100'
+    );
     res.json({ users: rows });
   } catch (err) {
     console.error(err);

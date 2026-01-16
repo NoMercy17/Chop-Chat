@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { wp, hp, fp, SPACING } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
 
@@ -22,6 +23,7 @@ const DIFFICULTIES = ['All', 'Easy', 'Medium', 'Hard'];
 
 export default function FavoriteRecipes({ navigation }) {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState('All');
   const [favorites, setFavorites] = useState(SAMPLE_FAVORITES);
@@ -51,22 +53,36 @@ export default function FavoriteRecipes({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.screenBackground, paddingTop: insets.top }]}>
+      {/* Back Button and Header Title */}
+      <View style={[styles.headerContainer, { backgroundColor: theme.screenBackground }]}>
+        <Pressable 
+          style={({ pressed }) => [
+            styles.backButton,
+            pressed && styles.backButtonPressed
+          ]}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={fp(24)} color={theme.headerTitleColor} />
+        </Pressable>
+        <Text style={[styles.headerTitle, { color: theme.headerTitleColor }]}>Favorites</Text>
+      </View>
+
       {/* Search by Keyword */}
       <View style={styles.searchContainer}>
-        <View style={styles.searchInputWrapper}>
-          <Ionicons name="search-outline" size={fp(20)} color="#9CA3AF" />
+        <View style={[styles.searchInputWrapper, { backgroundColor: theme.inputBackground }]}>
+          <Ionicons name="search-outline" size={fp(20)} color={theme.textTertiary} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: theme.textPrimary }]}
             placeholder="Search by keyword..."
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={theme.placeholderText}
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoCapitalize="none"
           />
           {searchQuery !== '' && (
             <Pressable onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={fp(20)} color="#9CA3AF" />
+              <Ionicons name="close-circle" size={fp(20)} color={theme.textTertiary} />
             </Pressable>
           )}
         </View>
@@ -84,6 +100,7 @@ export default function FavoriteRecipes({ navigation }) {
               key={difficulty}
               style={({ pressed }) => [
                 styles.filterTab,
+                { backgroundColor: theme.inputBackground },
                 selectedDifficulty === difficulty && styles.filterTabActive,
                 pressed && styles.filterTabPressed
               ]}
@@ -91,6 +108,7 @@ export default function FavoriteRecipes({ navigation }) {
             >
               <Text style={[
                 styles.filterText,
+                { color: theme.textSecondary },
                 selectedDifficulty === difficulty && styles.filterTextActive
               ]}>
                 {difficulty}
@@ -112,6 +130,7 @@ export default function FavoriteRecipes({ navigation }) {
               key={recipe.id}
               style={({ pressed }) => [
                 styles.recipeCard,
+                { backgroundColor: theme.cardBackground },
                 pressed && styles.recipeCardPressed
               ]}
               onPress={() => console.log('Recipe pressed:', recipe.id)}
@@ -121,26 +140,26 @@ export default function FavoriteRecipes({ navigation }) {
                 {recipe.image ? (
                   <Image source={{ uri: recipe.image }} style={styles.recipeImage} />
                 ) : (
-                  <View style={styles.imagePlaceholder}>
+                  <View style={[styles.imagePlaceholder, { backgroundColor: theme.inputBackground }]}>
                     <Ionicons name="restaurant-outline" size={fp(28)} color="#9CA3AF" />
                   </View>
                 )}
               </View>
 
               {/* Recipe Info */}
-              <View style={styles.recipeInfo}>
-                <Text style={styles.recipeTitle} numberOfLines={1}>{recipe.title}</Text>
-                <Text style={styles.recipeAuthor}>by {recipe.author}</Text>
+              <View style={[styles.recipeInfo, { backgroundColor: theme.recipeInfoBackground }]}>
+                <Text style={[styles.recipeTitle, { color: theme.textPrimary }]} numberOfLines={1}>{recipe.title}</Text>
+                <Text style={[styles.recipeAuthor, { color: theme.textSecondary }]}>by {recipe.author}</Text>
                 
                 <View style={styles.recipeMeta}>
                   <View style={styles.metaItem}>
-                    <Ionicons name="time-outline" size={fp(14)} color="#6B7280" />
-                    <Text style={styles.metaText}>{recipe.cookTime}min</Text>
+                    <Ionicons name="time-outline" size={fp(14)} color={theme.textSecondary} />
+                    <Text style={[styles.metaText, { color: theme.textSecondary }]}>{recipe.cookTime}min</Text>
                   </View>
                   
                   <View style={styles.metaItem}>
                     <Ionicons name="star" size={fp(14)} color="#FBBF24" />
-                    <Text style={styles.metaText}>{recipe.rating}</Text>
+                    <Text style={[styles.metaText, { color: theme.textSecondary }]}>{recipe.rating}</Text>
                   </View>
 
                   <View style={[styles.difficultyBadge, { backgroundColor: getDifficultyColor(recipe.difficulty) + '20' }]}>
@@ -153,7 +172,7 @@ export default function FavoriteRecipes({ navigation }) {
 
               {/* Favorite Button */}
               <Pressable 
-                style={styles.heartButton}
+                style={[styles.heartButton, { backgroundColor: theme.recipeInfoBackground }]}
                 onPress={() => removeFavorite(recipe.id)}
               >
                 <Ionicons name="bookmark" size={fp(24)} color="#EF4444" />
@@ -164,11 +183,11 @@ export default function FavoriteRecipes({ navigation }) {
       ) : (
         /* Empty State */
         <View style={styles.emptyState}>
-          <View style={styles.emptyIconContainer}>
-            <Ionicons name="bookmark-outline" size={fp(48)} color="#9CA3AF" />
+          <View style={[styles.emptyIconContainer, { backgroundColor: theme.inputBackground }]}>
+            <Ionicons name="bookmark-outline" size={fp(48)} color={theme.textTertiary} />
           </View>
-          <Text style={styles.emptyTitle}>No favorites found</Text>
-          <Text style={styles.emptySubtitle}>
+          <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>No favorites found</Text>
+          <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
             {searchQuery || selectedDifficulty !== 'All' 
               ? 'Try adjusting your filters'
               : 'Heart a recipe to save it here!'}
@@ -182,16 +201,40 @@ export default function FavoriteRecipes({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+  },
+
+  // Header with Back Button and Title
+  headerContainer: {
+    alignItems: 'center',
+    paddingHorizontal: wp(12),
+    paddingVertical: hp(12),
+  },
+  headerTitle: {
+    fontSize: fp(28),
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  backButton: {
+    position: 'absolute',
+    left: wp(12),
+    width: wp(40),
+    height: wp(40),
+    borderRadius: wp(20),
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backButtonPressed: {
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
   },
 
   // Search
   searchContainer: {
-    backgroundColor: '#FFFFFF',
     paddingHorizontal: SPACING.screenPadding,
-    paddingVertical: hp(12),
+    paddingTop: hp(16),
+    paddingBottom: hp(12),
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: 'rgba(255, 255, 255, 0.2)',
   },
   searchInputWrapper: {
     flexDirection: 'row',
@@ -210,15 +253,15 @@ const styles = StyleSheet.create({
 
   // Filter Tabs
   filterContainer: {
-    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: 'rgba(255, 255, 255, 0.2)',
   },
   filterScroll: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING.screenPadding,
-    paddingVertical: hp(12),
+    paddingTop: hp(16),
+    paddingBottom: hp(12),
     gap: wp(10),
   },
   filterTab: {
@@ -248,7 +291,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: SPACING.screenPadding,
-    paddingTop: hp(16),
+    paddingTop: hp(20),
     paddingBottom: hp(32),
     gap: SPACING.itemGap,
   },

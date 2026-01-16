@@ -153,13 +153,12 @@ export default function MainActions() {
                 </View>
             </Pressable>
 
-            {/* ============================================================ */}
-            {/* NEW FIND RECIPE MODAL */}
-            {/* ============================================================ */}
+
+            {/* FIND RECIPE MODAL */}            
             <Modal 
                 visible={findRecipeModalVisible} 
                 animationType="slide"
-                presentationStyle="pageSheet" // Looks nice on iOS
+                presentationStyle="pageSheet"
                 onRequestClose={() => setFindRecipeModalVisible(false)}
             >
                 <View style={[styles.fullScreenModal, { backgroundColor: theme.background }]}>

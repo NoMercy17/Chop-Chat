@@ -5,3 +5,7 @@ CREATE TABLE IF NOT EXISTS users (
   name TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- New columns for profile features
+ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_photo TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT;
