@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { wp, hp, fp, SPACING } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
+import CreatePostModal from '../components/posts/CreatePostModal';
 
 // Sample data 
 const SAMPLE_RECIPES = [
@@ -16,10 +17,11 @@ const SAMPLE_RECIPES = [
 const CATEGORIES = ['All', 'Breakfast', 'Lunch', 'Dinner', 'Dessert'];
 
 export default function MyRecipes({ navigation }) {
-  const { theme } = useTheme();
+  const { theme, isDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [recipes, setRecipes] = useState(SAMPLE_RECIPES);
+  const [createPostModalVisible, setCreatePostModalVisible] = useState(false);
 
   const filteredRecipes = selectedCategory === 'All' 
     ? recipes 
@@ -34,6 +36,21 @@ export default function MyRecipes({ navigation }) {
     }
   };
 
+  const handleCreatePost = () => {
+    setCreatePostModalVisible(true);
+  };
+
+  const handleCreatePostSubmit = (postData) => {
+    console.log('Recipe created:', postData);
+    // TODO: Add recipe to your recipes list
+    // You could add it to the SAMPLE_RECIPES or send to backend
+    setCreatePostModalVisible(false);
+  };
+
+  const handleCloseCreatePost = () => {
+    setCreatePostModalVisible(false);
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.screenBackground, paddingTop: insets.top }]}>
       {/* Header with Back Button and Title */}
@@ -41,6 +58,7 @@ export default function MyRecipes({ navigation }) {
         <Pressable 
           style={({ pressed }) => [
             styles.backButton,
+            !isDarkMode && styles.backButtonLight,
             pressed && styles.backButtonPressed
           ]}
           onPress={() => navigation.goBack()}
@@ -139,7 +157,7 @@ export default function MyRecipes({ navigation }) {
               styles.addButton,
               pressed && styles.addButtonPressed
             ]}
-            onPress={() => console.log('Add recipe')}
+            onPress={handleCreatePost}
           >
             <Ionicons name="add" size={fp(20)} color="#FFFFFF" />
             <Text style={styles.addButtonText}>Add Recipe</Text>
@@ -154,11 +172,20 @@ export default function MyRecipes({ navigation }) {
             styles.fab,
             pressed && styles.fabPressed
           ]}
-          onPress={() => console.log('Add recipe')}
+          onPress={handleCreatePost}
         >
           <Ionicons name="add" size={fp(28)} color="#FFFFFF" />
         </Pressable>
       )}
+
+      {/* Create Post Modal */}
+      <CreatePostModal
+        visible={createPostModalVisible}
+        onClose={handleCloseCreatePost}
+        onBack={null} // No back navigation needed
+        imageUri={null} // No image from camera/gallery
+        onSubmit={handleCreatePostSubmit}
+      />
     </View>
   );
 }

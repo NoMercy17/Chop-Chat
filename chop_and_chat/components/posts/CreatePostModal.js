@@ -18,7 +18,7 @@ const UTENSIL_OPTIONS = [
     { id: 'airfryer', label: 'Air Fryer', icon: 'leaf-outline' },
 ];
 
-export default function CreatePostModal({ visible, onClose, imageUri, onSubmit }) {
+export default function CreatePostModal({ visible, onClose, onBack, imageUri, onSubmit }) {
     const { theme } = useTheme();
     
     // Form State
@@ -108,6 +108,12 @@ export default function CreatePostModal({ visible, onClose, imageUri, onSubmit }
         onClose();
     };
 
+    const handleBackPress = () => {
+        console.log('Back pressed in CreatePostModal, calling onBack');
+        resetForm();
+        onBack?.();
+    };
+
     const getDifficultyColor = (diff) => {
         switch (diff) {
             case 'Easy': return '#10B981';
@@ -131,8 +137,15 @@ export default function CreatePostModal({ visible, onClose, imageUri, onSubmit }
                 <View style={[styles.container, { backgroundColor: theme.screenBackground }]}>
                     {/* Header */}
                     <View style={[styles.header, { borderBottomColor: theme.border }]}>
-                        <Pressable onPress={handleClose} style={styles.headerButton}>
-                            <Ionicons name="close" size={fp(24)} color={theme.textPrimary} />
+                        <Pressable 
+                            onPress={onBack ? handleBackPress : handleClose} 
+                            style={({ pressed }) => [styles.headerButton, pressed && { opacity: 0.6 }]}
+                        >
+                            <Ionicons 
+                                name={onBack ? "arrow-back" : "close"} 
+                                size={fp(24)} 
+                                color={theme.textPrimary} 
+                            />
                         </Pressable>
                         <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Create Post</Text>
                         <Pressable 
@@ -285,7 +298,6 @@ export default function CreatePostModal({ visible, onClose, imageUri, onSubmit }
                             </View>
                             {ingredients.map((ingredient, index) => (
                                 <View key={index} style={styles.ingredientRow}>
-                                    <View style={[styles.bulletPoint, { backgroundColor: theme.primary }]} />
                                     <TextInput
                                         style={[styles.ingredientInput, { backgroundColor: theme.inputBackground, color: theme.textPrimary }]}
                                         placeholder={`Ingredient ${index + 1}`}
@@ -334,22 +346,26 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: SPACING.screenPadding,
-        paddingVertical: hp(12),
+        paddingHorizontal: 20,
+        paddingVertical: 12,
         borderBottomWidth: 1,
     },
     headerButton: {
-        padding: wp(4),
+        padding: 12,
+        marginLeft: -4,
     },
     headerTitle: {
-        fontSize: fp(18),
+        fontSize: 18,
         fontWeight: '700',
+        flex: 1,
+        textAlign: 'center',
+        marginLeft: -28,
     },
     postButton: {
-        paddingVertical: hp(8),
-        paddingHorizontal: wp(16),
+        paddingVertical: 8,
+        paddingHorizontal: 16,
         backgroundColor: '#3B82F6',
-        borderRadius: wp(20),
+        borderRadius: 20,
     },
     postButtonDisabled: {
         backgroundColor: '#E5E7EB',
@@ -357,115 +373,109 @@ const styles = StyleSheet.create({
     postButtonText: {
         color: '#FFFFFF',
         fontWeight: '600',
-        fontSize: fp(14),
+        fontSize: 14,
     },
     scrollContainer: {
         flex: 1,
     },
     scrollContent: {
-        padding: SPACING.screenPadding,
+        padding: 20,
     },
     imagePreviewContainer: {
-        marginBottom: hp(20),
-        borderRadius: wp(16),
+        marginBottom: 20,
+        borderRadius: 16,
         overflow: 'hidden',
     },
     imagePreview: {
         width: '100%',
-        height: hp(200),
+        height: 200,
         backgroundColor: '#F3F4F6',
     },
     inputGroup: {
-        marginBottom: hp(20),
+        marginBottom: 20,
     },
     label: {
-        fontSize: fp(14),
+        fontSize: 14,
         fontWeight: '600',
-        marginBottom: hp(8),
+        marginBottom: 8,
     },
     labelRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: hp(8),
+        marginBottom: 8,
     },
     required: {
         color: '#EF4444',
     },
     input: {
-        borderRadius: wp(12),
-        paddingHorizontal: wp(16),
-        paddingVertical: hp(12),
-        fontSize: fp(15),
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        fontSize: 15,
     },
     textArea: {
-        minHeight: hp(80),
+        minHeight: 80,
         textAlignVertical: 'top',
     },
     rowGroup: {
         flexDirection: 'row',
-        gap: wp(12),
+        gap: 12,
     },
     difficultyRow: {
         flexDirection: 'row',
-        gap: wp(10),
+        gap: 10,
     },
     difficultyChip: {
-        paddingVertical: hp(10),
-        paddingHorizontal: wp(20),
-        borderRadius: wp(20),
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 20,
         borderWidth: 1,
     },
     difficultyChipText: {
-        fontSize: fp(14),
+        fontSize: 14,
         fontWeight: '600',
     },
     utensilsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: wp(8),
+        gap: 8,
     },
     utensilChip: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: wp(6),
-        paddingVertical: hp(8),
-        paddingHorizontal: wp(12),
-        borderRadius: wp(20),
+        gap: 6,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 20,
         borderWidth: 1,
     },
     utensilChipText: {
-        fontSize: fp(13),
+        fontSize: 13,
         fontWeight: '500',
     },
     addButton: {
-        padding: wp(4),
+        padding: 4,
     },
     ingredientRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: hp(8),
-    },
-    bulletPoint: {
-        width: wp(8),
-        height: wp(8),
-        borderRadius: wp(4),
-        marginRight: wp(10),
+        marginBottom: 8,
     },
     ingredientInput: {
         flex: 1,
-        borderRadius: wp(10),
-        paddingHorizontal: wp(14),
-        paddingVertical: hp(10),
-        fontSize: fp(14),
+        borderRadius: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        fontSize: 14,
     },
     removeButton: {
-        padding: wp(6),
-        marginLeft: wp(6),
+        padding: 6,
+        marginLeft: 6,
     },
     instructionsArea: {
-        minHeight: hp(140),
+        minHeight: 140,
         textAlignVertical: 'top',
-        paddingTop: hp(12),
+        paddingTop: 12,
     },
 });

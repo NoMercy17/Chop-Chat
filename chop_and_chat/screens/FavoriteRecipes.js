@@ -22,7 +22,7 @@ const SAMPLE_FAVORITES = [
 const DIFFICULTIES = ['All', 'Easy', 'Medium', 'Hard'];
 
 export default function FavoriteRecipes({ navigation }) {
-  const { theme } = useTheme();
+  const { theme, isDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState('All');
@@ -59,6 +59,7 @@ export default function FavoriteRecipes({ navigation }) {
         <Pressable 
           style={({ pressed }) => [
             styles.backButton,
+            !isDarkMode && styles.backButtonLight,
             pressed && styles.backButtonPressed
           ]}
           onPress={() => navigation.goBack()}

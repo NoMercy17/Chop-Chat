@@ -564,11 +564,12 @@ export default function ProfileScreen({ navigation }) {
         <Pressable 
           style={({ pressed }) => [
             styles.backButton,
+            !isDarkMode && styles.backButtonLight,
             pressed && styles.backButtonPressed
           ]}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={fp(24)} color="rgba(255, 255, 255, 0.85)" />
+          <Ionicons name="arrow-back" size={fp(24)} color={theme.headerTitleColor} />
         </Pressable>
         
         <View style={styles.profileImageContainer}>
@@ -582,11 +583,11 @@ export default function ProfileScreen({ navigation }) {
             style={[styles.profileImage, { borderColor: theme.profileImageBorder }]}
           />
           <Pressable 
-            style={[styles.editImageBadge, { backgroundColor: theme.primary }]}
+            style={[styles.editImageBadge, isDarkMode ? { backgroundColor: '#2563EB' } : { backgroundColor: theme.primary }]}
             onPress={handleChangeProfileImage}
             disabled={isUploading}
           >
-            <Ionicons name="add" size={fp(16)} color={theme.textInverse} />
+            <Ionicons name="add" size={fp(18)} color={theme.textInverse} />
           </Pressable>
         </View>
         <Text style={[styles.username, { color: theme.profileTextPrimary }]}>Antonio</Text>
@@ -667,66 +668,58 @@ export default function ProfileScreen({ navigation }) {
         </Pressable>
       </View>
 
-      {/* Profile Image Source Modal */}
+      {/* Profile Image Source Modal - Compact Top Design */}
       <Modal 
         visible={imageSourceModalVisible} 
         transparent={true} 
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setImageSourceModalVisible(false)}
       >
         <Pressable 
-          style={[styles.actionModalOverlay, { backgroundColor: theme.overlayBackgroundDark }]}
+          style={[styles.compactModalOverlay, { backgroundColor: theme.overlayBackground }]}
           onPress={() => setImageSourceModalVisible(false)}
         >
-          <Pressable style={[styles.actionModalCard, { backgroundColor: theme.cardBackground }]}>
-            <View style={styles.actionModalHeader}>
-              <Text style={[styles.actionModalTitle, { color: theme.textPrimary }]}>Change Profile Picture</Text>
-              <Text style={[styles.actionModalSubtitle, { color: theme.textSecondary }]}>Choose how to add your photo</Text>
-            </View>
-
-            <View style={styles.actionButtonsContainer}>
+          <View style={[styles.compactModalContainer, { backgroundColor: theme.cardBackground }]}>
+            <View style={styles.compactModalHandle} />
+            
+            <Text style={[styles.compactModalTitle, { color: theme.textPrimary }]}>
+              Update Profile Picture
+            </Text>
+            
+            <View style={styles.compactOptionsContainer}>
               <Pressable
                 style={({ pressed }) => [
-                  styles.actionButton,
-                  { backgroundColor: theme.successLighter },
-                  pressed && styles.actionButtonPressed
+                  styles.compactOption,
+                  { backgroundColor: theme.inputBackground },
+                  pressed && styles.compactOptionPressed
                 ]}
                 onPress={handleTakePhoto}
               >
-                <View style={styles.actionTextContainer}>
-                  <Text style={[styles.actionButtonTitle, { color: theme.textPrimary }]}>Take Photo</Text>
-                  <Text style={[styles.actionButtonSubtitle, { color: theme.textSecondary }]}>Capture with your camera</Text>
-                </View>
                 <Ionicons name="camera-outline" size={fp(24)} color={theme.success} />
+                <Text style={[styles.compactOptionText, { color: theme.textPrimary }]}>
+                  Take Photo
+                </Text>
               </Pressable>
 
               <Pressable
                 style={({ pressed }) => [
-                  styles.actionButton,
-                  { backgroundColor: theme.primaryLightest },
-                  pressed && styles.actionButtonPressed
+                  styles.compactOption,
+                  { backgroundColor: theme.inputBackground },
+                  pressed && styles.compactOptionPressed
                 ]}
                 onPress={handleAccessGallery}
               >
-                <View style={styles.actionTextContainer}>
-                  <Text style={[styles.actionButtonTitle, { color: theme.textPrimary }]}>Access Gallery</Text>
-                  <Text style={[styles.actionButtonSubtitle, { color: theme.textSecondary }]}>Choose from your photos</Text>
-                </View>
                 <Ionicons name="images-outline" size={fp(24)} color={theme.primary} />
+                <Text style={[styles.compactOptionText, { color: theme.textPrimary }]}>
+                  Choose from Gallery
+                </Text>
               </Pressable>
             </View>
 
-            <Pressable
-              style={({ pressed }) => [
-                styles.cancelButton,
-                { backgroundColor: theme.dangerLighter },
-                pressed && styles.cancelButtonPressed
-              ]}
-              onPress={() => setImageSourceModalVisible(false)}
-            >
-              <Text style={[styles.cancelButtonText, { color: theme.dangerMuted }]}>Cancel</Text>
-            </Pressable>
-          </Pressable>
+            <Text style={[styles.modalHint, { color: theme.textTertiary }]}>
+              You can change this anytime
+            </Text>
+          </View>
         </Pressable>
       </Modal>
 
@@ -832,16 +825,23 @@ const styles = StyleSheet.create({
   },
   editImageBadge: {
     position: "absolute",
-    bottom: 0,
-    right: 0,
-    width: wp(28),
-    height: wp(28),
-    borderRadius: wp(14),
-    backgroundColor: "#3B82F6",
+    bottom: -wp(2),
+    right: -wp(2),
+    width: wp(34),
+    height: wp(34),
+    borderRadius: wp(17),
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
     borderColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 6,
+  },
+  editImageBadgeDark: {
+    borderColor: '#334155',
   },
   username: {
     fontSize: fp(24),
@@ -955,90 +955,66 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  // Profile Image Modal Styles
-  actionModalOverlay: {
+  // Compact Top Modal Styles
+  compactModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: wp(24),
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'flex-start',
+    paddingTop: hp(60),
   },
-  actionModalCard: {
+  compactModalContainer: {
     backgroundColor: '#FFFFFF',
-    borderRadius: wp(24),
-    width: '100%',
-    maxWidth: wp(340),
-    paddingVertical: hp(24),
+    borderBottomLeftRadius: wp(20),
+    borderBottomRightRadius: wp(20),
+    paddingTop: hp(12),
+    paddingBottom: hp(24),
     paddingHorizontal: wp(20),
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: hp(8) },
+    shadowOffset: { width: 0, height: hp(4) },
     shadowOpacity: 0.15,
-    shadowRadius: wp(24),
-    elevation: 12,
+    shadowRadius: wp(12),
+    elevation: 8,
   },
-  actionModalHeader: {
-    alignItems: 'center',
-    marginBottom: hp(24),
-  },
-  actionModalTitle: {
-    fontSize: fp(20),
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: hp(4),
-  },
-  actionModalSubtitle: {
-    fontSize: fp(14),
-    color: '#6B7280',
-  },
-  actionButtonsContainer: {
-    gap: hp(8),
+  compactModalHandle: {
+    width: wp(40),
+    height: hp(4),
+    backgroundColor: '#D1D5DB',
+    borderRadius: wp(2),
+    alignSelf: 'center',
     marginBottom: hp(16),
   },
-  actionButton: {
+  compactModalTitle: {
+    fontSize: fp(18),
+    fontWeight: '700',
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: hp(16),
+  },
+  compactOptionsContainer: {
+    backgroundColor: 'transparent',
+    gap: hp(12),
+  },
+  compactOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: hp(16),
-    paddingHorizontal: wp(16),
-    borderRadius: wp(12),
-    backgroundColor: '#F9FAFB',
+    gap: wp(16),
+    paddingVertical: hp(18),
+    paddingHorizontal: wp(20),
+    borderRadius: wp(14),
   },
-  takePhotoButton: {
-    backgroundColor: '#F0FDF4',
-  },
-  galleryButton: {
-    backgroundColor: '#EEF2FF',
-  },
-  actionButtonPressed: {
+  compactOptionPressed: {
     backgroundColor: '#F3F4F6',
-    transform: [{ scale: 0.98 }],
   },
-  actionTextContainer: {
-    flex: 1,
-  },
-  actionButtonTitle: {
+  compactOptionText: {
     fontSize: fp(16),
     fontWeight: '600',
     color: '#111827',
   },
-  actionButtonSubtitle: {
-    fontSize: fp(13),
-    color: '#6B7280',
-    marginTop: hp(2),
-  },
-  cancelButton: {
-    alignItems: 'center',
-    paddingVertical: hp(14),
-    borderRadius: wp(12),
-    backgroundColor: '#FEF2F2',
-  },
-  cancelButtonPressed: {
-    opacity: 0.7,
-    transform: [{ scale: 0.98 }],
-  },
-  cancelButtonText: {
-    color: "#dc2626c5",
-    fontSize: fp(16),
-    fontWeight: "700",
+  modalHint: {
+    textAlign: 'center',
+    fontSize: fp(12),
+    color: '#9CA3AF',
+    marginTop: hp(12),
   },
 
   // Settings Modal Styles

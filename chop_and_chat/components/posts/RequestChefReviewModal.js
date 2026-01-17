@@ -9,10 +9,12 @@ import {
     Alert,
     KeyboardAvoidingView,
     Platform,
-    ScrollView
+    ScrollView,
+    Image,
+    Animated
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { wp, hp, fp } from '../../utils/responsive';
+import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { useTheme } from '../../context/ThemeContext';
 
 const CHEF_FILTERS = ['Following', 'All Chefs'];
@@ -20,24 +22,44 @@ const CHEF_FILTERS = ['Following', 'All Chefs'];
 export default function RequestChefReviewModal({ 
     visible, 
     onClose, 
+    onBack,
     dish,
+    imageUri,
     onSubmit 
 }) {
     const { theme } = useTheme();
     const [selectedFilter, setSelectedFilter] = useState('Following');
     const [feedbackContext, setFeedbackContext] = useState('');
+    const [imageExpanded, setImageExpanded] = useState(false);
+    const [rotateAnim] = useState(new Animated.Value(0));
+
+    const toggleImageExpanded = () => {
+        const toValue = imageExpanded ? 0 : 1;
+        
+        Animated.timing(rotateAnim, {
+            toValue,
+            duration: 300,
+            useNativeDriver: true,
+        }).start();
+        
+        setImageExpanded(!imageExpanded);
+    };
+
+    const arrowRotation = rotateAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0deg', '180deg'],
+    });
 
     const handleSubmit = () => {
         if (!feedbackContext.trim()) {
             Alert.alert(
                 'Context Required',
-                'Please describe what kind of feedback you\'re looking for.',
+                'Please specify some of the ingredients and/or preparation steps.',
                 [{ text: 'OK' }]
             );
             return;
         }
 
-        // Submit the review request
         onSubmit?.({
             dishId: dish?.id,
             dishTitle: dish?.title,
@@ -46,13 +68,14 @@ export default function RequestChefReviewModal({
             timestamp: new Date().toISOString()
         });
 
-        // Reset and close
         setFeedbackContext('');
         setSelectedFilter('Following');
+        setImageExpanded(false);
+        rotateAnim.setValue(0);
         onClose();
 
         Alert.alert(
-            'Request Sent! 🎉',
+            'Request Sent!!',
             selectedFilter === 'Following' 
                 ? 'Chefs you follow will be notified about your review request.'
                 : 'All chefs in the community will be notified about your review request.',
@@ -63,7 +86,18 @@ export default function RequestChefReviewModal({
     const handleClose = () => {
         setFeedbackContext('');
         setSelectedFilter('Following');
+        setImageExpanded(false);
+        rotateAnim.setValue(0);
         onClose();
+    };
+
+    const handleBackPress = () => {
+        console.log('Back pressed in RequestChefReviewModal, calling onBack');
+        setFeedbackContext('');
+        setSelectedFilter('Following');
+        setImageExpanded(false);
+        rotateAnim.setValue(0);
+        onBack?.();
     };
 
     return (
@@ -73,38 +107,60 @@ export default function RequestChefReviewModal({
             animationType="slide"
             onRequestClose={handleClose}
         >
-            <Pressable style={styles.overlay} onPress={handleClose}>
+            <View style={styles.overlay}>
+                <Pressable 
+                    style={styles.overlayPressable} 
+                    onPress={handleClose}
+                />
                 <KeyboardAvoidingView 
                     behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    style={{ width: '100%' }}
+                    style={styles.keyboardAvoid}
                 >
-                    <Pressable 
-                        style={[styles.modalContainer, { backgroundColor: theme.modalBackground }]}
-                        onPress={(e) => e.stopPropagation()}
-                    >
+                    <View style={[styles.modalContainer, { backgroundColor: theme.modalBackground }]}>
                         {/* Header */}
                         <View style={[styles.header, { borderBottomColor: theme.border }]}>
+                            <Pressable onPress={handleBackPress} style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.6 }]}>
+                                <Ionicons name="arrow-back" size={fp(24)} color={theme.textPrimary} />
+                            </Pressable>
                             <Text style={[styles.title, { color: theme.textPrimary }]}>
                                 Request Chef Review
                             </Text>
-                            <Pressable onPress={handleClose} style={styles.closeButton}>
-                                <Ionicons name="close" size={fp(24)} color={theme.textSecondary} />
-                            </Pressable>
+                            <View style={styles.placeholder} />
                         </View>
 
                         <ScrollView 
-                            style={styles.content}
+                            style={styles.scrollContent}
+                            contentContainerStyle={styles.scrollContentContainer}
                             showsVerticalScrollIndicator={false}
                             keyboardShouldPersistTaps="handled"
                         >
-                            {/* Dish Info */}
+                            {/* Dish Info - Pressable */}
                             {dish && (
-                                <View style={[styles.dishInfo, { backgroundColor: theme.cardBackgroundAlt }]}>
-                                    <Ionicons name="restaurant-outline" size={fp(20)} color={theme.primary} />
-                                    <Text style={[styles.dishTitle, { color: theme.textPrimary }]} numberOfLines={1}>
-                                        {dish.title}
-                                    </Text>
-                                </View>
+                                <>
+                                    <Pressable 
+                                        style={[styles.dishInfo, { backgroundColor: theme.cardBackgroundAlt }]}
+                                        onPress={toggleImageExpanded}
+                                    >
+                                        <Ionicons name="restaurant-outline" size={fp(20)} color={theme.primary} />
+                                        <Text style={[styles.dishTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+                                            {dish.title}
+                                        </Text>
+                                        <Animated.View style={{ transform: [{ rotate: arrowRotation }] }}>
+                                            <Ionicons name="chevron-down" size={fp(20)} color={theme.textSecondary} />
+                                        </Animated.View>
+                                    </Pressable>
+
+                                    {/* Expandable Image */}
+                                    {imageExpanded && imageUri && (
+                                        <View style={styles.imageContainer}>
+                                            <Image 
+                                                source={{ uri: imageUri }} 
+                                                style={styles.dishImage}
+                                                resizeMode="cover"
+                                            />
+                                        </View>
+                                    )}
+                                </>
                             )}
 
                             {/* Info Section */}
@@ -112,14 +168,13 @@ export default function RequestChefReviewModal({
                                 <Ionicons name="information-circle" size={fp(20)} color={theme.primary} />
                                 <Text style={[styles.infoText, { color: theme.textSecondary }]}>
                                     Professional chefs will review your dish and provide feedback based on 
-                                    presentation, technique, and flavor potential. Tell them what aspects 
-                                    you'd like reviewed!
+                                    presentation, technique, and flavor potential. Tell them what they need to know!
                                 </Text>
                             </View>
 
                             {/* Feedback Context Input */}
                             <Text style={[styles.label, { color: theme.textPrimary }]}>
-                                What feedback are you looking for? <Text style={styles.required}>*</Text>
+                                Specify the ingredients and/or preparation steps. <Text style={styles.required}>*</Text>
                             </Text>
                             <TextInput
                                 style={[
@@ -130,12 +185,12 @@ export default function RequestChefReviewModal({
                                         borderColor: theme.border
                                     }
                                 ]}
-                                placeholder="e.g., How can I improve the plating? Is the sauce consistency right?"
+                                placeholder="e.g., Chicken breast, garlic, olive oil. Seasoned and pan-seared for 5 minutes each side, then baked at 180°C for 15 minutes."
                                 placeholderTextColor={theme.textTertiary}
                                 value={feedbackContext}
                                 onChangeText={setFeedbackContext}
                                 multiline
-                                numberOfLines={4}
+                                numberOfLines={6}
                                 textAlignVertical="top"
                             />
 
@@ -185,21 +240,19 @@ export default function RequestChefReviewModal({
                                     : 'All verified chefs can see and claim this request'
                                 }
                             </Text>
-                        </ScrollView>
 
-                        {/* Submit Button */}
-                        <View style={[styles.footer, { borderTopColor: theme.border }]}>
+                            {/* Submit Button inside ScrollView */}
                             <Pressable
-                                style={[styles.submitButton, { backgroundColor: theme.primary }]}
+                                style={[styles.submitButton, { backgroundColor: '#2563EB' }]}
                                 onPress={handleSubmit}
                             >
                                 <Ionicons name="paper-plane" size={fp(18)} color="#FFFFFF" />
                                 <Text style={styles.submitButtonText}>Send Request</Text>
                             </Pressable>
-                        </View>
-                    </Pressable>
+                        </ScrollView>
+                    </View>
                 </KeyboardAvoidingView>
-            </Pressable>
+            </View>
         </Modal>
     );
 }
@@ -210,10 +263,16 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'flex-end',
     },
+    overlayPressable: {
+        flex: 1,
+    },
+    keyboardAvoid: {
+        maxHeight: '85%',
+    },
     modalContainer: {
         borderTopLeftRadius: wp(24),
         borderTopRightRadius: wp(24),
-        maxHeight: '85%',
+        height: '100%',
     },
     header: {
         flexDirection: 'row',
@@ -227,12 +286,22 @@ const styles = StyleSheet.create({
     title: {
         fontSize: fp(18),
         fontWeight: '700',
+        flex: 1,
+        textAlign: 'center',
     },
-    closeButton: {
+    backButton: {
         padding: wp(4),
+        width: wp(32),
     },
-    content: {
+    placeholder: {
+        width: wp(32),
+    },
+    scrollContent: {
+        flex: 1,
+    },
+    scrollContentContainer: {
         padding: wp(20),
+        paddingBottom: hp(40),
     },
     dishInfo: {
         flexDirection: 'row',
@@ -246,6 +315,17 @@ const styles = StyleSheet.create({
         fontSize: fp(15),
         fontWeight: '600',
         flex: 1,
+    },
+    imageContainer: {
+        width: '100%',
+        marginBottom: hp(16),
+        borderRadius: wp(12),
+        overflow: 'hidden',
+    },
+    dishImage: {
+        width: '100%',
+        height: hp(140),
+        backgroundColor: '#F3F4F6',
     },
     infoBox: {
         flexDirection: 'row',
@@ -273,7 +353,7 @@ const styles = StyleSheet.create({
         borderRadius: wp(12),
         padding: wp(14),
         fontSize: fp(14),
-        minHeight: hp(100),
+        minHeight: hp(120),
     },
     filterContainer: {
         flexDirection: 'row',
@@ -296,12 +376,8 @@ const styles = StyleSheet.create({
     filterHint: {
         fontSize: fp(12),
         marginTop: hp(10),
+        marginBottom: hp(24),
         textAlign: 'center',
-    },
-    footer: {
-        padding: wp(20),
-        paddingBottom: hp(30),
-        borderTopWidth: 1,
     },
     submitButton: {
         flexDirection: 'row',

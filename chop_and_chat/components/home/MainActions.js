@@ -5,8 +5,9 @@ import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { useTheme } from '../../context/ThemeContext';
 import CameraScreen, { uploadImage } from '../../utils/photoHandling';
 import CreatePostModal from '../posts/CreatePostModal';
+import RequestChefReviewModal from '../posts/RequestChefReviewModal';
 
-// --- CONFIGURATION DATA ---
+
 const AVAILABLE_UTENSILS = [
     { id: 'oven', label: 'Oven', icon: 'tablet-landscape-outline' },
     { id: 'mixer', label: 'Mixer', icon: 'sync-outline' },
@@ -40,6 +41,8 @@ export default function MainActions() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedUtensils, setSelectedUtensils] = useState([]);
 
+    // Upload Chef review modal state
+    const [chefReviewModalVisible, setChefReviewModalVisible] = useState(false);
     // --- HELPER FOR DIFFICULTY COLOR ---
     const getDifficultyColor = (difficulty) => {
         switch (difficulty.toLowerCase()) {
@@ -126,17 +129,41 @@ export default function MainActions() {
         setSelectedImageUri(null);
     };
 
-    const handleGetChefReview = () => {
-        setNextStepModalVisible(false);
-        // TODO: Implement chef review request
-        console.log('Requesting chef review for image:', selectedImageUri);
-        setSelectedImageUri(null);
+    const handlePostToFeedBack = () => {
+        setCreatePostModalVisible(false);
+        // Reopen the "What's next?" modal after a short delay
+        setTimeout(() => {
+            setNextStepModalVisible(true);
+        }, 300);
     };
+
+    const handleGetChefReview = () => {
+    setNextStepModalVisible(false);
+    // Open the Chef Review Modal
+    setTimeout(() => {
+        setChefReviewModalVisible(true);
+    }, 300);
+};
 
     const handleCancelAction = () => {
         setNextStepModalVisible(false);
         setSelectedImageUri(null);
     };
+
+    const handleChefReviewSubmit = (reviewData) => {
+    console.log('Chef review requested:', reviewData);
+    // TODO: Send to backend
+    setChefReviewModalVisible(false);
+    setSelectedImageUri(null);
+    };
+
+    const handleChefReviewBack = () => {
+    setChefReviewModalVisible(false);
+    // Reopen the "What's next?" modal after a short delay
+    setTimeout(() => {
+        setNextStepModalVisible(true);
+    }, 300);
+};
 
     return (
         <View style={styles.container}>
@@ -477,8 +504,25 @@ export default function MainActions() {
                     setCreatePostModalVisible(false);
                     setSelectedImageUri(null);
                 }}
+                onBack={handlePostToFeedBack}
                 imageUri={selectedImageUri}
                 onSubmit={handleCreatePostSubmit}
+            />
+
+            {/* Request Chef Review Modal */}
+            <RequestChefReviewModal
+                visible={chefReviewModalVisible}
+                onClose={() => {
+                    setChefReviewModalVisible(false);
+                    setSelectedImageUri(null);
+                }}
+                onBack={handleChefReviewBack}
+                dish={{
+                    id: 'temp-dish-id',
+                    title: 'Your Dish',
+                }}
+                imageUri={selectedImageUri}
+                onSubmit={handleChefReviewSubmit}
             />
         </View>
     );

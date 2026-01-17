@@ -135,46 +135,48 @@ export default function CameraScreen({ onPhotoTaken, onClose }) {
                 facing={facing}
                 enableTorch={flash === 'on'}
                 ref={cameraRef}
-            >
-                <View style={styles.topControls}>
-                    <Pressable 
-                        style={styles.iconButton} 
-                        onPress={toggleFlash}
-                    >
-                        <Ionicons 
-                            name={flash === 'off' ? 'flash-off' : 'flash'} 
-                            size={fp(28)} 
-                            color={flash === 'off' ? '#FFF' : '#FFD700'} 
-                        />
-                    </Pressable>
-                    <Pressable 
-                        style={styles.iconButton} 
-                        onPress={onClose}
-                    >
-                        <Ionicons name="close" size={fp(28)} color="#FFF" />
-                    </Pressable>
-                </View>
+            />
+            
+            {/* Top Controls - Absolute Positioning */}
+            <View style={styles.topControls}>
+                <Pressable 
+                    style={styles.iconButton} 
+                    onPress={toggleFlash}
+                >
+                    <Ionicons 
+                        name={flash === 'off' ? 'flash-off' : 'flash'} 
+                        size={fp(28)} 
+                        color={flash === 'off' ? '#FFF' : '#FFD700'} 
+                    />
+                </Pressable>
+                <Pressable 
+                    style={styles.iconButton} 
+                    onPress={onClose}
+                >
+                    <Ionicons name="close" size={fp(28)} color="#FFF" />
+                </Pressable>
+            </View>
 
-                <View style={styles.bottomControls}>
-                    <View style={styles.captureContainer}>
-                        <Pressable 
-                            style={styles.flipButton} 
-                            onPress={toggleCameraFacing}
-                        >
-                            <Ionicons name="camera-reverse" size={fp(32)} color="#FFF" />
-                        </Pressable>
-                        
-                        <Pressable 
-                            style={styles.captureButton} 
-                            onPress={takePicture}
-                        >
-                            <View style={styles.captureButtonInner} />
-                        </Pressable>
-                        
-                        <View style={{ width: wp(50) }} />
-                    </View>
+            {/* Bottom Controls - Absolute Positioning */}
+            <View style={styles.bottomControls}>
+                <View style={styles.captureContainer}>
+                    <Pressable 
+                        style={styles.flipButton} 
+                        onPress={toggleCameraFacing}
+                    >
+                        <Ionicons name="camera-reverse" size={fp(32)} color="#FFF" />
+                    </Pressable>
+                    
+                    <Pressable 
+                        style={styles.captureButton} 
+                        onPress={takePicture}
+                    >
+                        <View style={styles.captureButtonInner} />
+                    </Pressable>
+                    
+                    <View style={{ width: wp(50) }} />
                 </View>
-            </CameraView>
+            </View>
         </View>
     );
 }
@@ -188,10 +190,15 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     topControls: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
         flexDirection: 'row',
         justifyContent: 'space-between',
         padding: wp(20),
         paddingTop: hp(50),
+        zIndex: 10,
     },
     bottomControls: {
         position: 'absolute',
@@ -199,6 +206,7 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         paddingBottom: hp(40),
+        zIndex: 10,
     },
     captureContainer: {
         flexDirection: 'row',
