@@ -2,9 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, Pressable, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { wp, hp, fp } from '../utils/responsive';
-import { useTheme } from '../context/ThemeContext';
 
-// Use your computer's IP for physical devices, localhost for iOS simulator
 const BASE_URL = 'http://192.168.0.107:4000';
 
 //const BASE_URL_ANDROID = 'http://10.0.2.2:4000';
@@ -13,11 +11,10 @@ export default function RegisterScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const { isDarkMode, theme } = useTheme();
 
   const onRegister = async () => {
-    if (!email || !password) {
-      Alert.alert('Validation', 'Email and password are required');
+    if (!name || !email || !password) {
+      Alert.alert('Validation', 'Name, email and password are required');
       return;
     }
 
@@ -69,7 +66,7 @@ export default function RegisterScreen({ navigation }) {
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Name</Text>
             <TextInput
-              placeholder="Your name (optional)"
+              placeholder="Enter a username"
               placeholderTextColor="#9CA3AF"
               value={name}
               onChangeText={setName}

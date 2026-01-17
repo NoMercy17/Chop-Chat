@@ -7,12 +7,12 @@ export const lightTheme = {
   background: '#F3F4F6',
   backgroundSecondary: '#F8FAFB',
   backgroundTertiary: '#FFFFFF',
-  screenBackground: '#93C5FD',  // Light blue for Home/Community/Chef screens
+  screenBackground: '#93C5FD',
   
   // Cards & Surfaces
   cardBackground: '#FFFFFF',
-  cardBackgroundAlt: '#F9FAFB',
-  cardBackgroundLight: '#FFFFFF',  // Same as cardBackground for light mode
+  cardBackgroundAlt: '#F9FAFB', // Very subtle difference
+  cardBackgroundLight: '#FFFFFF',
   modalBackground: '#FFFFFF',
   overlayBackground: 'rgba(0, 0, 0, 0.5)',
   overlayBackgroundDark: 'rgba(0, 0, 0, 0.6)',
@@ -21,7 +21,7 @@ export const lightTheme = {
   postCardBackground: '#FFFFFF',
   postContentBackground: '#FFFFFF',
   postMetaBackground: '#FFFFFF',
-  postHeaderBackground: '#FFFFFF',  // Header section (author info)
+  postHeaderBackground: '#FFFFFF',
   imageBackground: '#F3F4F6',
   
   // Text Colors
@@ -85,13 +85,13 @@ export const lightTheme = {
   profileTextPrimary: '#FFFFFF',
   profileTextSecondary: '#E0EFFE',
   
-  // Header title color (screen titles)
+  // Header title color
   headerTitleColor: '#111827',
   
   // Recipe info background
   recipeInfoBackground: '#FFFFFF',
   
-  // Modal action button backgrounds (light mode)
+  // Modal action buttons
   takePhotoButtonBg: '#F0FDF4',
   galleryButtonBg: '#EEF2FF',
   postFeedButtonBg: '#EFF6FF',
@@ -99,9 +99,9 @@ export const lightTheme = {
   chefReviewButtonBg: '#f7e9faff',
   cancelButtonBg: '#FEF2F2',
   
-  // Chef/Community card specific
+  // Chef/Community card
   chefCardBackground: '#FFFFFF',
-  chefCardHeaderBg: '#FFFFFF',  // Header section
+  chefCardHeaderBg: '#FFFFFF',
   chefCardContentBg: '#FFFFFF',
   commentSectionBg: '#F9FAFB',
 };
@@ -112,11 +112,11 @@ export const darkTheme = {
   background: '#0F172A',
   backgroundSecondary: '#1E293B',
   backgroundTertiary: '#3D4A5C',
-  screenBackground: '#1a3a52',  // Darker blue
+  screenBackground: '#1a3a52',
   
   // Cards & Surfaces
   cardBackground: '#1E293B',
-  cardBackgroundAlt: '#3D4A5C',
+  cardBackgroundAlt: '#263242', 
   cardBackgroundLight: '#2D3A4F',  
   modalBackground: '#1E293B',
   overlayBackground: 'rgba(0, 0, 0, 0.7)',
@@ -124,9 +124,9 @@ export const darkTheme = {
   
   // Post/Feed specific backgrounds 
   postCardBackground: '#1E293B',
-  postContentBackground: '#3D4A5C',  // Lighter grey for content/comments section
+  postContentBackground: '#3D4A5C',
   postMetaBackground: '#3D4A5C',  
-  postHeaderBackground: '#1E293B',  // Darker for "reacted to" header section
+  postHeaderBackground: '#1E293B',
   imageBackground: '#F9FAFB',  
   
   // Text Colors
@@ -190,13 +190,13 @@ export const darkTheme = {
   profileTextPrimary: 'rgba(255, 255, 255, 0.85)',
   profileTextSecondary: 'rgba(255, 255, 255, 0.6)',
   
-  // Header title color (screen titles)
+  // Header title
   headerTitleColor: '#f1f5f9ee',
   
-  // Recipe info background
+  // Recipe info
   recipeInfoBackground: '#3D4A5C',
   
-  // Modal action button backgrounds (dark mode)
+  // Modal action buttons
   takePhotoButtonBg: '#1E3A2E',
   galleryButtonBg: '#1E2A4A',
   postFeedButtonBg: '#1E3A5F',
@@ -204,11 +204,11 @@ export const darkTheme = {
   chefReviewButtonBg: '#2E2535',
   cancelButtonBg: '#3D2020',
   
-  // Chef/Community card specific 
+  // Chef/Community card
   chefCardBackground: '#1E293B',  
-  chefCardHeaderBg: '#1E293B',  // Darker header section (reacted to...)
-  chefCardContentBg: '#3D4A5C',  // Lighter content area (comment text)
-  commentSectionBg: '#3D4A5C',  // Same as content
+  chefCardHeaderBg: '#1E293B',
+  chefCardContentBg: '#3D4A5C',
+  commentSectionBg: '#3D4A5C',  
 };
 
 const ThemeContext = createContext();
@@ -217,7 +217,6 @@ export function ThemeProvider({ children }) {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load theme preference on mount
   useEffect(() => {
     loadThemePreference();
   }, []);

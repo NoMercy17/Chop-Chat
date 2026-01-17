@@ -7,11 +7,11 @@ import CameraScreen, { uploadImage } from '../../utils/photoHandling';
 
 // --- CONFIGURATION DATA ---
 const AVAILABLE_UTENSILS = [
-    { id: 'oven', label: 'Oven', icon: 'flame-outline' },
-    { id: 'mixer', label: 'Mixer', icon: 'nutrition-outline' }, // nutrition is a placeholder, verify icon name
-    { id: 'blender', label: 'Blender', icon: 'flask-outline' },
-    { id: 'stove', label: 'Stove', icon: 'restaurant-outline' },
-    { id: 'microwave', label: 'Microwave', icon: 'flash-outline' },
+    { id: 'oven', label: 'Oven', icon: 'tablet-landscape-outline' },
+    { id: 'mixer', label: 'Mixer', icon: 'sync-outline' },
+    { id: 'blender', label: 'Blender', icon: 'color-wand-outline' },
+    { id: 'stove', label: 'Stove', icon: 'flame-outline' },
+    { id: 'microwave', label: 'Microwave', icon: 'tv-outline' },
 ];
 
 const DUMMY_RECIPES = [
@@ -36,6 +36,16 @@ export default function MainActions() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedUtensils, setSelectedUtensils] = useState([]);
 
+    // --- HELPER FOR DIFFICULTY COLOR ---
+    const getDifficultyColor = (difficulty) => {
+        switch (difficulty.toLowerCase()) {
+            case 'easy': return '#10B981';
+            case 'medium': return '#F59E0B';
+            case 'hard': return '#EF4444';
+            default: return '#6B7280';
+        }
+    };
+
     // --- FIND RECIPE HANDLERS ---
     const handleFindRecipe = () => {
         setFindRecipeModalVisible(true);
@@ -49,14 +59,9 @@ export default function MainActions() {
         }
     };
 
-    // Simple Filter Logic (Visual Demo Only)
     const filteredRecipes = useMemo(() => {
         return DUMMY_RECIPES.filter(recipe => {
-            // 1. Filter by Text
             const matchesSearch = recipe.name.toLowerCase().includes(searchQuery.toLowerCase());
-            
-            // 2. Filter by Utensils (Strict Mode: Must have ALL required tools selected? 
-            //    Or just show matches? For now, let's just filter by text to keep it simple visually)
             return matchesSearch; 
         });
     }, [searchQuery, selectedUtensils]);
@@ -153,7 +158,6 @@ export default function MainActions() {
                 </View>
             </Pressable>
 
-
             {/* FIND RECIPE MODAL */}            
             <Modal 
                 visible={findRecipeModalVisible} 
@@ -229,66 +233,69 @@ export default function MainActions() {
                             Results ({filteredRecipes.length})
                         </Text>
                         
-                    <FlatList 
-                        data={filteredRecipes}
-                        keyExtractor={item => item.id}
-                        contentContainerStyle={{ paddingBottom: hp(40) }}
-                        renderItem={({ item }) => (
-                            <Pressable 
-                                onPress={() => console.log('Selected Recipe ID:', item.id)}
-                                style={({ pressed }) => [
-                                    styles.recipeCard, 
-                                    { 
-                                        backgroundColor: theme.cardBackground, 
-                                        shadowColor: theme.shadowColor,
-                                        // Visual feedback when pressed
-                                        opacity: pressed ? 0.7 : 1,
-                                        transform: [{ scale: pressed ? 0.98 : 1 }]
-                                    }
-                                ]}
-                            >
-                                {/* Mock Image Placeholder */}
-                                <View style={[styles.recipeImagePlaceholder, { backgroundColor: theme.cardBackgroundAlt }]}>
-                                    <Ionicons name="restaurant" size={30} color={theme.textTertiary} />
-                                </View>
-                                
-                                <View style={styles.recipeInfo}>
-                                    <Text style={[styles.recipeName, { color: theme.textPrimary }]}>{item.name}</Text>
-                                    <View style={styles.recipeMetaRow}>
-                                        <View style={styles.metaBadge}>
-                                            <Ionicons name="time-outline" size={12} color={theme.textSecondary} />
-                                            <Text style={[styles.metaText, { color: theme.textSecondary }]}>{item.time}</Text>
+                        <FlatList 
+                            data={filteredRecipes}
+                            keyExtractor={item => item.id}
+                            contentContainerStyle={{ paddingBottom: hp(40) }}
+                            renderItem={({ item }) => (
+                                <Pressable 
+                                    onPress={() => console.log('Selected Recipe ID:', item.id)}
+                                    style={({ pressed }) => [
+                                        styles.recipeCard, 
+                                        { 
+                                            backgroundColor: theme.cardBackground, 
+                                            shadowColor: theme.shadowColor,
+                                            opacity: pressed ? 0.7 : 1,
+                                            transform: [{ scale: pressed ? 0.98 : 1 }]
+                                        }
+                                    ]}
+                                >
+                                    <View style={[styles.recipeImagePlaceholder, { backgroundColor: theme.cardBackgroundAlt }]}>
+                                        <Ionicons name="restaurant" size={30} color={theme.textTertiary} />
+                                    </View>
+                                    
+                                    <View style={styles.recipeInfo}>
+                                        <Text style={[styles.recipeName, { color: theme.textPrimary }]}>{item.name}</Text>
+                                        
+                                        <View style={styles.recipeMetaRow}>
+                                            <View style={styles.metaBadge}>
+                                                <Ionicons name="time-outline" size={14} color={theme.textSecondary} />
+                                                <Text style={[styles.metaText, { color: theme.textSecondary }]}>{item.time}</Text>
+                                            </View>
+                                            <View style={[
+                                                styles.difficultyBadge, 
+                                                { backgroundColor: getDifficultyColor(item.difficulty) + '20' }
+                                            ]}>
+                                                <Text style={[
+                                                    styles.difficultyText, 
+                                                    { color: getDifficultyColor(item.difficulty) }
+                                                ]}>
+                                                    {item.difficulty}
+                                                </Text>
+                                            </View>
                                         </View>
-                                        <View style={styles.metaBadge}>
-                                            <Ionicons name="bar-chart-outline" size={12} color={theme.textSecondary} />
-                                            <Text style={[styles.metaText, { color: theme.textSecondary }]}>{item.difficulty}</Text>
+                                        
+                                        <View style={styles.toolsRow}>
+                                            {item.tools.map((toolId, index) => (
+                                                <View key={`${item.id}-${toolId}-${index}`} style={[
+                                                    styles.miniToolDot, 
+                                                    { backgroundColor: selectedUtensils.includes(toolId) ? '#10B981' : theme.textTertiary } 
+                                                ]} />
+                                            ))}
+                                            <Text style={[styles.metaText, { fontSize: fp(10), color: theme.textTertiary, marginLeft: 4 }]}>
+                                                {item.tools.join(', ')}
+                                            </Text>
                                         </View>
                                     </View>
                                     
-                                    {/* Tools Indicators */}
-                                    <View style={styles.toolsRow}>
-                                        {item.tools.map((toolId, index) => (
-                                            <View key={`${item.id}-${toolId}-${index}`} style={[
-                                                styles.miniToolDot, 
-                                                { backgroundColor: selectedUtensils.includes(toolId) ? '#10B981' : theme.textTertiary } 
-                                            ]} />
-                                        ))}
-                                        <Text style={[styles.metaText, { fontSize: fp(10), color: theme.textTertiary, marginLeft: 4 }]}>
-                                            {item.tools.join(', ')}
-                                        </Text>
-                                    </View>
-                                </View>
-                                
-                                <Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />
-                            </Pressable>
-                        )}
-                    />
+                                    <Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />
+                                </Pressable>
+                            )}
+                        />
                     </View>
                 </View>
             </Modal>
 
-
-            
             {/* Step 1: Image Source Modal */}
             <Modal 
                 visible={sourceModalVisible} 
@@ -310,7 +317,7 @@ export default function MainActions() {
                             <Pressable
                                 style={({ pressed }) => [
                                     styles.actionButton,
-                                    { backgroundColor: theme.takePhotoButtonBg },
+                                    { backgroundColor: theme.successLighter }, // UPDATED: Green background
                                     pressed && styles.actionButtonPressed
                                 ]}
                                 onPress={handleTakePhoto}
@@ -319,13 +326,14 @@ export default function MainActions() {
                                     <Text style={[styles.actionButtonTitle, { color: theme.textPrimary }]}>Take Photo</Text>
                                     <Text style={[styles.actionButtonSubtitle, { color: theme.textSecondary }]}>Capture with your camera</Text>
                                 </View>
-                                <Text style={[styles.actionArrow, { color: theme.textTertiary }]}>→</Text>
+                                {/* UPDATED: Green Arrow */}
+                                <Text style={[styles.actionArrow, { color: theme.success }]}>→</Text>
                             </Pressable>
 
                             <Pressable
                                 style={({ pressed }) => [
                                     styles.actionButton,
-                                    { backgroundColor: theme.galleryButtonBg },
+                                    { backgroundColor: theme.primaryLightest }, // UPDATED: Blue background
                                     pressed && styles.actionButtonPressed
                                 ]}
                                 onPress={handleAccessGallery}
@@ -334,14 +342,15 @@ export default function MainActions() {
                                     <Text style={[styles.actionButtonTitle, { color: theme.textPrimary }]}>Access Gallery</Text>
                                     <Text style={[styles.actionButtonSubtitle, { color: theme.textSecondary }]}>Choose from your photos</Text>
                                 </View>
-                                <Text style={[styles.actionArrow, { color: theme.textTertiary }]}>→</Text>
+                                {/* UPDATED: Blue Arrow */}
+                                <Text style={[styles.actionArrow, { color: theme.primary }]}>→</Text>
                             </Pressable>
                         </View>
 
                         <Pressable
                             style={({ pressed }) => [
                                 styles.cancelButton,
-                                { backgroundColor: theme.cancelButtonBg },
+                                { backgroundColor: theme.dangerLighter }, // UPDATED: Red background
                                 pressed && styles.cancelButtonPressed
                             ]}
                             onPress={() => setSourceModalVisible(false)}
@@ -386,7 +395,7 @@ export default function MainActions() {
                             <Pressable
                                 style={({ pressed }) => [
                                     styles.actionButton,
-                                    { backgroundColor: theme.postFeedButtonBg },
+                                    { backgroundColor: theme.primaryLightest }, // UPDATED: Blue (matches Gallery)
                                     pressed && styles.actionButtonPressed
                                 ]}
                                 onPress={handlePostToFeed}
@@ -395,13 +404,13 @@ export default function MainActions() {
                                     <Text style={[styles.actionButtonTitle, { color: theme.textPrimary }]}>Post to Feed</Text>
                                     <Text style={[styles.actionButtonSubtitle, { color: theme.textSecondary }]}>Share with the community</Text>
                                 </View>
-                                <Text style={[styles.actionArrow, { color: theme.textTertiary }]}>→</Text>
+                                <Text style={[styles.actionArrow, { color: theme.primary }]}>→</Text>
                             </Pressable>
 
                             <Pressable
                                 style={({ pressed }) => [
                                     styles.actionButton,
-                                    { backgroundColor: theme.aiRatingButtonBg },
+                                    { backgroundColor: theme.warningLight }, 
                                     pressed && styles.actionButtonPressed
                                 ]}
                                 onPress={handleGetAiRating}
@@ -410,13 +419,13 @@ export default function MainActions() {
                                     <Text style={[styles.actionButtonTitle, { color: theme.textPrimary }]}>Get AI Rating</Text>
                                     <Text style={[styles.actionButtonSubtitle, { color: theme.textSecondary }]}>Let AI judge your creation</Text>
                                 </View>
-                                <Text style={[styles.actionArrow, { color: theme.textTertiary }]}>→</Text>
+                                <Text style={[styles.actionArrow, { color: theme.warning }]}>→</Text>
                             </Pressable>
 
                             <Pressable
                                 style={({ pressed }) => [
                                     styles.actionButton,
-                                    { backgroundColor: theme.chefReviewButtonBg },
+                                    { backgroundColor: theme.chefReviewButtonBg }, 
                                     pressed && styles.actionButtonPressed
                                 ]}
                                 onPress={handleGetChefReview}
@@ -432,7 +441,7 @@ export default function MainActions() {
                         <Pressable
                             style={({ pressed }) => [
                                 styles.cancelButton,
-                                { backgroundColor: theme.cancelButtonBg },
+                                { backgroundColor: theme.dangerLighter }, // UPDATED: Red
                                 pressed && styles.cancelButtonPressed
                             ]}
                             onPress={handleCancelAction}
@@ -490,13 +499,12 @@ const styles = StyleSheet.create({
         width: wp(40),
         height: wp(40),
         borderRadius: wp(10),
-        backgroundColor: '#F3F4F6',
+        backgroundColor: 'transparent',
         justifyContent: 'center',
         alignItems: 'center',
         marginLeft: wp(16),
+        padding: 0,
     },
-    
-    // --- NEW STYLES FOR RECIPE MODAL ---
     fullScreenModal: {
         flex: 1,
         paddingTop: hp(50), 
@@ -541,7 +549,7 @@ const styles = StyleSheet.create({
     },
     chipsContainer: {
         gap: wp(10),
-        paddingRight: wp(20), // Add some padding at the end of scroll
+        paddingRight: wp(20),
     },
     chip: {
         flexDirection: 'row',
@@ -584,6 +592,7 @@ const styles = StyleSheet.create({
     },
     recipeMetaRow: {
         flexDirection: 'row',
+        alignItems: 'center',
         gap: wp(12),
         marginBottom: hp(6),
     },
@@ -594,6 +603,16 @@ const styles = StyleSheet.create({
     },
     metaText: {
         fontSize: fp(12),
+    },
+    difficultyBadge: {
+        paddingHorizontal: wp(8),
+        paddingVertical: hp(2),
+        borderRadius: wp(6),
+    },
+    difficultyText: {
+        fontSize: fp(11),
+        fontWeight: '600',
+        textTransform: 'capitalize',
     },
     toolsRow: {
         flexDirection: 'row',
@@ -606,8 +625,6 @@ const styles = StyleSheet.create({
         borderRadius: 3,
         marginRight: 4,
     },
-
-    // --- EXISTING MODAL STYLES ---
     actionModalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.6)',

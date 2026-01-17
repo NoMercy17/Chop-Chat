@@ -1,10 +1,12 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Text, View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { chefFeedItems } from '../../data/chefFeedData';
+import ChefPostDetailModal from '../posts/ChefPostDetailModal';
+import DishDetailModal from '../posts/DishDetailModal';
 
 // Get 4 random items for the quick menu
 const getRandomFeedItems = (items, count) => {
@@ -15,6 +17,11 @@ const getRandomFeedItems = (items, count) => {
 export default function FeaturedChef() {
     const navigation = useNavigation();
     const { theme } = useTheme();
+    
+    const [chefPostDetailVisible, setChefPostDetailVisible] = useState(false);
+    const [dishDetailModalVisible, setDishDetailModalVisible] = useState(false);
+    const [selectedItem, setSelectedItem] = useState(null);
+    const [selectedDish, setSelectedDish] = useState(null);
     
     // Select 4 random feed items on mount
     const feedItems = useMemo(() => getRandomFeedItems(chefFeedItems, 4), []);
@@ -42,7 +49,10 @@ export default function FeaturedChef() {
                     { backgroundColor: theme.chefCardBackground },
                     pressed && styles.reviewCardPressed
                 ]}
-                onPress={() => console.log('Feed item pressed:', item.id)}
+                onPress={() => {
+                    setSelectedItem(item);
+                    setChefPostDetailVisible(true);
+                }}
             >
                 <View style={[styles.cardHeader, { backgroundColor: theme.chefCardHeaderBg }]}>
                     <View style={[styles.chefAvatar, { backgroundColor: theme.primary }]}>
@@ -118,6 +128,37 @@ export default function FeaturedChef() {
                     </View>
                 </Pressable>
             </ScrollView>
+
+            {/* Chef Post Detail Modal (First expansion - slightly bigger) */}
+            <ChefPostDetailModal
+                visible={chefPostDetailVisible}
+                onClose={() => {
+                    setChefPostDetailVisible(false);
+                    setSelectedItem(null);
+                }}
+                item={selectedItem}
+                onChefHeaderPress={(chef) => {
+                    console.log('Chef header pressed, navigate to profile:', chef.id);
+                }}
+                onTitlePress={(item) => {
+                    console.log('Title pressed, opening full dish detail');
+                    // Open the dish detail modal
+                    setSelectedDish(item);
+                    setDishDetailModalVisible(true);
+                }}
+            />
+
+            {/* Dish Detail Modal (Full expansion) */}
+            <DishDetailModal
+                visible={dishDetailModalVisible}
+                onClose={() => {
+                    setDishDetailModalVisible(false);
+                    setSelectedDish(null);
+                    // Reopen the chef post detail modal
+                    setChefPostDetailVisible(true);
+                }}
+                dish={selectedDish}
+            />
         </View>
     );
 }
@@ -241,8 +282,9 @@ const styles = StyleSheet.create({
     moreCard: {
         alignSelf: 'center',
         width: wp(110),
+        marginTop: hp(8),
+        marginBottom: hp(16),
         overflow: 'hidden',
-        marginLeft: wp(4),
     },
     moreCardPressed: {
         opacity: 0.85,
@@ -257,6 +299,7 @@ const styles = StyleSheet.create({
     moreCardContent: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
         paddingVertical: hp(12),
         paddingHorizontal: wp(24),
     },

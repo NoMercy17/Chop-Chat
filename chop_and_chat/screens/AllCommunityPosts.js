@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { usePosts } from '../context/PostsContext';
+import DishDetailModal from '../components/posts/DishDetailModal';
 
 
 const CATEGORIES = ['Following', 'All'];
@@ -20,6 +21,8 @@ export default function AllCommunityPosts({ navigation }) {
     const [selectedCategory, setSelectedCategory] = useState('All');
     const [commentsModalVisible, setCommentsModalVisible] = useState(false);
     const [selectedPost, setSelectedPost] = useState(null);
+    const [dishDetailModalVisible, setDishDetailModalVisible] = useState(false);
+    const [selectedDish, setSelectedDish] = useState(null);
     const [newComment, setNewComment] = useState('');
     
     // Filter posts based on selected category
@@ -88,7 +91,10 @@ export default function AllCommunityPosts({ navigation }) {
                         { backgroundColor: theme.postCardBackground },
                         pressed && styles.postCardPressed
                     ]}
-                    onPress={() => console.log('Post pressed:', post.id)}
+                    onPress={() => {
+                        setSelectedDish(post);
+                        setDishDetailModalVisible(true);
+                    }}
                 >
                     <View style={[styles.imageplaceholder, { backgroundColor: theme.imageBackground }]}>
                         <Text style={[styles.imagePlaceholderText, { color: theme.textTertiary }]}>IMAGE</Text>
@@ -257,6 +263,16 @@ export default function AllCommunityPosts({ navigation }) {
                     </View>
                 </TouchableWithoutFeedback>
             </Modal>
+
+            {/* Dish Detail Modal */}
+            <DishDetailModal
+                visible={dishDetailModalVisible}
+                onClose={() => {
+                    setDishDetailModalVisible(false);
+                    setSelectedDish(null);
+                }}
+                dish={selectedDish}
+            />
             </ScrollView>
         </View>
     );

@@ -2,11 +2,9 @@ import React, { useState, useContext } from 'react';
 import { View, Text, TextInput, StyleSheet, Pressable, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthContext, navigationRef } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
 import { StatusBar } from 'expo-status-bar';
 import { wp, hp, fp } from '../utils/responsive';
 
-// Use your computer's IP for physical devices
 const BASE_URL = 'http://192.168.0.107:4000';
 
 //const BASE_URL_ANDROID = 'http://10.0.2.2:4000';
@@ -15,7 +13,6 @@ export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const auth = useContext(AuthContext);
-  const { isDarkMode, theme } = useTheme();
 
   const onLogin = async () => {
     if (!email || !password) {
@@ -53,7 +50,6 @@ export default function LoginScreen({ navigation }) {
           return;
         }
       } catch (e) {
-        // fallback: nothing — App gating will show Home
       }
     } catch (err) {
       console.warn(err);

@@ -78,15 +78,21 @@ export default function ProfileScreen({ navigation }) {
         }
       });
 
+      if (response.status === 401 || response.status === 403) {
+        console.error(' Authentication failed, status:', response.status);
+        console.log(' User needs to login again');
+        return;
+      }
+
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Profile loaded:', data.user);
+        console.log(' Profile loaded:', data.user);
         
         if (data.user.profile_photo) {
-          console.log('📸 Profile photo URL:', data.user.profile_photo);
+          console.log(' Profile photo URL:', data.user.profile_photo);
           setProfileImage(data.user.profile_photo);
         } else {
-          console.log('⚠️ No profile photo');
+          console.log(' No profile photo');
           setProfileImage(null);
         }
         
@@ -94,10 +100,10 @@ export default function ProfileScreen({ navigation }) {
           setBio(data.user.bio);
         }
       } else {
-        console.error('❌ Failed to load profile, status:', response.status);
+        console.error(' Failed to load profile, status:', response.status);
       }
     } catch (error) {
-      console.error('❌ Failed to load profile:', error);
+      console.error(' Failed to load profile:', error);
     }
   };
 
@@ -228,7 +234,7 @@ export default function ProfileScreen({ navigation }) {
       setIsUploading(true);
       
       // Step 1: Upload to Cloudinary
-      console.log('📤 Uploading to Cloudinary...');
+      console.log(' Uploading to CLOUDINARY...');
       const cloudinaryUrl = await uploadToCloudinary(localUri, 'profile_photos');
       
       if (!cloudinaryUrl) {
@@ -238,7 +244,7 @@ export default function ProfileScreen({ navigation }) {
       }
       
       // Step 2: Save URL to backend
-      console.log('💾 Saving to database...');
+      console.log(' Saving to database...');
       let token = await AsyncStorage.getItem('userToken');
       if (!token) {
         const session = await AsyncStorage.getItem('session_user');
@@ -259,7 +265,7 @@ export default function ProfileScreen({ navigation }) {
       const data = await response.json();
       
       if (response.ok) {
-        console.log('✅ Profile photo saved!');
+        console.log(' Profile photo saved!');
         setProfileImage(cloudinaryUrl); // Update to use Cloudinary URL
         Alert.alert('Success', 'Profile photo updated!');
         
