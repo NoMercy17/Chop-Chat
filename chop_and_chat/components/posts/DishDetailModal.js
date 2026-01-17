@@ -3,9 +3,11 @@ import { View, Text, StyleSheet, Modal, ScrollView, Pressable } from 'react-nati
 import { Ionicons } from '@expo/vector-icons';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { useTheme } from '../../context/ThemeContext';
+import RequestChefReviewModal from './RequestChefReviewModal';
 
 export default function DishDetailModal({ visible, onClose, dish }) {
     const { theme } = useTheme();
+    const [reviewModalVisible, setReviewModalVisible] = useState(false);
 
     if (!dish) return null;
 
@@ -206,9 +208,36 @@ Divide dough and stretch into pizza bases. Add toppings and bake at 220°C for 1
                             </>
                         )}
 
+                        {/* Request Chef Review Button */}
+                        <View
+                            style={[styles.divider, { backgroundColor: theme.textSecondary, opacity: 0.2 }]}
+                        />
+                        <Pressable
+                            style={({ pressed }) => [
+                                styles.chefReviewButton,
+                                { backgroundColor: theme.primary },
+                                pressed && { opacity: 0.8 }
+                            ]}
+                            onPress={() => setReviewModalVisible(true)}
+                        >
+                            <Ionicons name="star-outline" size={fp(20)} color="#FFFFFF" />
+                            <Text style={styles.chefReviewButtonText}>Request Chef Review</Text>
+                        </Pressable>
+
                         <View style={{ height: hp(20) }} />
                     </View>
                 </ScrollView>
+
+                {/* Request Chef Review Modal */}
+                <RequestChefReviewModal
+                    visible={reviewModalVisible}
+                    onClose={() => setReviewModalVisible(false)}
+                    dish={dish}
+                    onSubmit={(reviewRequest) => {
+                        console.log('Chef review request submitted:', reviewRequest);
+                        // TODO: Send to backend and trigger notifications
+                    }}
+                />
             </View>
         </Modal>
     );
@@ -365,5 +394,19 @@ const styles = StyleSheet.create({
         lineHeight: fp(22),
         fontWeight: '400',
         marginTop: hp(8),
+    },
+    chefReviewButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: wp(10),
+        paddingVertical: hp(16),
+        borderRadius: wp(12),
+        marginTop: hp(10),
+    },
+    chefReviewButtonText: {
+        color: '#FFFFFF',
+        fontSize: fp(16),
+        fontWeight: '700',
     },
 });

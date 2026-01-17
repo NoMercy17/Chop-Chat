@@ -1,45 +1,89 @@
-import { useMemo, useState } from 'react';
-import { Text, View, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { useMemo, useState, useEffect } from 'react';
+import { Text, View, StyleSheet, ScrollView, Pressable, Modal, TouchableWithoutFeedback, KeyboardAvoidingView, Platform, TextInput } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
-import { chefFeedItems } from '../../data/chefFeedData';
+import { useChefFeed } from '../../context/ChefFeedContext';
 import ChefPostDetailModal from '../posts/ChefPostDetailModal';
 import DishDetailModal from '../posts/DishDetailModal';
-
-// Get 4 random items for the quick menu
-const getRandomFeedItems = (items, count) => {
-    const shuffled = [...items].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, count);
-};
 
 export default function FeaturedChef() {
     const navigation = useNavigation();
     const { theme } = useTheme();
     
+    const { feedItems, handleLike, handleSave, updateCommentCount } = useChefFeed();
+    
     const [chefPostDetailVisible, setChefPostDetailVisible] = useState(false);
     const [dishDetailModalVisible, setDishDetailModalVisible] = useState(false);
-    const [selectedItem, setSelectedItem] = useState(null);
-    const [selectedDish, setSelectedDish] = useState(null);
+    const [commentsModalVisible, setCommentsModalVisible] = useState(false);
     
-    // Select 4 random feed items on mount
-    const feedItems = useMemo(() => getRandomFeedItems(chefFeedItems, 4), []);
+    const [selectedItemId, setSelectedItemId] = useState(null);
+    const [selectedDish, setSelectedDish] = useState(null);
+    const [newComment, setNewComment] = useState('');
+
+    // Derive the selected item from context based on ID
+    const selectedItem = useMemo(() => {
+        if (!selectedItemId) return null;
+        return feedItems.find(item => item.id === selectedItemId) || null;
+    }, [selectedItemId, feedItems]);
+
+    // --- RANDOM SELECTION LOGIC ---
+    const [randomIndices, setRandomIndices] = useState([]);
+
+    useEffect(() => {
+        if (feedItems.length > 0 && randomIndices.length === 0) {
+            const indices = Array.from({ length: feedItems.length }, (_, i) => i)
+                .sort(() => Math.random() - 0.5)
+                .slice(0, 4);
+            setRandomIndices(indices);
+        }
+    }, [feedItems, randomIndices.length]);
+
+    const quickItems = useMemo(() => {
+        return randomIndices.map(i => feedItems[i]).filter(Boolean);
+    }, [randomIndices, feedItems]);
+
+    // --- HANDLERS ---
+
+    const handleOpenComments = (item) => {
+        console.log('Opening comments for:', item?.id);
+        
+        // Close the detail modal FIRST, then open comments
+        setChefPostDetailVisible(false);
+        
+        // Small delay to ensure modal transition completes
+        setTimeout(() => {
+            setCommentsModalVisible(true);
+        }, 150);
+    };
+
+    const submitComment = () => {
+        if (newComment.trim() && selectedItemId) {
+            console.log("Comment submitted:", newComment);
+            
+            // Update comment count in context
+            updateCommentCount(selectedItemId);
+            
+            // Clear input but DON'T close modal
+            setNewComment('');
+        }
+    };
+
+    const handleCloseComments = () => {
+        setCommentsModalVisible(false);
+        setNewComment('');
+    };
 
     // Render card based on content type
     const renderQuickCard = (item) => {
+        if (!item) return null;
+        
         const isReaction = item.contentType === 'reaction';
         const isOwnReaction = isReaction && item.reaction?.targetAuthor?.id === item.chef.id;
         
-        // Get the title to display
-        const displayTitle = isReaction 
-            ? item.reaction.targetPost?.title 
-            : item.post?.title;
-        
-        // Get the text content
-        const displayText = isReaction 
-            ? item.reaction.text 
-            : item.post?.caption;
+        const displayTitle = isReaction ? item.reaction.targetPost?.title : item.post?.title;
+        const displayText = isReaction ? item.reaction.text : item.post?.caption;
 
         return (
             <Pressable 
@@ -50,7 +94,7 @@ export default function FeaturedChef() {
                     pressed && styles.reviewCardPressed
                 ]}
                 onPress={() => {
-                    setSelectedItem(item);
+                    setSelectedItemId(item.id);
                     setChefPostDetailVisible(true);
                 }}
             >
@@ -79,7 +123,7 @@ export default function FeaturedChef() {
                     <Text style={[styles.reviewText, { color: theme.textPrimary }]} numberOfLines={3}>{displayText}</Text>
                     <View style={styles.cardFooter}>
                         <Text style={[styles.reviewChef, { color: theme.textSecondary }]}>{item.chef.name}</Text>
-                        
+                        {item.liked && <Ionicons name="heart" size={12} color={theme.likeColor} />}
                     </View>
                 </View>
             </Pressable>
@@ -103,7 +147,6 @@ export default function FeaturedChef() {
                         <Ionicons name="arrow-forward" size={fp(14)} color={theme.textSecondary} />
                     </View>
                 </Pressable>
-            
             </View>
             
             <ScrollView 
@@ -111,9 +154,8 @@ export default function FeaturedChef() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContainer}
             >
-                {feedItems.map((item) => renderQuickCard(item))}
+                {quickItems.map((item) => renderQuickCard(item))}
                 
-                {/* More Button */}
                 <Pressable 
                     style={({ pressed }) => [
                         styles.moreCard,
@@ -129,36 +171,145 @@ export default function FeaturedChef() {
                 </Pressable>
             </ScrollView>
 
-            {/* Chef Post Detail Modal (First expansion - slightly bigger) */}
+            {/* --- INTERMEDIARY MODAL --- */}
             <ChefPostDetailModal
                 visible={chefPostDetailVisible}
                 onClose={() => {
                     setChefPostDetailVisible(false);
-                    setSelectedItem(null);
+                    setSelectedItemId(null);
                 }}
                 item={selectedItem}
-                onChefHeaderPress={(chef) => {
-                    console.log('Chef header pressed, navigate to profile:', chef.id);
+                
+                onLike={(id) => {
+                    try {
+                        handleLike(id);
+                    } catch (error) {
+                        console.error('Error liking post:', error);
+                    }
                 }}
+                onSave={(id) => {
+                    try {
+                        handleSave(id);
+                    } catch (error) {
+                        console.error('Error saving post:', error);
+                    }
+                }}
+                onComment={(item) => {
+                    if (item) {
+                        handleOpenComments(item);
+                    }
+                }}
+
                 onTitlePress={(item) => {
-                    console.log('Title pressed, opening full dish detail');
-                    // Open the dish detail modal
-                    setSelectedDish(item);
-                    setDishDetailModalVisible(true);
+                    setChefPostDetailVisible(false);
+                    setTimeout(() => {
+                        setSelectedDish(item);
+                        setDishDetailModalVisible(true);
+                    }, 100);
                 }}
             />
 
-            {/* Dish Detail Modal (Full expansion) */}
+            {/* --- DISH DETAIL MODAL --- */}
             <DishDetailModal
                 visible={dishDetailModalVisible}
                 onClose={() => {
                     setDishDetailModalVisible(false);
                     setSelectedDish(null);
-                    // Reopen the chef post detail modal
-                    setChefPostDetailVisible(true);
                 }}
                 dish={selectedDish}
             />
+
+            {/* --- COMMENTS MODAL --- */}
+            <Modal 
+                visible={commentsModalVisible} 
+                transparent={true} 
+                animationType="slide"
+                onRequestClose={handleCloseComments}
+            >
+                <TouchableWithoutFeedback onPress={handleCloseComments}>
+                    <View style={styles.modalOverlay}>
+                        <KeyboardAvoidingView 
+                            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                            style={{ width: '100%' }}
+                        >
+                            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+                                <View style={[styles.modalContainer, { backgroundColor: theme.modalBackground }]}>
+                                    <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+                                        <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Comments</Text>
+                                        <Pressable onPress={handleCloseComments}>
+                                            <Text style={{color: theme.primary, fontWeight:'600'}}>Close</Text>
+                                        </Pressable>
+                                    </View>
+                                    
+                                    {/* SCROLLABLE COMMENTS SECTION */}
+                                    <ScrollView 
+                                        style={styles.commentsScrollView}
+                                        contentContainerStyle={styles.commentsContent}
+                                        showsVerticalScrollIndicator={true}
+                                        bounces={true}
+                                    >
+                                        {/* Mock Comments - Replace with real data */}
+                                        <View style={styles.commentItem}>
+                                            <View style={[styles.commentAvatar, { backgroundColor: '#E0F2FE' }]}>
+                                                <Text style={styles.commentAvatarText}>JD</Text>
+                                            </View>
+                                            <View style={styles.commentContent}>
+                                                <Text style={[styles.commentAuthor, { color: theme.textPrimary }]}>John Doe</Text>
+                                                <Text style={[styles.commentText, { color: theme.textSecondary }]}>Great perspective, Chef!</Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.commentItem}>
+                                            <View style={[styles.commentAvatar, { backgroundColor: '#FEE2E2' }]}>
+                                                <Text style={[styles.commentAvatarText, { color: '#DC2626' }]}>AS</Text>
+                                            </View>
+                                            <View style={styles.commentContent}>
+                                                <Text style={[styles.commentAuthor, { color: theme.textPrimary }]}>Alice Smith</Text>
+                                                <Text style={[styles.commentText, { color: theme.textSecondary }]}>I tried this technique and it worked perfectly! Thanks for sharing.</Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.commentItem}>
+                                            <View style={[styles.commentAvatar, { backgroundColor: '#DBEAFE' }]}>
+                                                <Text style={styles.commentAvatarText}>MB</Text>
+                                            </View>
+                                            <View style={styles.commentContent}>
+                                                <Text style={[styles.commentAuthor, { color: theme.textPrimary }]}>Maria Brown</Text>
+                                                <Text style={[styles.commentText, { color: theme.textSecondary }]}>Would love to see more content like this!</Text>
+                                            </View>
+                                        </View>
+
+                                        {/* Empty state when no real comments */}
+                                        {selectedItem && selectedItem.comments === 0 && (
+                                            <View style={styles.emptyCommentsState}>
+                                                <Ionicons name="chatbubble-outline" size={fp(38)} color={theme.textTertiary} />
+                                                <Text style={[styles.emptyCommentsText, { color: theme.textSecondary }]}>No comments yet</Text>
+                                                <Text style={[styles.emptyCommentsSubtext, { color: theme.textTertiary }]}>Be the first to comment!</Text>
+                                            </View>
+                                        )}
+                                    </ScrollView>
+
+                                    <View style={[styles.addCommentContainer, { backgroundColor: theme.cardBackground, borderTopColor: theme.border }]}>
+                                        <TextInput
+                                            style={[styles.commentInput, { backgroundColor: theme.inputBackground, color: theme.textPrimary }]}
+                                            placeholder="Write a comment..."
+                                            placeholderTextColor={theme.textTertiary}
+                                            value={newComment}
+                                            onChangeText={setNewComment}
+                                        />
+                                        <Pressable 
+                                            onPress={submitComment}
+                                            style={{padding: 8, backgroundColor: theme.primary, borderRadius: 20}}
+                                        >
+                                            <Ionicons name="send" size={16} color="white" />
+                                        </Pressable>
+                                    </View>
+                                </View>
+                            </TouchableWithoutFeedback>
+                        </KeyboardAvoidingView>
+                    </View>
+                </TouchableWithoutFeedback>
+            </Modal>
         </View>
     );
 }
@@ -273,12 +424,6 @@ const styles = StyleSheet.create({
         color: '#6B7280',
         fontWeight: '500',
     },
-    reactionBadge: {
-        backgroundColor: '#E0F2FE',
-        paddingHorizontal: wp(6),
-        paddingVertical: hp(3),
-        borderRadius: wp(8),
-    },
     moreCard: {
         alignSelf: 'center',
         width: wp(110),
@@ -308,5 +453,92 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#FFFFFF',
         letterSpacing: 0.3,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalContainer: {
+        backgroundColor: '#F8FAFB',
+        borderTopLeftRadius: wp(24),
+        borderTopRightRadius: wp(24),
+        paddingTop: hp(20),
+        paddingBottom: hp(30),
+        maxHeight: '80%',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: wp(20),
+        paddingBottom: hp(16),
+        borderBottomWidth: 1,
+    },
+    modalTitle: {
+        fontSize: fp(18),
+        fontWeight: '700',
+    },
+    commentsScrollView: {
+        maxHeight: hp(350),
+        paddingHorizontal: wp(20),
+    },
+    commentsContent: {
+        paddingVertical: hp(12),
+    },
+    commentItem: {
+        flexDirection: 'row',
+        gap: wp(10),
+        marginBottom: hp(16),
+    },
+    commentAvatar: {
+        width: wp(32),
+        height: wp(32),
+        borderRadius: wp(16),
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    commentAvatarText: {
+        color: '#0284C7',
+        fontSize: fp(10),
+        fontWeight: '700',
+    },
+    commentContent: {
+        flex: 1,
+    },
+    commentAuthor: {
+        fontWeight: '600',
+        fontSize: fp(13),
+        marginBottom: hp(2),
+    },
+    commentText: {
+        fontSize: fp(13),
+        lineHeight: hp(18),
+    },
+    emptyCommentsState: {
+        alignItems: 'center',
+        paddingVertical: hp(40),
+    },
+    emptyCommentsText: {
+        fontSize: fp(16),
+        marginTop: hp(12),
+    },
+    emptyCommentsSubtext: {
+        fontSize: fp(13),
+        marginTop: hp(4),
+    },
+    addCommentContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: wp(20),
+        paddingTop: hp(16),
+        borderTopWidth: 1,
+        gap: wp(12),
+    },
+    commentInput: {
+        flex: 1,
+        borderRadius: wp(20),
+        paddingHorizontal: wp(16),
+        paddingVertical: hp(10),
+        fontSize: fp(14),
     },
 });

@@ -1,135 +1,166 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Modal, TextInput, KeyboardAvoidingView, Platform, TouchableWithoutFeedback } from 'react-native';
 import { wp, hp, fp, SPACING } from '../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { FOLLOWED_CHEF_IDS } from '../data/chefFeedData';
-import { useChefFeed } from '../context/ChefFeedContext';
+import { useChefFeed } from '../context/ChefFeedContext'; 
+import DishDetailModal from '../components/posts/DishDetailModal'; 
 
 const CATEGORIES = ['Following', 'All'];
 
 export default function AllChefReviews({ navigation }) {
     const { theme } = useTheme();
     const insets = useSafeAreaInsets();
-    const { feedItems, handleLike, handleSave } = useChefFeed();
+    
+    // Global State
+    const { feedItems, handleLike, handleSave, updateCommentCount } = useChefFeed();
+    
+    // Local State
     const [selectedCategory, setSelectedCategory] = useState('All');
     
+    // Modal States
+    const [dishDetailModalVisible, setDishDetailModalVisible] = useState(false);
+    const [selectedDish, setSelectedDish] = useState(null);
+    const [commentsModalVisible, setCommentsModalVisible] = useState(false);
+    const [selectedPostForComments, setSelectedPostForComments] = useState(null);
+    const [newComment, setNewComment] = useState('');
+
     // Filter feed items based on selected category
     const filteredItems = selectedCategory === 'All' 
         ? feedItems 
         : feedItems.filter(item => FOLLOWED_CHEF_IDS.includes(item.chef.id));
 
-    // Render card based on content type for main feed
+    // --- HANDLERS ---
+
+    const handleOpenDish = (item) => {
+        setSelectedDish(item);
+        setDishDetailModalVisible(true);
+    };
+
+    const handleOpenComments = (item) => {
+        setSelectedPostForComments(item);
+        setCommentsModalVisible(true);
+    };
+
+    const submitComment = () => {
+        if (newComment.trim() && selectedPostForComments) {
+            console.log("Comment submitted for:", selectedPostForComments?.id, newComment);
+            
+            // Update comment count in context
+            updateCommentCount(selectedPostForComments.id);
+            
+            // Clear input but DON'T close modal (like Community Posts)
+            setNewComment('');
+        }
+    };
+
+    const handleCloseComments = () => {
+        setCommentsModalVisible(false);
+        setSelectedPostForComments(null);
+        setNewComment('');
+    };
+
+    // Render card
     const renderFeedCard = (item) => {
         const isReaction = item.contentType === 'reaction';
         const isOwnReaction = isReaction && item.reaction?.targetAuthor?.id === item.chef.id;
         
-        // For reactions: show original post title at top, reaction text as content
-        // For posts: show chef's post title and caption
-        const displayTitle = isReaction 
-            ? item.reaction.targetPost?.title 
-            : item.post?.title;
-        
-        const displayText = isReaction 
-            ? item.reaction.text 
-            : item.post?.caption;
+        const displayTitle = isReaction ? item.reaction.targetPost?.title : item.post?.title;
+        const displayText = isReaction ? item.reaction.text : item.post?.caption;
 
         return (
             <View
                 key={item.id}
                 style={[styles.feedCard, { backgroundColor: theme.chefCardBackground }]}
             >
-                {/* Chef Header */}
-                <View style={[styles.cardHeader, { backgroundColor: theme.chefCardHeaderBg }]}>
-                    <View style={[styles.chefAvatar, { backgroundColor: theme.primary }]}>
-                        <Text style={styles.chefInitial}>{item.chef.avatar}</Text>
-                    </View>
-                    <View style={styles.headerText}>
-                        <Text style={[styles.chefName, { color: theme.textPrimary }]}>{item.chef.name}</Text>
-                        {isReaction && !isOwnReaction && (
-                            <View style={styles.reactionContextRow}>
-                                <Text style={[styles.reactionContext, { color: theme.textSecondary }]}>reacted to </Text>
-                                <Pressable 
-                                    onPress={() => console.log('Navigate to user:', item.reaction.targetAuthor.id)}
-                                    style={({ pressed }) => pressed && styles.targetAuthorPressed}
-                                >
-                                    <Text style={[styles.targetAuthor, { color: theme.primary }]}>@{item.reaction.targetAuthor.name}</Text>
-                                </Pressable>
-                                <Text style={[styles.reactionContext, { color: theme.textSecondary }]}>'s post</Text>
-                            </View>
-                        )}
-                        {isOwnReaction && (
-                            <Text style={[styles.reactionContext, { color: theme.textSecondary }]}>
-                                replied to their own post
-                            </Text>
-                        )}
+                {/* --- HEADER (Avatar + Name) --- */}
+                <View style={[styles.cardHeader, { borderBottomColor: theme.border }]}>
+                    <View style={styles.headerLeft}>
+                        <View style={[styles.chefAvatar, { backgroundColor: theme.primary }]}>
+                            <Text style={styles.chefInitial}>{item.chef.avatar}</Text>
+                        </View>
+                        <View>
+                            <Text style={[styles.chefName, { color: theme.textPrimary }]}>{item.chef.name}</Text>
+                            <Text style={[styles.timestamp, { color: theme.textSecondary }]}>2 hours ago</Text>
+                        </View>
                     </View>
                 </View>
 
-                {/* Content */}
+                {/* --- CONTENT BODY --- */}
                 <View style={[styles.cardContent, { backgroundColor: theme.chefCardContentBg }]}>
-                    <Text style={[styles.contentTitle, { color: theme.textPrimary }]}>{displayTitle}</Text>
+                    
+                    {/* Context Row (Reacted to...) */}
+                    {isReaction && !isOwnReaction && (
+                        <View style={styles.contextRow}>
+                            <Ionicons name="return-down-forward" size={fp(14)} color={theme.textTertiary} />
+                            <Text style={[styles.contextText, { color: theme.textSecondary }]}>
+                                Reacted to{' '}
+                            </Text>
+                            {/* CLICKABLE USERNAME */}
+                            <Pressable 
+                                onPress={() => console.log('Navigate to profile:', item.reaction.targetAuthor.name)}
+                                style={({pressed}) => pressed && {opacity: 0.7}}
+                            >
+                                <Text style={[styles.targetAuthor, { color: theme.primary }]}>
+                                    @{item.reaction.targetAuthor.name}
+                                </Text>
+                            </Pressable>
+                            <Text style={[styles.contextText, { color: theme.textSecondary }]}>'s post</Text>
+                        </View>
+                    )}
+
+                    {/* Title Row (Clickable with Blue Chevron) */}
+                    <Pressable 
+                        style={({pressed}) => [styles.titleRow, pressed && {opacity: 0.7}]}
+                        onPress={() => handleOpenDish(item)}
+                    >
+                        <Text style={[styles.contentTitle, { color: theme.textPrimary }]}>{displayTitle}</Text>
+                        <Ionicons name="chevron-forward" size={fp(18)} color={theme.primary} />
+                    </Pressable>
+
+                    {/* Body Text */}
                     <Text style={[styles.contentText, { color: theme.textSecondary }]}>{displayText}</Text>
                 </View>
 
-                {/* Target Post Preview (for reactions) */}
-                {isReaction && (
-                    <View style={[styles.targetPostPreview, { backgroundColor: theme.chefCardHeaderBg, borderColor: theme.border }]}>
-                        <View style={styles.targetPostHeader}>
-                            <View style={[styles.targetAvatarSmall, { backgroundColor: theme.primary }]}>
-                                <Text style={styles.targetInitialSmall}>{item.reaction.targetAuthor.avatar}</Text>
-                            </View>
-                            <Text style={[styles.targetPostTitle, { color: theme.textPrimary }]} numberOfLines={1}>
-                                {item.reaction.targetPost?.title}
-                            </Text>
-                        </View>
-                    </View>
-                )}
-
-                {/* Engagement Stats - These belong to the FEED ITEM, not the original post */}
-                <View style={[styles.engagementBar, { backgroundColor: theme.chefCardContentBg }]}>
+                {/* --- ENGAGEMENT BAR --- */}
+                <View style={[styles.engagementBar, { borderTopColor: theme.border }]}>
                     <View style={styles.leftStats}>
+                        {/* Like */}
                         <Pressable 
-                            style={({ pressed }) => [
-                                styles.statButton,
-                                pressed && styles.statButtonPressed
-                            ]}
+                            style={({ pressed }) => [styles.statButton, pressed && styles.statButtonPressed]}
                             onPress={() => handleLike(item.id)}
                         >
                             <Ionicons 
                                 name={item.liked ? "heart" : "heart-outline"} 
-                                size={fp(18)} 
-                                color={item.liked ? theme.likeColor : theme.textSecondary} 
+                                size={fp(20)} 
+                                color={item.liked ? theme.likeColor : theme.textPrimary} 
                             />
-                            <Text style={[styles.statText, { color: theme.textSecondary }, item.liked && { color: theme.likeColor }]}>
+                            <Text style={[styles.statText, { color: theme.textSecondary }]}>
                                 {item.likes}
                             </Text>
                         </Pressable>
 
+                        {/* Comment - shows actual comment count from context */}
                         <Pressable 
-                            style={({ pressed }) => [
-                                styles.statButton,
-                                pressed && styles.statButtonPressed
-                            ]}
-                            onPress={() => console.log('Comments pressed:', item.id)}
+                            style={({ pressed }) => [styles.statButton, pressed && styles.statButtonPressed]}
+                            onPress={() => handleOpenComments(item)}
                         >
-                            <Ionicons name="chatbubble-outline" size={fp(17)} color={theme.textSecondary} />
+                            <Ionicons name="chatbubble-outline" size={fp(19)} color={theme.textPrimary} />
                             <Text style={[styles.statText, { color: theme.textSecondary }]}>{item.comments}</Text>
                         </Pressable>
                     </View>
                     
+                    {/* Save */}
                     <Pressable 
-                        style={({ pressed }) => [
-                            styles.saveButton,
-                            pressed && styles.statButtonPressed
-                        ]}
+                        style={({ pressed }) => [styles.saveButton, pressed && styles.statButtonPressed]}
                         onPress={() => handleSave(item.id)}
                     >
                         <Ionicons 
                             name={item.saved ? "bookmark" : "bookmark-outline"} 
-                            size={fp(18)} 
-                            color={item.saved ? theme.saveColor : theme.textSecondary} 
+                            size={fp(20)} 
+                            color={item.saved ? theme.saveColor : theme.textPrimary} 
                         />
                     </Pressable>
                 </View>
@@ -139,13 +170,10 @@ export default function AllChefReviews({ navigation }) {
 
     return (
         <View style={[styles.container, { backgroundColor: theme.screenBackground, paddingTop: insets.top }]}>
-            {/* Category Tabs with Back Button */}
+            {/* Category Tabs */}
             <View style={[styles.categoryWrapper, { backgroundColor: theme.screenBackground }]}>
                 <Pressable 
-                    style={({ pressed }) => [
-                        styles.backButton,
-                        pressed && styles.backButtonPressed
-                    ]}
+                    style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
                     onPress={() => navigation.goBack()}
                 >
                     <Ionicons name="arrow-back" size={fp(24)} color="rgba(255, 255, 255, 0.85)" />
@@ -174,13 +202,115 @@ export default function AllChefReviews({ navigation }) {
 
             <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.content}>
                 {filteredItems.length > 0 ? filteredItems.map((item) => renderFeedCard(item)) : (
-                <View style={styles.emptyState}>
-                    <Ionicons name="people-outline" size={fp(48)} color="#9CA3AF" />
-                    <Text style={styles.emptyStateTitle}>No posts from followed chefs</Text>
-                    <Text style={styles.emptyStateSubtitle}>Follow some chefs to see their content here!</Text>
-                </View>
-            )}
+                    <View style={styles.emptyState}>
+                        <Ionicons name="people-outline" size={fp(48)} color="#9CA3AF" />
+                        <Text style={styles.emptyStateTitle}>No posts from followed chefs</Text>
+                        <Text style={styles.emptyStateSubtitle}>Follow some chefs to see their content here!</Text>
+                    </View>
+                )}
             </ScrollView>
+
+            {/* --- DISH DETAIL MODAL --- */}
+            <DishDetailModal
+                visible={dishDetailModalVisible}
+                onClose={() => {
+                    setDishDetailModalVisible(false);
+                    setSelectedDish(null);
+                }}
+                dish={selectedDish}
+            />
+
+            {/* --- COMMENTS MODAL --- */}
+            <Modal 
+                visible={commentsModalVisible} 
+                transparent={true} 
+                animationType="slide"
+                onRequestClose={handleCloseComments}
+            >
+                <TouchableWithoutFeedback onPress={handleCloseComments}>
+                    <View style={styles.modalOverlay}>
+                        <KeyboardAvoidingView 
+                            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                            style={{ width: '100%' }}
+                        >
+                            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+                                <View style={[styles.modalContainer, { backgroundColor: theme.modalBackground }]}>
+                                    <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+                                        <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Comments</Text>
+                                        <Pressable onPress={handleCloseComments}>
+                                            <Text style={{color: theme.primary, fontWeight:'600'}}>Close</Text>
+                                        </Pressable>
+                                    </View>
+                                    
+                                    {/* SCROLLABLE COMMENTS SECTION */}
+                                    <ScrollView 
+                                        style={styles.commentsScrollView}
+                                        contentContainerStyle={styles.commentsContent}
+                                        showsVerticalScrollIndicator={true}
+                                        bounces={true}
+                                    >
+                                        {/* Mock Comments - Replace with real data */}
+                                        <View style={styles.commentItem}>
+                                            <View style={[styles.commentAvatar, { backgroundColor: '#E0F2FE' }]}>
+                                                <Text style={styles.commentAvatarText}>JD</Text>
+                                            </View>
+                                            <View style={styles.commentContent}>
+                                                <Text style={[styles.commentAuthor, { color: theme.textPrimary }]}>John Doe</Text>
+                                                <Text style={[styles.commentText, { color: theme.textSecondary }]}>Great perspective, Chef!</Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.commentItem}>
+                                            <View style={[styles.commentAvatar, { backgroundColor: '#FEE2E2' }]}>
+                                                <Text style={[styles.commentAvatarText, { color: '#DC2626' }]}>AS</Text>
+                                            </View>
+                                            <View style={styles.commentContent}>
+                                                <Text style={[styles.commentAuthor, { color: theme.textPrimary }]}>Alice Smith</Text>
+                                                <Text style={[styles.commentText, { color: theme.textSecondary }]}>I tried this technique and it worked perfectly! Thanks for sharing.</Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.commentItem}>
+                                            <View style={[styles.commentAvatar, { backgroundColor: '#DBEAFE' }]}>
+                                                <Text style={styles.commentAvatarText}>MB</Text>
+                                            </View>
+                                            <View style={styles.commentContent}>
+                                                <Text style={[styles.commentAuthor, { color: theme.textPrimary }]}>Maria Brown</Text>
+                                                <Text style={[styles.commentText, { color: theme.textSecondary }]}>Would love to see more content like this!</Text>
+                                            </View>
+                                        </View>
+
+                                        {/* Empty state when no real comments */}
+                                        {selectedPostForComments && selectedPostForComments.comments === 0 && (
+                                            <View style={styles.emptyCommentsState}>
+                                                <Ionicons name="chatbubble-outline" size={fp(38)} color={theme.textTertiary} />
+                                                <Text style={[styles.emptyCommentsText, { color: theme.textSecondary }]}>No comments yet</Text>
+                                                <Text style={[styles.emptyCommentsSubtext, { color: theme.textTertiary }]}>Be the first to comment!</Text>
+                                            </View>
+                                        )}
+                                    </ScrollView>
+
+                                    <View style={[styles.addCommentContainer, { backgroundColor: theme.cardBackground, borderTopColor: theme.border }]}>
+                                        <TextInput
+                                            style={[styles.commentInput, { backgroundColor: theme.inputBackground, color: theme.textPrimary }]}
+                                            placeholder="Write a comment..."
+                                            placeholderTextColor={theme.textTertiary}
+                                            value={newComment}
+                                            onChangeText={setNewComment}
+                                        />
+                                        <Pressable 
+                                            onPress={submitComment}
+                                            style={{padding: 8, backgroundColor: theme.primary, borderRadius: 20}}
+                                        >
+                                            <Ionicons name="send" size={16} color="white" />
+                                        </Pressable>
+                                    </View>
+                                </View>
+                            </TouchableWithoutFeedback>
+                        </KeyboardAvoidingView>
+                    </View>
+                </TouchableWithoutFeedback>
+            </Modal>
         </View>
     );
 }
@@ -188,12 +318,10 @@ export default function AllChefReviews({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#93C5FD',
     },
     
     // Category Tabs
     categoryWrapper: {
-        backgroundColor: '#93C5FD',
         paddingTop: hp(8),
         flexDirection: 'row',
         alignItems: 'center',
@@ -269,9 +397,8 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     
-    // Feed Card Styles
+    // --- FEED CARD STYLES ---
     feedCard: {
-        backgroundColor: '#FFFFFF',
         borderRadius: wp(16),
         marginBottom: SPACING.itemGap,
         overflow: 'hidden',
@@ -281,103 +408,67 @@ const styles = StyleSheet.create({
         shadowRadius: wp(12),
         elevation: 3,
     },
-    feedCardPressed: {
-        opacity: 0.9,
-        transform: [{ scale: 0.98 }],
-    },
     cardHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         padding: wp(16),
-        paddingBottom: hp(12),
+        borderBottomWidth: 1,
+    },
+    headerLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(12),
     },
     chefAvatar: {
-        width: wp(44),
-        height: wp(44),
-        backgroundColor: '#3B82F6',
-        borderRadius: wp(22),
+        width: wp(40),
+        height: wp(40),
+        borderRadius: wp(20),
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: wp(12),
     },
     chefInitial: {
         fontSize: fp(16),
         fontWeight: '700',
         color: '#FFFFFF',
     },
-    headerText: {
-        flex: 1,
-    },
     chefName: {
-        fontSize: fp(15),
-        fontWeight: '600',
-        color: '#111827',
+        fontSize: fp(16),
+        fontWeight: '700',
     },
-    reactionContext: {
+    timestamp: {
         fontSize: fp(12),
-        color: '#6B7280',
     },
-    reactionContextRow: {
+    cardContent: {
+        padding: wp(16),
+    },
+    contextRow: {
         flexDirection: 'row',
         alignItems: 'center',
         flexWrap: 'wrap',
-        marginTop: hp(2),
+        marginBottom: hp(10),
+    },
+    contextText: {
+        fontSize: fp(13),
+        marginLeft: wp(4),
     },
     targetAuthor: {
-        fontSize: fp(12),
+        fontSize: fp(13),
         fontWeight: '600',
-        color: '#3B82F6',
     },
-    targetAuthorPressed: {
-        opacity: 0.6,
-    },
-    cardContent: {
-        paddingHorizontal: wp(16),
-        paddingBottom: hp(12),
-    },
-    contentTitle: {
-        fontSize: fp(16),
-        fontWeight: '700',
-        color: '#111827',
-        marginBottom: hp(6),
-    },
-    contentText: {
-        fontSize: fp(14),
-        color: '#374151',
-        lineHeight: hp(20),
-    },
-    targetPostPreview: {
-        backgroundColor: '#F9FAFB',
-        marginHorizontal: wp(12),
-        marginBottom: hp(12),
-        borderRadius: wp(12),
-        borderLeftWidth: 3,
-        borderLeftColor: '#3B82F6',
-    },
-    targetPostHeader: {
+    titleRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: wp(12),
+        gap: wp(8),
+        marginBottom: hp(8),
     },
-    targetAvatarSmall: {
-        width: wp(28),
-        height: wp(28),
-        backgroundColor: '#9CA3AF',
-        borderRadius: wp(14),
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: wp(10),
+    contentTitle: {
+        fontSize: fp(18),
+        fontWeight: '800',
+        letterSpacing: -0.3,
     },
-    targetInitialSmall: {
-        fontSize: fp(11),
-        fontWeight: '600',
-        color: '#FFFFFF',
-    },
-    targetPostTitle: {
-        flex: 1,
-        fontSize: fp(13),
-        fontWeight: '500',
-        color: '#6B7280',
+    contentText: {
+        fontSize: fp(15),
+        lineHeight: hp(22),
     },
     
     // Engagement Bar
@@ -388,32 +479,112 @@ const styles = StyleSheet.create({
         paddingHorizontal: wp(16),
         paddingVertical: hp(12),
         borderTopWidth: 1,
-        borderTopColor: '#F3F4F6',
     },
     leftStats: {
         flexDirection: 'row',
-        gap: wp(20),
+        gap: wp(24),
     },
     statButton: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: wp(6),
-        paddingVertical: hp(4),
-        paddingHorizontal: wp(8),
-        borderRadius: wp(8),
     },
     statButtonPressed: {
-        backgroundColor: '#F3F4F6',
+        opacity: 0.6,
     },
     saveButton: {
         padding: wp(4),
     },
     statText: {
-        fontSize: fp(13),
-        color: '#6B7280',
-        fontWeight: '500',
+        fontSize: fp(14),
+        fontWeight: '600',
     },
-    statTextLiked: {
-        color: '#b90808ff',
+
+    // Modal Styles (Comments)
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalContainer: {
+        borderTopLeftRadius: wp(24),
+        borderTopRightRadius: wp(24),
+        paddingTop: hp(20),
+        paddingBottom: hp(30),
+        maxHeight: '80%',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: wp(20),
+        paddingBottom: hp(16),
+        borderBottomWidth: 1,
+    },
+    modalTitle: {
+        fontSize: fp(18),
+        fontWeight: '700',
+    },
+    commentsScrollView: {
+        maxHeight: hp(350),
+        paddingHorizontal: wp(20),
+    },
+    commentsContent: {
+        paddingVertical: hp(12),
+    },
+    commentItem: {
+        flexDirection: 'row',
+        gap: wp(10),
+        marginBottom: hp(16),
+    },
+    commentAvatar: {
+        width: wp(32),
+        height: wp(32),
+        borderRadius: wp(16),
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    commentAvatarText: {
+        color: '#0284C7',
+        fontSize: fp(10),
+        fontWeight: '700',
+    },
+    commentContent: {
+        flex: 1,
+    },
+    commentAuthor: {
+        fontWeight: '600',
+        fontSize: fp(13),
+        marginBottom: hp(2),
+    },
+    commentText: {
+        fontSize: fp(13),
+        lineHeight: hp(18),
+    },
+    emptyCommentsState: {
+        alignItems: 'center',
+        paddingVertical: hp(40),
+    },
+    emptyCommentsText: {
+        fontSize: fp(16),
+        marginTop: hp(12),
+    },
+    emptyCommentsSubtext: {
+        fontSize: fp(13),
+        marginTop: hp(4),
+    },
+    addCommentContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: wp(20),
+        paddingTop: hp(16),
+        borderTopWidth: 1,
+        gap: wp(12),
+    },
+    commentInput: {
+        flex: 1,
+        borderRadius: wp(20),
+        paddingHorizontal: wp(16),
+        paddingVertical: hp(10),
+        fontSize: fp(14),
     },
 });

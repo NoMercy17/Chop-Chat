@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { useTheme } from '../../context/ThemeContext';
 import CameraScreen, { uploadImage } from '../../utils/photoHandling';
+import CreatePostModal from '../posts/CreatePostModal';
 
 // --- CONFIGURATION DATA ---
 const AVAILABLE_UTENSILS = [
@@ -30,6 +31,9 @@ export default function MainActions() {
     const [nextStepModalVisible, setNextStepModalVisible] = useState(false);
     const [selectedImageUri, setSelectedImageUri] = useState(null);
     const [modalKey, setModalKey] = useState(0);
+    
+    // NEW: Create Post Modal State
+    const [createPostModalVisible, setCreatePostModalVisible] = useState(false);
 
     // --- NEW STATE FOR FIND RECIPE ---
     const [findRecipeModalVisible, setFindRecipeModalVisible] = useState(false);
@@ -102,16 +106,30 @@ export default function MainActions() {
 
     const handleGetAiRating = () => {
         setNextStepModalVisible(false);
+        // TODO: Implement AI rating logic
+        console.log('Getting AI rating for image:', selectedImageUri);
         setSelectedImageUri(null);
     };
 
     const handlePostToFeed = () => {
         setNextStepModalVisible(false);
+        // Open the Create Post Modal with the image
+        setTimeout(() => {
+            setCreatePostModalVisible(true);
+        }, 300);
+    };
+
+    const handleCreatePostSubmit = (postData) => {
+        console.log('Post submitted:', postData);
+        // TODO: Send to backend / add to context
+        setCreatePostModalVisible(false);
         setSelectedImageUri(null);
     };
 
     const handleGetChefReview = () => {
         setNextStepModalVisible(false);
+        // TODO: Implement chef review request
+        console.log('Requesting chef review for image:', selectedImageUri);
         setSelectedImageUri(null);
     };
 
@@ -451,6 +469,17 @@ export default function MainActions() {
                     </Pressable>
                 </Pressable>
             </Modal>
+
+            {/* Create Post Modal */}
+            <CreatePostModal
+                visible={createPostModalVisible}
+                onClose={() => {
+                    setCreatePostModalVisible(false);
+                    setSelectedImageUri(null);
+                }}
+                imageUri={selectedImageUri}
+                onSubmit={handleCreatePostSubmit}
+            />
         </View>
     );
 }

@@ -167,96 +167,64 @@ export default function AllCommunityPosts({ navigation }) {
                 animationType="slide"
                 onRequestClose={() => setCommentsModalVisible(false)}
             >
-                <TouchableWithoutFeedback onPress={() => {
-                    setCommentsModalVisible(false);
-                    setSelectedPost(null);
-                    setNewComment('');
-                }}>
+                <TouchableWithoutFeedback onPress={() => setCommentsModalVisible(false)}>
                     <View style={styles.modalOverlay}>
                         <KeyboardAvoidingView 
                             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-                            style={styles.modalKeyboardView}
+                            style={{ width: '100%' }}
                         >
                             <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
                                 <View style={[styles.modalContainer, { backgroundColor: theme.modalBackground }]}>
-                        <View style={[styles.modalHeader, { backgroundColor: theme.headerBackground }]}>
-                            <Text style={[styles.modalTitle, { color: '#FFFFFF' }]}>Comments</Text>
-                            <Text style={[styles.modalSubtitle, { color: 'rgba(255,255,255,0.8)' }]} numberOfLines={1}>
-                                {selectedPost?.title}
-                            </Text>
-                        </View>
-                        
-                        <ScrollView 
-                            style={[styles.commentsList, { backgroundColor: theme.commentSectionBg }]}
-                            showsVerticalScrollIndicator={false}
-                        >
-                            {selectedPost && getCommentsForPost(selectedPost.id).map((comment) => (
-                                <View key={comment.id} style={[styles.commentItem, { backgroundColor: theme.cardBackgroundAlt }]}>
-                                    <View style={[styles.commentAvatar, { backgroundColor: theme.primary }]}>
-                                        <Text style={styles.commentAvatarText}>{comment.initials}</Text>
+                                    <View style={[styles.modalHeader, { borderBottomColor: theme.border, alignItems: 'center' }]}>
+                                        <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Comments</Text>
+                                        <Pressable 
+                                            onPress={() => setCommentsModalVisible(false)}
+                                            style={{ paddingVertical: hp(4), paddingLeft: wp(12) }}
+                                        >
+                                            <Text style={{color: theme.primary, fontWeight:'600', fontSize: fp(15)}}>Close</Text>
+                                        </Pressable>
                                     </View>
                                     
-                                    <View style={styles.commentContent}>
-                                        <View style={styles.commentHeader}>
-                                            <Text style={[styles.commentAuthor, { color: theme.textPrimary }]}>{comment.author}</Text>
-                                            <Text style={[styles.commentTime, { color: theme.textTertiary }]}>{comment.timestamp}</Text>
-                                        </View>
-                                        <Text style={[styles.commentText, { color: theme.textSecondary }]}>{comment.text}</Text>
+                                    <ScrollView style={{maxHeight: hp(300), padding: wp(20)}}>
+                                        {selectedPost && getCommentsForPost(selectedPost.id).map((comment) => (
+                                            <View key={comment.id} style={{marginBottom: hp(15), flexDirection:'row', gap: wp(10)}}>
+                                                <View style={{width: wp(30), height: wp(30), borderRadius: wp(15), backgroundColor: theme.primary, alignItems:'center', justifyContent:'center'}}>
+                                                    <Text style={{color: '#FFFFFF', fontSize: fp(10), fontWeight:'700'}}>{comment.initials}</Text>
+                                                </View>
+                                                <View style={{flex: 1}}>
+                                                    <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
+                                                        <Text style={{color: theme.textPrimary, fontWeight:'600', fontSize: fp(13)}}>{comment.author}</Text>
+                                                        <Text style={{color: theme.textTertiary, fontSize: fp(11)}}>{comment.timestamp}</Text>
+                                                    </View>
+                                                    <Text style={{color: theme.textSecondary, fontSize: fp(13), marginTop: hp(2)}}>{comment.text}</Text>
+                                                </View>
+                                            </View>
+                                        ))}
+                                        
+                                        {selectedPost && getCommentsForPost(selectedPost.id).length === 0 && (
+                                            <View style={{alignItems: 'center', paddingVertical: hp(40)}}>
+                                                <Ionicons name="chatbubble-outline" size={fp(38)} color={theme.textTertiary} />
+                                                <Text style={{color: theme.textSecondary, fontSize: fp(16), marginTop: hp(12)}}>No comments yet</Text>
+                                                <Text style={{color: theme.textTertiary, fontSize: fp(13), marginTop: hp(4)}}>Be the first to comment!</Text>
+                                            </View>
+                                        )}
+                                    </ScrollView>
+
+                                    <View style={[styles.addCommentContainer, { backgroundColor: theme.cardBackground, borderTopColor: theme.border }]}>
+                                        <TextInput
+                                            style={[styles.commentInput, { backgroundColor: theme.inputBackground, color: theme.textPrimary }]}
+                                            placeholder="Write a comment..."
+                                            placeholderTextColor={theme.textTertiary}
+                                            value={newComment}
+                                            onChangeText={setNewComment}
+                                        />
+                                        <Pressable 
+                                            onPress={handleAddComment}
+                                            style={{padding: wp(8), backgroundColor: theme.primary, borderRadius: wp(20)}}
+                                        >
+                                            <Ionicons name="send" size={fp(16)} color="white" />
+                                        </Pressable>
                                     </View>
-                                </View>
-                            ))}
-                            
-                            {selectedPost && getCommentsForPost(selectedPost.id).length === 0 && (
-                                <View style={styles.emptyComments}>
-                                    <Ionicons name="chatbubble-outline" size={fp(38)} color={theme.textTertiary} />
-                                    <Text style={[styles.emptyCommentsText, { color: theme.textSecondary }]}>No comments yet</Text>
-                                    <Text style={[styles.emptyCommentsSubtext, { color: theme.textTertiary }]}>Be the first to comment!</Text>
-                                </View>
-                            )}
-                        </ScrollView>
-
-                        <View style={[styles.addCommentContainer, { backgroundColor: theme.cardBackground, borderTopColor: theme.border }]}>
-                            <TextInput
-                                style={[styles.commentInput, { backgroundColor: theme.inputBackground, color: theme.textPrimary }]}
-                                placeholder="Write a comment..."
-                                placeholderTextColor={theme.textTertiary}
-                                value={newComment}
-                                onChangeText={setNewComment}
-                                multiline
-                            />
-                            <Pressable 
-                                style={({ pressed }) => [
-                                    styles.sendButton,
-                                    { backgroundColor: theme.primary },
-                                    pressed && styles.sendButtonPressed,
-                                    !newComment.trim() && styles.sendButtonDisabled
-                                ]}
-                                onPress={handleAddComment}
-                                disabled={!newComment.trim()}
-                            >
-                                <Ionicons 
-                                    name="send" 
-                                    size={fp(20)} 
-                                    color={newComment.trim() ? "#FFFFFF" : theme.textTertiary} 
-                                />
-                            </Pressable>
-                        </View>
-
-                        <Pressable 
-                            onPress={() => {
-                                setCommentsModalVisible(false);
-                                setSelectedPost(null);
-                                setNewComment('');
-                            }} 
-                            style={({ pressed }) => [
-                                styles.closeButton,
-                                { backgroundColor: theme.border },
-                                pressed && styles.closeButtonPressed
-                            ]}
-                        >
-                            <Text style={[styles.closeButtonText, { color: theme.textSecondary }]}>Close</Text>
-                        </Pressable>
                                 </View>
                             </TouchableWithoutFeedback>
                         </KeyboardAvoidingView>
@@ -447,28 +415,22 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'flex-end',
     },
-    modalKeyboardView: {
-        width: '100%',
-    },
     modalContainer: {
-        backgroundColor: '#F8FAFB',
         borderTopLeftRadius: wp(24),
         borderTopRightRadius: wp(24),
         paddingTop: hp(20),
         paddingBottom: hp(30),
-        maxHeight: hp(600),
     },
     modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
         paddingHorizontal: wp(20),
         paddingBottom: hp(16),
         borderBottomWidth: 1,
-        borderBottomColor: '#d8d9dbf8',
     },
     modalTitle: {
-        fontSize: fp(20),
+        fontSize: fp(18),
         fontWeight: '700',
-        color: '#111827',
-        marginBottom: hp(4),
     },
     modalSubtitle: {
         fontSize: fp(14),
