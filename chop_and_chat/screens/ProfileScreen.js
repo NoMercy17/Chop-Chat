@@ -287,24 +287,24 @@ export default function ProfileScreen({ navigation }) {
       return (
         <>
           <View style={styles.settingTabContent}>
-            <Text style={styles.settingTabTitle}>Update Bio</Text>
-            <Text style={styles.settingTabSubtitle}>Tell others about your cooking style</Text>
+            <Text style={[styles.settingTabTitle, { color: theme.textPrimary }]}>Update Bio</Text>
+            <Text style={[styles.settingTabSubtitle, { color: theme.textSecondary }]}>Tell others about your cooking style</Text>
             <TextInput
-              style={styles.bioInput}
+              style={[styles.bioInput, { backgroundColor: theme.inputBackground, borderColor: theme.border, color: theme.textPrimary }]}
               value={tempBio}
               onChangeText={setTempBio}
               placeholder="Enter your bio..."
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={theme.placeholderText}
               multiline
               maxLength={50}
             />
-            <Text style={styles.charCount}>{tempBio.length}/50</Text>
+            <Text style={[styles.charCount, { color: theme.textTertiary }]}>{tempBio.length}/50</Text>
             <View style={styles.settingTabButtons}>
               <Pressable 
-                style={({ pressed }) => [styles.cancelBtn, pressed && styles.btnPressed]}
+                style={({ pressed }) => [styles.cancelBtn, { backgroundColor: theme.inputBackground }, pressed && styles.btnPressed]}
                 onPress={() => setActiveSettingTab(null)}
               >
-                <Text style={styles.cancelBtnText}>Cancel</Text>
+                <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
               </Pressable>
               <Pressable 
                 style={({ pressed }) => [styles.saveBtn, pressed && styles.btnPressed]}
@@ -322,35 +322,35 @@ export default function ProfileScreen({ navigation }) {
       return (
         <>
           <View style={styles.settingTabContent}>
-            <Text style={styles.settingTabTitle}>Change Password</Text>
-            <Text style={styles.settingTabSubtitle}>Enter your current and new password</Text>
+            <Text style={[styles.settingTabTitle, { color: theme.textPrimary }]}>Change Password</Text>
+            <Text style={[styles.settingTabSubtitle, { color: theme.textSecondary }]}>Enter your current and new password</Text>
             <TextInput
-              style={styles.passwordInput}
+              style={[styles.passwordInput, { backgroundColor: theme.inputBackground, borderColor: theme.border, color: theme.textPrimary }]}
               value={currentPassword}
               onChangeText={setCurrentPassword}
               placeholder="Current password"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={theme.placeholderText}
               secureTextEntry
             />
             <TextInput
-              style={styles.passwordInput}
+              style={[styles.passwordInput, { backgroundColor: theme.inputBackground, borderColor: theme.border, color: theme.textPrimary }]}
               value={newPassword}
               onChangeText={setNewPassword}
               placeholder="New password"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={theme.placeholderText}
               secureTextEntry
             />
             <TextInput
-              style={styles.passwordInput}
+              style={[styles.passwordInput, { backgroundColor: theme.inputBackground, borderColor: theme.border, color: theme.textPrimary }]}
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               placeholder="Confirm new password"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={theme.placeholderText}
               secureTextEntry
             />
             <View style={styles.settingTabButtons}>
               <Pressable 
-                style={({ pressed }) => [styles.cancelBtn, pressed && styles.btnPressed]}
+                style={({ pressed }) => [styles.cancelBtn, { backgroundColor: theme.inputBackground }, pressed && styles.btnPressed]}
                 onPress={() => {
                   setActiveSettingTab(null);
                   setCurrentPassword("");
@@ -358,7 +358,7 @@ export default function ProfileScreen({ navigation }) {
                   setConfirmPassword("");
                 }}
               >
-                <Text style={styles.cancelBtnText}>Cancel</Text>
+                <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
               </Pressable>
               <Pressable 
                 style={({ pressed }) => [styles.saveBtn, pressed && styles.btnPressed]}
@@ -376,69 +376,56 @@ export default function ProfileScreen({ navigation }) {
       return (
         <>
           <View style={styles.settingTabContent}>
-            <Text style={styles.settingTabTitle}>Notifications</Text>
-            <Text style={styles.settingTabSubtitle}>Choose what you want to be notified about</Text>
+            <Text style={[styles.settingTabTitle, { color: theme.textPrimary }]}>Notifications</Text>
+            <Text style={[styles.settingTabSubtitle, { color: theme.textSecondary }]}>Choose what you want to be notified about</Text>
             
             <View style={styles.notificationsList}>
-              <View style={styles.notificationItem}>
+              <View style={[styles.notificationItem, { backgroundColor: theme.inputBackground }]}>
                 <View style={styles.notificationInfo}>
-                  <Ionicons name="restaurant-outline" size={fp(20)} color="#3B82F6" />
-                  <Text style={styles.notificationLabel}>Recipe Matches</Text>
-                </View>
-                <Switch
-                  value={notifications.recipeMatches}
-                  onValueChange={() => toggleNotification('recipeMatches')}
-                  trackColor={{ false: '#E5E7EB', true: '#93C5FD' }}
-                  thumbColor={notifications.recipeMatches ? '#3B82F6' : '#9CA3AF'}
-                />
-              </View>
-              
-              <View style={styles.notificationItem}>
-                <View style={styles.notificationInfo}>
-                  <Ionicons name="star-outline" size={fp(20)} color="#3B82F6" />
-                  <Text style={styles.notificationLabel}>Chef Reviews</Text>
+                  <Ionicons name="star-outline" size={fp(20)} color={theme.primary} />
+                  <Text style={[styles.notificationLabel, { color: theme.textPrimary }]}>Chef Reviews</Text>
                 </View>
                 <Switch
                   value={notifications.chefReviews}
                   onValueChange={() => toggleNotification('chefReviews')}
-                  trackColor={{ false: '#E5E7EB', true: '#93C5FD' }}
-                  thumbColor={notifications.chefReviews ? '#3B82F6' : '#9CA3AF'}
+                  trackColor={{ false: theme.switchTrackOff, true: theme.switchTrackOn }}
+                  thumbColor={notifications.chefReviews ? theme.switchThumbOn : theme.switchThumbOff}
                 />
               </View>
               
-              <View style={styles.notificationItem}>
+              <View style={[styles.notificationItem, { backgroundColor: theme.inputBackground }]}>
                 <View style={styles.notificationInfo}>
-                  <Ionicons name="heart-outline" size={fp(20)} color="#3B82F6" />
-                  <Text style={styles.notificationLabel}>Likes & Comments</Text>
+                  <Ionicons name="heart-outline" size={fp(20)} color={theme.primary} />
+                  <Text style={[styles.notificationLabel, { color: theme.textPrimary }]}>Likes & Comments</Text>
                 </View>
                 <Switch
                   value={notifications.likesComments}
                   onValueChange={() => toggleNotification('likesComments')}
-                  trackColor={{ false: '#E5E7EB', true: '#93C5FD' }}
-                  thumbColor={notifications.likesComments ? '#3B82F6' : '#9CA3AF'}
+                  trackColor={{ false: theme.switchTrackOff, true: theme.switchTrackOn }}
+                  thumbColor={notifications.likesComments ? theme.switchThumbOn : theme.switchThumbOff}
                 />
               </View>
               
-              <View style={styles.notificationItem}>
+              <View style={[styles.notificationItem, { backgroundColor: theme.inputBackground }]}>
                 <View style={styles.notificationInfo}>
-                  <Ionicons name="people-outline" size={fp(20)} color="#3B82F6" />
-                  <Text style={styles.notificationLabel}>New Followers</Text>
+                  <Ionicons name="people-outline" size={fp(20)} color={theme.primary} />
+                  <Text style={[styles.notificationLabel, { color: theme.textPrimary }]}>New Followers</Text>
                 </View>
                 <Switch
                   value={notifications.newFollowers}
                   onValueChange={() => toggleNotification('newFollowers')}
-                  trackColor={{ false: '#E5E7EB', true: '#93C5FD' }}
-                  thumbColor={notifications.newFollowers ? '#3B82F6' : '#9CA3AF'}
+                  trackColor={{ false: theme.switchTrackOff, true: theme.switchTrackOn }}
+                  thumbColor={notifications.newFollowers ? theme.switchThumbOn : theme.switchThumbOff}
                 />
               </View>
             </View>
             
             <Pressable 
-              style={({ pressed }) => [styles.backToSettingsBtn, pressed && styles.btnPressed]}
+              style={({ pressed }) => [styles.backToSettingsBtn, { backgroundColor: theme.inputBackground }, pressed && styles.btnPressed]}
               onPress={() => setActiveSettingTab(null)}
             >
-              <Ionicons name="arrow-back" size={fp(18)} color="#374151" />
-              <Text style={styles.backToSettingsBtnText}>Back to Settings</Text>
+              <Ionicons name="arrow-back" size={fp(18)} color={theme.textSecondary} />
+              <Text style={[styles.backToSettingsBtnText, { color: theme.textPrimary }]}>Back to Settings</Text>
             </Pressable>
           </View>
         </>

@@ -4,19 +4,140 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { wp, hp, fp, SPACING } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
+import DishDetailModal from '../components/posts/DishDetailModal';
 
 // Sample data - will be replaced with real data later
 const SAMPLE_FAVORITES = [
-  { id: 1, title: 'Pasta Carbonara', cookTime: 30, difficulty: 'easy', author: 'Chef Maria', rating: 4.8, image: null, ingredients: ['pasta', 'eggs', 'pancetta', 'parmesan', 'black pepper'] },
-  { id: 2, title: 'Thai Green Curry', cookTime: 45, difficulty: 'medium', author: 'Chef Antoine', rating: 4.5, image: null, ingredients: ['chicken', 'coconut milk', 'green curry paste', 'basil', 'bamboo shoots'] },
-  { id: 3, title: 'Beef Wellington', cookTime: 120, difficulty: 'hard', author: 'Chef Gordon', rating: 4.9, image: null, ingredients: ['beef tenderloin', 'mushrooms', 'puff pastry', 'prosciutto', 'mustard'] },
-  { id: 4, title: 'Caesar Salad', cookTime: 15, difficulty: 'easy', author: 'Carmen', rating: 4.2, image: null, ingredients: ['romaine lettuce', 'croutons', 'parmesan', 'caesar dressing', 'anchovies'] },
-  { id: 5, title: 'Sushi Rolls', cookTime: 60, difficulty: 'hard', author: 'Marcel', rating: 4.7, image: null, ingredients: ['sushi rice', 'nori', 'salmon', 'avocado', 'cucumber'] },
-  { id: 6, title: 'Tiramisu', cookTime: 40, difficulty: 'medium', author: 'Sofia', rating: 4.9, image: null, ingredients: ['mascarpone', 'espresso', 'ladyfingers', 'cocoa powder', 'eggs'] },
-  { id: 7, title: 'Chicken Tacos', cookTime: 25, difficulty: 'easy', author: 'Diego', rating: 4.4, image: null, ingredients: ['chicken', 'tortillas', 'salsa', 'avocado', 'lime', 'cilantro'] },
-  { id: 8, title: 'Mushroom Risotto', cookTime: 50, difficulty: 'medium', author: 'Elena', rating: 4.6, image: null, ingredients: ['arborio rice', 'mushrooms', 'white wine', 'parmesan', 'butter'] },
-  { id: 9, title: 'Chocolate Lava Cake', cookTime: 20, difficulty: 'medium', author: 'Chef Maria', rating: 4.8, image: null, ingredients: ['dark chocolate', 'butter', 'eggs', 'flour', 'sugar'] },
-  { id: 10, title: 'Greek Salad', cookTime: 10, difficulty: 'easy', author: 'Nikos', rating: 4.3, image: null, ingredients: ['tomatoes', 'cucumber', 'feta', 'olives', 'olive oil', 'oregano'] },
+  { 
+    id: 1, 
+    title: 'Pasta Carbonara', 
+    cookTime: 30, 
+    difficulty: 'Easy', 
+    author: 'Chef Maria', 
+    rating: 4.8, 
+    image: null, 
+    ingredients: ['2 cups pasta', '3 eggs', '200g pancetta', '100g parmesan', '1 tsp black pepper'],
+    description: 'Classic Italian pasta dish with creamy egg sauce and crispy pancetta.',
+    instructions: 'Cook pasta in salted water until al dente.\n\nWhile pasta cooks, fry pancetta until crispy.\n\nWhisk eggs with grated parmesan and pepper.\n\nDrain pasta, reserving some water. Mix with pancetta.\n\nRemove from heat, add egg mixture. Toss quickly.\n\nServe immediately with extra parmesan.',
+    utensils: ['pot', 'pan', 'whisk']
+  },
+  { 
+    id: 2, 
+    title: 'Thai Green Curry', 
+    cookTime: 45, 
+    difficulty: 'Medium', 
+    author: 'Chef Antoine', 
+    rating: 4.5, 
+    image: null, 
+    ingredients: ['500g chicken breast', '400ml coconut milk', '3 tbsp green curry paste', 'Thai basil', '100g bamboo shoots'],
+    description: 'Aromatic and spicy Thai curry with tender chicken and vegetables.',
+    instructions: 'Cut chicken into bite-sized pieces.\n\nHeat oil in a wok, fry curry paste until fragrant.\n\nAdd coconut milk and bring to simmer.\n\nAdd chicken and cook for 10 minutes.\n\nAdd bamboo shoots and Thai basil.\n\nServe with jasmine rice.',
+    utensils: ['wok', 'stove']
+  },
+  { 
+    id: 3, 
+    title: 'Beef Wellington', 
+    cookTime: 120, 
+    difficulty: 'Hard', 
+    author: 'Chef Gordon', 
+    rating: 4.9, 
+    image: null, 
+    ingredients: ['800g beef tenderloin', '400g mushrooms', '500g puff pastry', '100g prosciutto', '2 tbsp Dijon mustard'],
+    description: 'A showstopper dish with tender beef wrapped in mushroom duxelles and flaky pastry.',
+    instructions: 'Sear beef on all sides. Let cool, brush with mustard.\n\nBlitz mushrooms, cook until dry to make duxelles.\n\nLay prosciutto on plastic wrap, spread duxelles.\n\nPlace beef on top, roll tightly. Chill for 30 minutes.\n\nWrap in puff pastry. Brush with egg wash.\n\nBake at 220°C for 25-30 minutes.',
+    utensils: ['oven', 'pan', 'food processor']
+  },
+  { 
+    id: 4, 
+    title: 'Caesar Salad', 
+    cookTime: 15, 
+    difficulty: 'Easy', 
+    author: 'Carmen', 
+    rating: 4.2, 
+    image: null, 
+    ingredients: ['1 head romaine lettuce', '1 cup croutons', '50g parmesan', '100ml caesar dressing', '4 anchovies'],
+    description: 'Crisp and refreshing salad with homemade dressing and crunchy croutons.',
+    instructions: 'Wash and dry romaine lettuce. Tear into pieces.\n\nMake dressing: blend anchovies, garlic, egg yolk, lemon juice, and oil.\n\nToss lettuce with dressing.\n\nTop with croutons and shaved parmesan.\n\nServe immediately.',
+    utensils: ['bowl', 'blender']
+  },
+  { 
+    id: 5, 
+    title: 'Sushi Rolls', 
+    cookTime: 60, 
+    difficulty: 'Hard', 
+    author: 'Marcel', 
+    rating: 4.7, 
+    image: null, 
+    ingredients: ['300g sushi rice', '4 nori sheets', '200g fresh salmon', '1 avocado', '1 cucumber'],
+    description: 'Fresh and delicate maki rolls with salmon and avocado.',
+    instructions: 'Rinse rice until water runs clear. Cook with 1.2x water.\n\nSeason rice with rice vinegar, sugar, and salt.\n\nPlace nori on bamboo mat, spread rice evenly.\n\nAdd salmon, avocado, cucumber strips.\n\nRoll tightly using the mat.\n\nSlice with wet knife. Serve with soy sauce.',
+    utensils: ['rice cooker', 'bamboo mat']
+  },
+  { 
+    id: 6, 
+    title: 'Tiramisu', 
+    cookTime: 40, 
+    difficulty: 'Medium', 
+    author: 'Sofia', 
+    rating: 4.9, 
+    image: null, 
+    ingredients: ['500g mascarpone', '300ml espresso', '200g ladyfingers', '2 tbsp cocoa powder', '4 eggs'],
+    description: 'Classic Italian dessert with layers of coffee-soaked ladyfingers and mascarpone cream.',
+    instructions: 'Separate eggs. Beat yolks with sugar until pale.\n\nFold in mascarpone until smooth.\n\nWhip egg whites to stiff peaks, fold into mixture.\n\nDip ladyfingers quickly in espresso.\n\nLayer in dish: ladyfingers, cream, repeat.\n\nRefrigerate 4 hours. Dust with cocoa before serving.',
+    utensils: ['mixer', 'dish']
+  },
+  { 
+    id: 7, 
+    title: 'Chicken Tacos', 
+    cookTime: 25, 
+    difficulty: 'Easy', 
+    author: 'Diego', 
+    rating: 4.4, 
+    image: null, 
+    ingredients: ['400g chicken breast', '8 corn tortillas', '200g salsa', '1 avocado', '2 limes', 'Fresh cilantro'],
+    description: 'Quick and flavorful Mexican tacos with juicy seasoned chicken.',
+    instructions: 'Season chicken with cumin, chili, salt.\n\nGrill or pan-fry until cooked through.\n\nSlice chicken into strips.\n\nWarm tortillas on dry pan.\n\nAssemble: chicken, salsa, avocado slices.\n\nTop with cilantro and lime juice.',
+    utensils: ['grill', 'pan']
+  },
+  { 
+    id: 8, 
+    title: 'Mushroom Risotto', 
+    cookTime: 50, 
+    difficulty: 'Medium', 
+    author: 'Elena', 
+    rating: 4.6, 
+    image: null, 
+    ingredients: ['300g arborio rice', '400g mixed mushrooms', '150ml white wine', '80g parmesan', '50g butter'],
+    description: 'Creamy and earthy Italian risotto with mixed mushrooms.',
+    instructions: 'Sauté mushrooms in butter, set aside.\n\nSauté onion, add rice, toast for 2 minutes.\n\nAdd wine, stir until absorbed.\n\nAdd warm stock one ladle at a time, stirring constantly.\n\nAfter 18 minutes, fold in mushrooms, butter, parmesan.\n\nRest 2 minutes before serving.',
+    utensils: ['pan', 'stove']
+  },
+  { 
+    id: 9, 
+    title: 'Chocolate Lava Cake', 
+    cookTime: 20, 
+    difficulty: 'Medium', 
+    author: 'Chef Maria', 
+    rating: 4.8, 
+    image: null, 
+    ingredients: ['200g dark chocolate', '100g butter', '2 eggs', '50g flour', '80g sugar'],
+    description: 'Decadent individual cakes with a molten chocolate center.',
+    instructions: 'Melt chocolate and butter together.\n\nWhisk eggs and sugar until light.\n\nFold chocolate mixture into eggs.\n\nAdd flour, mix gently.\n\nPour into greased ramekins.\n\nBake at 200°C for 10-12 minutes. Center should wobble.',
+    utensils: ['oven', 'ramekins', 'bowl']
+  },
+  { 
+    id: 10, 
+    title: 'Greek Salad', 
+    cookTime: 10, 
+    difficulty: 'Easy', 
+    author: 'Nikos', 
+    rating: 4.3, 
+    image: null, 
+    ingredients: ['4 ripe tomatoes', '1 cucumber', '200g feta cheese', '100g Kalamata olives', '4 tbsp olive oil', '1 tsp dried oregano'],
+    description: 'Simple and fresh Mediterranean salad with quality ingredients.',
+    instructions: 'Cut tomatoes into wedges.\n\nSlice cucumber into half-moons.\n\nCube feta cheese.\n\nCombine vegetables in a bowl.\n\nAdd olives and feta on top.\n\nDrizzle with olive oil, sprinkle oregano.',
+    utensils: ['bowl', 'knife']
+  },
 ];
 
 const DIFFICULTIES = ['All', 'Easy', 'Medium', 'Hard'];
@@ -27,6 +148,8 @@ export default function FavoriteRecipes({ navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState('All');
   const [favorites, setFavorites] = useState(SAMPLE_FAVORITES);
+  const [selectedDish, setSelectedDish] = useState(null);
+  const [dishDetailModalVisible, setDishDetailModalVisible] = useState(false);
 
   const filteredFavorites = favorites.filter(recipe => {
     const query = searchQuery.toLowerCase();
@@ -40,7 +163,7 @@ export default function FavoriteRecipes({ navigation }) {
   });
 
   const getDifficultyColor = (difficulty) => {
-    switch (difficulty) {
+    switch (difficulty?.toLowerCase()) {
       case 'easy': return '#10B981';
       case 'medium': return '#F59E0B';
       case 'hard': return '#EF4444';
@@ -134,7 +257,10 @@ export default function FavoriteRecipes({ navigation }) {
                 { backgroundColor: theme.cardBackground },
                 pressed && styles.recipeCardPressed
               ]}
-              onPress={() => console.log('Recipe pressed:', recipe.id)}
+              onPress={() => {
+                setSelectedDish(recipe);
+                setDishDetailModalVisible(true);
+              }}
             >
               {/* Recipe Image */}
               <View style={styles.recipeImageContainer}>
@@ -148,7 +274,7 @@ export default function FavoriteRecipes({ navigation }) {
               </View>
 
               {/* Recipe Info */}
-              <View style={[styles.recipeInfo, { backgroundColor: theme.recipeInfoBackground }]}>
+              <View style={[styles.recipeInfo, { backgroundColor: theme.postContentBackground }]}>
                 <Text style={[styles.recipeTitle, { color: theme.textPrimary }]} numberOfLines={1}>{recipe.title}</Text>
                 <Text style={[styles.recipeAuthor, { color: theme.textSecondary }]}>by {recipe.author}</Text>
                 
@@ -173,7 +299,7 @@ export default function FavoriteRecipes({ navigation }) {
 
               {/* Favorite Button */}
               <Pressable 
-                style={[styles.heartButton, { backgroundColor: theme.recipeInfoBackground }]}
+                style={[styles.heartButton, { backgroundColor: theme.postContentBackground }]}
                 onPress={() => removeFavorite(recipe.id)}
               >
                 <Ionicons name="bookmark" size={fp(24)} color="#EF4444" />
@@ -195,6 +321,17 @@ export default function FavoriteRecipes({ navigation }) {
           </Text>
         </View>
       )}
+
+      {/* Dish Detail Modal */}
+      <DishDetailModal
+        visible={dishDetailModalVisible}
+        onClose={() => {
+          setDishDetailModalVisible(false);
+          setSelectedDish(null);
+        }}
+        dish={selectedDish}
+        showChefReviewButton={false}
+      />
     </View>
   );
 }

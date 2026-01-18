@@ -97,7 +97,7 @@ export default function CommunityFeed() {
                             <Text style={[styles.postTitle, { color: theme.textPrimary }]}>{post.title}</Text>
                             <Text style={[styles.postDescription, { color: theme.textPrimary }]}>{post.description}</Text>
                             
-                            <View style={[styles.postMeta, { backgroundColor: theme.postContentBackground }]}>
+                            <View style={[styles.postMeta, { backgroundColor: theme.postMetaBackground }]}>
                                 <Text style={[styles.postAuthor, { color: theme.textSecondary }]}>by {post.author}</Text>
                                 <View style={styles.postStats}>
                                     <Pressable 

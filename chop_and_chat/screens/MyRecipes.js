@@ -1,190 +1,305 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
+import { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, Modal, TextInput, KeyboardAvoidingView, Platform, TouchableWithoutFeedback } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { wp, hp, fp, SPACING } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
-import CreatePostModal from '../components/posts/CreatePostModal';
+import DishDetailModal from '../components/posts/DishDetailModal';
 
-// Sample data 
-const SAMPLE_RECIPES = [
-  { id: 1, title: 'Pasta Carbonara', cookTime: 30, difficulty: 'easy', category: 'dinner', image: null },
-  { id: 2, title: 'Morning Pancakes', cookTime: 20, difficulty: 'easy', category: 'breakfast', image: null },
-  { id: 3, title: 'Grilled Salmon', cookTime: 25, difficulty: 'medium', category: 'dinner', image: null },
-  { id: 4, title: 'Caesar Salad', cookTime: 15, difficulty: 'easy', category: 'lunch', image: null },
-];
+// Sample comments data
+const commentsData = {
+  '1': [
+    { id: 1, author: 'Sarah M.', initials: 'SM', text: 'This pasta looks amazing! Will definitely try this recipe!', timestamp: '2h ago' },
+    { id: 2, author: 'Marco V.', initials: 'MV', text: 'Pro tip: use fresh parmesan for best results', timestamp: '1h ago' },
+  ],
+  '2': [
+    { id: 3, author: 'Tommy K.', initials: 'TK', text: 'The broth looks so rich and flavorful!', timestamp: '3h ago' },
+  ],
+  '3': [],
+};
 
-const CATEGORIES = ['All', 'Breakfast', 'Lunch', 'Dinner', 'Dessert'];
-
-export default function MyRecipes({ navigation }) {
-  const { theme, isDarkMode } = useTheme();
+export default function MyPostsScreen({ navigation }) {
+  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [recipes, setRecipes] = useState(SAMPLE_RECIPES);
-  const [createPostModalVisible, setCreatePostModalVisible] = useState(false);
+  const [selectedDish, setSelectedDish] = useState(null);
+  const [dishDetailModalVisible, setDishDetailModalVisible] = useState(false);
+  const [commentsModalVisible, setCommentsModalVisible] = useState(false);
+  const [selectedPost, setSelectedPost] = useState(null);
+  const [newComment, setNewComment] = useState('');
+  const [myPosts, setMyPosts] = useState([
+    {
+      id: '1',
+      title: 'Creamy Garlic Pasta',
+      description: 'Quick comfort pasta with garlic, butter and parmesan.',
+      likes: 124,
+      comments: 18,
+      saves: 42,
+      liked: false,
+      saved: false,
+    },
+    {
+      id: '2',
+      title: 'Homemade Ramen Bowl',
+      description: 'Slow-cooked broth, noodles, egg and fresh toppings.',
+      likes: 256,
+      comments: 34,
+      saves: 89,
+      liked: false,
+      saved: false,
+    },
+    {
+      id: '3',
+      title: 'Protein Pancakes',
+      description: 'Healthy pancakes perfect for breakfast or post-workout.',
+      likes: 98,
+      comments: 12,
+      saves: 61,
+      liked: false,
+      saved: false,
+    },
+  ]);
 
-  const filteredRecipes = selectedCategory === 'All' 
-    ? recipes 
-    : recipes.filter(r => r.category.toLowerCase() === selectedCategory.toLowerCase());
+  const handleLike = (postId) => {
+    setMyPosts(currentPosts =>
+      currentPosts.map(post => {
+        if (post.id === postId) {
+          return {
+            ...post,
+            likes: post.liked ? post.likes - 1 : post.likes + 1,
+            liked: !post.liked,
+          };
+        }
+        return post;
+      })
+    );
+  };
 
-  const getDifficultyColor = (difficulty) => {
-    switch (difficulty) {
-      case 'easy': return '#10B981';
-      case 'medium': return '#F59E0B';
-      case 'hard': return '#EF4444';
-      default: return '#6B7280';
+  const handleSave = (postId) => {
+    setMyPosts(currentPosts =>
+      currentPosts.map(post => {
+        if (post.id === postId) {
+          return { ...post, saves: post.saved ? post.saves - 1 : post.saves + 1, saved: !post.saved };
+        }
+        return post;
+      })
+    );
+  };
+
+  const handleComment = (post) => {
+    setSelectedPost(post);
+    setCommentsModalVisible(true);
+  };
+
+  const handleAddComment = () => {
+    if (newComment.trim() && selectedPost) {
+      setMyPosts(currentPosts =>
+        currentPosts.map(post => {
+          if (post.id === selectedPost.id) {
+            return { ...post, comments: post.comments + 1 };
+          }
+          return post;
+        })
+      );
+      setNewComment('');
     }
   };
 
-  const handleCreatePost = () => {
-    setCreatePostModalVisible(true);
-  };
-
-  const handleCreatePostSubmit = (postData) => {
-    console.log('Recipe created:', postData);
-    // TODO: Add recipe to your recipes list
-    // You could add it to the SAMPLE_RECIPES or send to backend
-    setCreatePostModalVisible(false);
-  };
-
-  const handleCloseCreatePost = () => {
-    setCreatePostModalVisible(false);
+  const getCommentsForPost = (postId) => {
+    return commentsData[postId] || [];
   };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.screenBackground, paddingTop: insets.top }]}>
       {/* Header with Back Button and Title */}
-      <View style={[styles.headerContainer, { backgroundColor: theme.screenBackground }]}>
+      <View style={[styles.header, { backgroundColor: theme.screenBackground }]}>
         <Pressable 
           style={({ pressed }) => [
             styles.backButton,
-            !isDarkMode && styles.backButtonLight,
             pressed && styles.backButtonPressed
           ]}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={fp(24)} color={theme.headerTitleColor} />
+          <Ionicons name="arrow-back" size={fp(24)} color="rgba(255, 255, 255, 0.85)" />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: theme.headerTitleColor }]}>My Recipes</Text>
+        <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>My Recipes</Text>
+        <View style={{ width: fp(24) }} />
       </View>
 
-      {/* Category Tabs */}
-      <View style={[styles.categoryWrapper, { backgroundColor: theme.screenBackground }]}>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoryContainer}
-        >
-          {CATEGORIES.map((category) => (
-            <Pressable
-              key={category}
-              style={({ pressed }) => [
-                styles.categoryTab,
-                { backgroundColor: theme.inputBackground },
-                selectedCategory === category && styles.categoryTabActive,
-                pressed && styles.categoryTabPressed
-              ]}
-              onPress={() => setSelectedCategory(category)}
-            >
-              <Text style={[
-                styles.categoryText,
-                { color: theme.textSecondary },
-                selectedCategory === category && styles.categoryTextActive
-              ]}>
-                {category}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </View>
+      <ScrollView contentContainerStyle={styles.content}>
+        {myPosts.map((post) => (
+          <Pressable
+            key={post.id}
+            style={({ pressed }) => [
+              styles.postCard,
+              { backgroundColor: theme.postCardBackground },
+              pressed && styles.postCardPressed,
+            ]}
+            onPress={() => {
+              setSelectedDish(post);
+              setDishDetailModalVisible(true);
+            }}
+          >
+            {/* Image placeholder */}
+            <View style={[styles.imagePlaceholder, { backgroundColor: theme.imageBackground }]}>
+              <Text style={{ color: theme.textTertiary, fontWeight: '600' }}>IMAGE</Text>
+            </View>
 
-      {/* Recipe Grid */}
-      {filteredRecipes.length > 0 ? (
-        <ScrollView 
-          style={styles.recipeList}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.recipeGrid}
-        >
-          {filteredRecipes.map((recipe) => (
-            <Pressable
-              key={recipe.id}
-              style={({ pressed }) => [
-                styles.recipeCard,
-                { backgroundColor: theme.cardBackground },
-                pressed && styles.recipeCardPressed
-              ]}
-              onPress={() => console.log('Recipe pressed:', recipe.id)}
-            >
-              <View style={styles.recipeImageContainer}>
-                {recipe.image ? (
-                  <Image source={{ uri: recipe.image }} style={styles.recipeImage} />
-                ) : (
-                  <View style={[styles.imagePlaceholder, { backgroundColor: theme.inputBackground }]}>
-                    <Ionicons name="restaurant-outline" size={fp(32)} color="#9CA3AF" />
-                  </View>
-                )}
+            {/* Content */}
+            <View style={styles.postContent}>
+              <View style={styles.titleRow}>
+                <Text style={[styles.postTitle, { color: theme.textPrimary }]}>{post.title}</Text>
+                <Ionicons name="ellipsis-horizontal" size={fp(18)} color={theme.textSecondary} />
               </View>
-              
-              <View style={[styles.recipeInfo, { backgroundColor: theme.recipeInfoBackground }]}>
-                <Text style={[styles.recipeTitle, { color: theme.textPrimary }]} numberOfLines={2}>{recipe.title}</Text>
-                
-                <View style={styles.recipeMeta}>
-                  <View style={styles.metaItem}>
-                    <Ionicons name="time-outline" size={fp(14)} color={theme.textSecondary} />
-                    <Text style={[styles.metaText, { color: theme.textSecondary }]}>{recipe.cookTime}min</Text>
+
+              <Text style={[styles.postDescription, { color: theme.textSecondary }]}>
+                {post.description}
+              </Text>
+
+              {/* Stats row */}
+              <View style={styles.statsRow}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.statButton,
+                    pressed && styles.statButtonPressed,
+                  ]}
+                  onPress={() => handleLike(post.id)}
+                >
+                  <Ionicons
+                    name={post.liked ? 'heart' : 'heart-outline'}
+                    size={fp(16)}
+                    color={post.liked ? theme.likeColor : theme.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.statText,
+                      { color: theme.textSecondary },
+                      post.liked && { color: theme.likeColor },
+                    ]}
+                  >
+                    {post.likes}
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.statButton,
+                    pressed && styles.statButtonPressed,
+                  ]}
+                  onPress={() => handleComment(post)}
+                >
+                  <Ionicons name="chatbubble-outline" size={fp(15)} color={theme.textSecondary} />
+                  <Text style={[styles.statText, { color: theme.textSecondary }]}>{post.comments}</Text>
+                </Pressable>
+
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.statButton,
+                    pressed && styles.statButtonPressed,
+                  ]}
+                  onPress={() => handleSave(post.id)}
+                >
+                  <Ionicons
+                    name={post.saved ? 'bookmark' : 'bookmark-outline'}
+                    size={fp(16)}
+                    color={post.saved ? theme.saveColor : theme.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.statText,
+                      { color: theme.textSecondary },
+                      post.saved && { color: theme.saveColor },
+                    ]}
+                  >
+                    {post.saves}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          </Pressable>
+        ))}
+      </ScrollView>
+
+      {/* Comments Modal */}
+      <Modal
+        visible={commentsModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setCommentsModalVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setCommentsModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={{ width: '100%' }}
+            >
+              <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+                <View style={[styles.modalContainer, { backgroundColor: theme.modalBackground }]}>
+                  <View style={[styles.modalHeader, { borderBottomColor: theme.border, alignItems: 'center' }]}>
+                    <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Comments</Text>
+                    <Pressable
+                      onPress={() => setCommentsModalVisible(false)}
+                      style={{ paddingVertical: hp(4), paddingLeft: wp(12) }}
+                    >
+                      <Text style={{ color: theme.primary, fontWeight: '600', fontSize: fp(15) }}>Close</Text>
+                    </Pressable>
                   </View>
-                  
-                  <View style={[styles.difficultyBadge, { backgroundColor: getDifficultyColor(recipe.difficulty) + '20' }]}>
-                    <Text style={[styles.difficultyText, { color: getDifficultyColor(recipe.difficulty) }]}>
-                      {recipe.difficulty}
-                    </Text>
+
+                  <ScrollView style={{ maxHeight: hp(300), padding: wp(20) }}>
+                    {selectedPost && getCommentsForPost(selectedPost.id).map((comment) => (
+                      <View key={comment.id} style={{ marginBottom: hp(15), flexDirection: 'row', gap: wp(10) }}>
+                        <View style={{ width: wp(30), height: wp(30), borderRadius: wp(15), backgroundColor: theme.primary, alignItems: 'center', justifyContent: 'center' }}>
+                          <Text style={{ color: '#FFFFFF', fontSize: fp(10), fontWeight: '700' }}>{comment.initials}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Text style={{ color: theme.textPrimary, fontWeight: '600', fontSize: fp(13) }}>{comment.author}</Text>
+                            <Text style={{ color: theme.textTertiary, fontSize: fp(11) }}>{comment.timestamp}</Text>
+                          </View>
+                          <Text style={{ color: theme.textSecondary, fontSize: fp(13), marginTop: hp(2) }}>{comment.text}</Text>
+                        </View>
+                      </View>
+                    ))}
+
+                    {selectedPost && getCommentsForPost(selectedPost.id).length === 0 && (
+                      <View style={{ alignItems: 'center', paddingVertical: hp(40) }}>
+                        <Ionicons name="chatbubble-outline" size={fp(38)} color={theme.textTertiary} />
+                        <Text style={{ color: theme.textSecondary, fontSize: fp(16), marginTop: hp(12) }}>No comments yet</Text>
+                        <Text style={{ color: theme.textTertiary, fontSize: fp(13), marginTop: hp(4) }}>Be the first to comment!</Text>
+                      </View>
+                    )}
+                  </ScrollView>
+
+                  <View style={[styles.addCommentContainer, { backgroundColor: theme.cardBackground, borderTopColor: theme.border }]}>
+                    <TextInput
+                      style={[styles.commentInput, { backgroundColor: theme.inputBackground, color: theme.textPrimary }]}
+                      placeholder="Write a comment..."
+                      placeholderTextColor={theme.textTertiary}
+                      value={newComment}
+                      onChangeText={setNewComment}
+                    />
+                    <Pressable
+                      onPress={handleAddComment}
+                      style={{ padding: wp(8), backgroundColor: theme.primary, borderRadius: wp(20) }}
+                    >
+                      <Ionicons name="send" size={fp(16)} color="white" />
+                    </Pressable>
                   </View>
                 </View>
-              </View>
-            </Pressable>
-          ))}
-        </ScrollView>
-      ) : (
-        /* Empty State */
-        <View style={styles.emptyState}>
-          <View style={[styles.emptyIconContainer, { backgroundColor: theme.inputBackground }]}>
-            <Ionicons name="book-outline" size={fp(48)} color={theme.textTertiary} />
+              </TouchableWithoutFeedback>
+            </KeyboardAvoidingView>
           </View>
-          <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>No recipes yet</Text>
-          <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>Start by adding your first recipe!</Text>
-          <Pressable 
-            style={({ pressed }) => [
-              styles.addButton,
-              pressed && styles.addButtonPressed
-            ]}
-            onPress={handleCreatePost}
-          >
-            <Ionicons name="add" size={fp(20)} color="#FFFFFF" />
-            <Text style={styles.addButtonText}>Add Recipe</Text>
-          </Pressable>
-        </View>
-      )}
+        </TouchableWithoutFeedback>
+      </Modal>
 
-      {/* Floating Add Button */}
-      {filteredRecipes.length > 0 && (
-        <Pressable 
-          style={({ pressed }) => [
-            styles.fab,
-            pressed && styles.fabPressed
-          ]}
-          onPress={handleCreatePost}
-        >
-          <Ionicons name="add" size={fp(28)} color="#FFFFFF" />
-        </Pressable>
-      )}
-
-      {/* Create Post Modal */}
-      <CreatePostModal
-        visible={createPostModalVisible}
-        onClose={handleCloseCreatePost}
-        onBack={null} // No back navigation needed
-        imageUri={null} // No image from camera/gallery
-        onSubmit={handleCreatePostSubmit}
+      {/* Dish Detail Modal */}
+      <DishDetailModal
+        visible={dishDetailModalVisible}
+        dish={selectedDish}
+        showChefReviewButton={true}
+        onClose={() => {
+          setDishDetailModalVisible(false);
+          setSelectedDish(null);
+        }}
       />
     </View>
   );
@@ -194,208 +309,117 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-
-  // Header with Back Button and Title
-  headerContainer: {
+  header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: wp(12),
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.screenPadding,
     paddingVertical: hp(12),
   },
   backButton: {
-    position: 'absolute',
-    left: wp(12),
-    width: wp(40),
-    height: wp(40),
-    borderRadius: wp(20),
-    backgroundColor: 'rgba(0, 0, 0, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: wp(8),
+    borderRadius: wp(8),
   },
   backButtonPressed: {
-    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    opacity: 0.7,
   },
   headerTitle: {
-    fontSize: fp(28),
+    fontSize: fp(20),
     fontWeight: '700',
-    textAlign: 'center',
   },
-
-  // Category Tabs
-  categoryWrapper: {
-    paddingHorizontal: SPACING.screenPadding,
-    paddingVertical: hp(12),
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.2)',
+  content: {
+    padding: SPACING.screenPadding,
+    paddingBottom: hp(40),
   },
-  categoryContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(10),
-  },
-  categoryTab: {
-    paddingHorizontal: wp(18),
-    paddingVertical: hp(10),
-    borderRadius: wp(24),
-    backgroundColor: '#F3F4F6',
-  },
-  categoryTabActive: {
-    backgroundColor: '#3B82F6',
-  },
-  categoryTabPressed: {
-    opacity: 0.8,
-  },
-  categoryText: {
-    fontSize: fp(14),
-    fontWeight: '500',
-    color: '#6B7280',
-  },
-  categoryTextActive: {
-    color: '#FFFFFF',
-  },
-
-  // Recipe Grid
-  recipeList: {
-    flex: 1,
-  },
-  recipeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: SPACING.screenPadding,
-    paddingTop: hp(16),
-    gap: SPACING.itemGap,
-    paddingBottom: hp(80),
-  },
-  recipeCard: {
-    width: (wp(393) - SPACING.screenPadding * 2 - SPACING.itemGap) / 2,
-    backgroundColor: '#FFFFFF',
-    borderRadius: SPACING.radiusLarge,
+  postCard: {
+    borderRadius: wp(16),
+    marginBottom: SPACING.itemGap,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: hp(2) },
-    shadowOpacity: 0.08,
-    shadowRadius: wp(8),
     elevation: 3,
   },
-  recipeCardPressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.98 }],
-  },
-  recipeImageContainer: {
-    width: '100%',
-    height: hp(120),
-  },
-  recipeImage: {
-    width: '100%',
-    height: '100%',
+  postCardPressed: {
+    opacity: 0.96,
+    transform: [{ scale: 0.99 }],
   },
   imagePlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#F3F4F6',
+    height: hp(200),
     justifyContent: 'center',
     alignItems: 'center',
   },
-  recipeInfo: {
-    padding: SPACING.cardPadding,
-    gap: hp(8),
+  postContent: {
+    padding: wp(16),
   },
-  recipeTitle: {
-    fontSize: fp(15),
-    fontWeight: '600',
-    color: '#111827',
-    lineHeight: fp(20),
-  },
-  recipeMeta: {
+  titleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(4),
-  },
-  metaText: {
-    fontSize: fp(12),
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  difficultyBadge: {
-    paddingHorizontal: wp(8),
-    paddingVertical: hp(2),
-    borderRadius: wp(6),
-  },
-  difficultyText: {
-    fontSize: fp(11),
-    fontWeight: '600',
-    textTransform: 'capitalize',
-  },
-
-  // Empty State
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.screenPadding,
-  },
-  emptyIconContainer: {
-    width: wp(80),
-    height: wp(80),
-    borderRadius: wp(40),
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: hp(16),
-  },
-  emptyTitle: {
-    fontSize: fp(20),
+  postTitle: {
+    fontSize: fp(18),
     fontWeight: '700',
-    color: '#111827',
-    marginBottom: hp(8),
   },
-  emptySubtitle: {
+  postDescription: {
+    marginTop: hp(6),
     fontSize: fp(14),
-    color: '#6B7280',
-    textAlign: 'center',
-    marginBottom: hp(24),
+    lineHeight: hp(20),
   },
-  addButton: {
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: hp(16),
+    paddingTop: hp(12),
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  statButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: wp(8),
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: wp(16),
-    paddingVertical: hp(14),
-    borderRadius: SPACING.radiusLarge,
+    gap: wp(6),
+    padding: wp(8),
   },
-  addButtonPressed: {
-    opacity: 0.8,
+  statButtonPressed: {
+    opacity: 0.6,
   },
-  addButtonText: {
-    fontSize: fp(16),
+  statText: {
+    fontSize: fp(13),
     fontWeight: '600',
-    color: '#FFFFFF',
   },
-
-  // Floating Action Button
-  fab: {
-    position: 'absolute',
-    bottom: hp(24),
-    right: SPACING.screenPadding,
-    width: wp(56),
-    height: wp(56),
-    borderRadius: wp(28),
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    borderTopLeftRadius: wp(24),
+    borderTopRightRadius: wp(24),
+    paddingTop: hp(20),
+    paddingBottom: hp(30),
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: wp(20),
+    paddingBottom: hp(16),
+    borderBottomWidth: 1,
+  },
+  modalTitle: {
+    fontSize: fp(18),
+    fontWeight: '700',
+  },
+  addCommentContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#3B82F6',
-    shadowOffset: { width: 0, height: hp(4) },
-    shadowOpacity: 0.3,
-    shadowRadius: wp(8),
-    elevation: 6,
+    paddingHorizontal: wp(20),
+    paddingTop: hp(16),
+    borderTopWidth: 1,
+    gap: wp(12),
   },
-  fabPressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.95 }],
+  commentInput: {
+    flex: 1,
+    borderRadius: wp(20),
+    paddingHorizontal: wp(16),
+    paddingVertical: hp(10),
+    fontSize: fp(14),
+    maxHeight: hp(80),
   },
 });

@@ -5,7 +5,7 @@ import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { useTheme } from '../../context/ThemeContext';
 import RequestChefReviewModal from './RequestChefReviewModal';
 
-export default function DishDetailModal({ visible, onClose, dish }) {
+export default function DishDetailModal({ visible, onClose, dish, showChefReviewButton = false }) {
     const { theme } = useTheme();
     const [reviewModalVisible, setReviewModalVisible] = useState(false);
 
@@ -208,21 +208,25 @@ Divide dough and stretch into pizza bases. Add toppings and bake at 220°C for 1
                             </>
                         )}
 
-                        {/* Request Chef Review Button */}
-                        <View
-                            style={[styles.divider, { backgroundColor: theme.textSecondary, opacity: 0.2 }]}
-                        />
-                        <Pressable
-                            style={({ pressed }) => [
-                                styles.chefReviewButton,
-                                { backgroundColor: theme.primary },
-                                pressed && { opacity: 0.8 }
-                            ]}
-                            onPress={() => setReviewModalVisible(true)}
-                        >
-                            <Ionicons name="star-outline" size={fp(20)} color="#FFFFFF" />
-                            <Text style={styles.chefReviewButtonText}>Request Chef Review</Text>
-                        </Pressable>
+                        {/* Request Chef Review Button - Only show for own posts */}
+                        {showChefReviewButton && (
+                            <>
+                                <View
+                                    style={[styles.divider, { backgroundColor: theme.textSecondary, opacity: 0.2 }]}
+                                />
+                                <Pressable
+                                    style={({ pressed }) => [
+                                        styles.chefReviewButton,
+                                        { backgroundColor: theme.primary },
+                                        pressed && { opacity: 0.8 }
+                                    ]}
+                                    onPress={() => setReviewModalVisible(true)}
+                                >
+                                    <Ionicons name="star-outline" size={fp(20)} color="#FFFFFF" />
+                                    <Text style={styles.chefReviewButtonText}>Request Chef Review</Text>
+                                </Pressable>
+                            </>
+                        )}
 
                         <View style={{ height: hp(20) }} />
                     </View>

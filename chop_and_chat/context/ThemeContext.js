@@ -11,7 +11,7 @@ export const lightTheme = {
   
   // Cards & Surfaces
   cardBackground: '#FFFFFF',
-  cardBackgroundAlt: '#F9FAFB', // Very subtle difference
+  cardBackgroundAlt: '#F9FAFB',
   cardBackgroundLight: '#FFFFFF',
   modalBackground: '#FFFFFF',
   overlayBackground: 'rgba(0, 0, 0, 0.5)',
@@ -19,7 +19,7 @@ export const lightTheme = {
   
   // Post/Feed specific backgrounds
   postCardBackground: '#FFFFFF',
-  postContentBackground: '#FFFFFF',
+  postContentBackground: '#FFFFFF',  // Light mode stays white
   postMetaBackground: '#FFFFFF',
   postHeaderBackground: '#FFFFFF',
   imageBackground: '#F3F4F6',
@@ -103,7 +103,7 @@ export const lightTheme = {
   chefCardBackground: '#FFFFFF',
   chefCardHeaderBg: '#FFFFFF',
   chefCardContentBg: '#FFFFFF',
-  commentSectionBg: '#F9FAFB',
+  commentSectionBg: '#FFFFFF',
 };
 
 // Dark Theme Colors
@@ -124,8 +124,8 @@ export const darkTheme = {
   
   // Post/Feed specific backgrounds 
   postCardBackground: '#1E293B',
-  postContentBackground: '#3D4A5C',
-  postMetaBackground: '#3D4A5C',  
+  postContentBackground: '#2D3948',  // UPDATED: Darker shade for content area
+  postMetaBackground: '#2D3948',     // UPDATED: Matches content background
   postHeaderBackground: '#1E293B',
   imageBackground: '#F9FAFB',  
   
@@ -194,7 +194,7 @@ export const darkTheme = {
   headerTitleColor: '#f1f5f9ee',
   
   // Recipe info
-  recipeInfoBackground: '#3D4A5C',
+  recipeInfoBackground: '#2D3948',  // UPDATED: Matches post content
   
   // Modal action buttons
   takePhotoButtonBg: '#1E3A2E',
@@ -207,8 +207,8 @@ export const darkTheme = {
   // Chef/Community card
   chefCardBackground: '#1E293B',  
   chefCardHeaderBg: '#1E293B',
-  chefCardContentBg: '#3D4A5C',
-  commentSectionBg: '#3D4A5C',  
+  chefCardContentBg: '#2D3948',  // UPDATED: Darker for content area
+  commentSectionBg: '#2D3948',   // UPDATED: Matches content
 };
 
 const ThemeContext = createContext();
