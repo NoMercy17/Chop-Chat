@@ -6,22 +6,52 @@ import { useTheme } from '../../context/ThemeContext';
 import CameraScreen, { uploadImage } from '../../utils/photoHandling';
 import CreatePostModal from '../posts/CreatePostModal';
 import RequestChefReviewModal from '../posts/RequestChefReviewModal';
+import { mockMyRecipes, mockFavoriteRecipes, mockCommunityPosts } from '../../data/mockData';
 
 
 const AVAILABLE_UTENSILS = [
     { id: 'oven', label: 'Oven', icon: 'tablet-landscape-outline' },
+    { id: 'stove', label: 'Stove', icon: 'flame-outline' },
     { id: 'mixer', label: 'Mixer', icon: 'sync-outline' },
     { id: 'blender', label: 'Blender', icon: 'color-wand-outline' },
-    { id: 'stove', label: 'Stove', icon: 'flame-outline' },
     { id: 'microwave', label: 'Microwave', icon: 'tv-outline' },
+    { id: 'grill', label: 'Grill', icon: 'bonfire-outline' },
+    { id: 'airfryer', label: 'Air Fryer', icon: 'leaf-outline' },
+    { id: 'pot', label: 'Pot', icon: 'water-outline' },
+    { id: 'wok', label: 'Wok', icon: 'restaurant-outline' },
 ];
 
-const DUMMY_RECIPES = [
-    { id: '1', name: 'Roasted Chicken', tools: ['oven'], difficulty: 'Medium', time: '45m' },
-    { id: '2', name: 'Smoothie Bowl', tools: ['blender'], difficulty: 'Easy', time: '5m' },
-    { id: '3', name: 'Pancakes', tools: ['stove', 'mixer'], difficulty: 'Medium', time: '20m' },
-    { id: '4', name: 'Mug Cake', tools: ['microwave'], difficulty: 'Easy', time: '3m' },
-];
+// Combine all recipes with source indicators, prioritized
+const getAllSearchableRecipes = () => {
+    // Priority 1: My Recipes (source: 'own')
+    const myRecipes = mockMyRecipes.map(recipe => ({
+        ...recipe,
+        source: 'own',
+        sourceDisplay: 'Own',
+    }));
+
+    // Priority 2: Favorites (source: 'favorite')
+    const favorites = mockFavoriteRecipes.map(recipe => ({
+        ...recipe,
+        source: 'favorite',
+        sourceDisplay: 'Favorite',
+    }));
+
+    // Priority 3: Community (source: '@author')
+    const community = mockCommunityPosts.map(post => ({
+        id: `community-${post.id}`,
+        name: post.title,
+        title: post.title,
+        tools: post.utensils || [],
+        difficulty: post.difficulty || 'Medium',
+        time: post.cookTime || '30m',
+        source: 'community',
+        sourceDisplay: `@${post.author}`,
+        originalPost: post,
+    }));
+
+    return [...myRecipes, ...favorites, ...community];
+};
 
 export default function MainActions() {
     const { theme } = useTheme();
@@ -67,9 +97,16 @@ export default function MainActions() {
     };
 
     const filteredRecipes = useMemo(() => {
-        return DUMMY_RECIPES.filter(recipe => {
-            const matchesSearch = recipe.name.toLowerCase().includes(searchQuery.toLowerCase());
-            return matchesSearch; 
+        const allRecipes = getAllSearchableRecipes();
+        return allRecipes.filter(recipe => {
+            const recipeName = recipe.name || recipe.title || '';
+            const matchesSearch = recipeName.toLowerCase().includes(searchQuery.toLowerCase());
+            
+            // Filter by utensils - if any utensils are selected, recipe must have at least one of them
+            const matchesUtensils = selectedUtensils.length === 0 || 
+                (recipe.tools && recipe.tools.some(tool => selectedUtensils.includes(tool)));
+            
+            return matchesSearch && matchesUtensils; 
         });
     }, [searchQuery, selectedUtensils]);
 
@@ -280,9 +317,40 @@ export default function MainActions() {
                         
                         <FlatList 
                             data={filteredRecipes}
-                            keyExtractor={item => item.id}
+                            keyExtractor={item => String(item.id)}
                             contentContainerStyle={{ paddingBottom: hp(40) }}
-                            renderItem={({ item }) => (
+                            ListEmptyComponent={() => (
+                                <View style={styles.emptyResults}>
+                                    <Ionicons name="search-outline" size={48} color={theme.textTertiary} />
+                                    <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                                        No recipes found
+                                    </Text>
+                                    <Text style={[styles.emptySubtext, { color: theme.textTertiary }]}>
+                                        Try a different search term
+                                    </Text>
+                                </View>
+                            )}
+                            renderItem={({ item }) => {
+                                // Determine source badge color
+                                const getSourceColor = () => {
+                                    switch (item.source) {
+                                        case 'own': return '#10B981'; // green
+                                        case 'favorite': return '#F59E0B'; // amber
+                                        case 'community': return '#3B82F6'; // blue
+                                        default: return theme.textTertiary;
+                                    }
+                                };
+                                
+                                const getSourceIcon = () => {
+                                    switch (item.source) {
+                                        case 'own': return 'person';
+                                        case 'favorite': return 'heart';
+                                        case 'community': return 'people';
+                                        default: return 'document';
+                                    }
+                                };
+
+                                return (
                                 <Pressable 
                                     onPress={() => console.log('Selected Recipe ID:', item.id)}
                                     style={({ pressed }) => [
@@ -300,7 +368,29 @@ export default function MainActions() {
                                     </View>
                                     
                                     <View style={styles.recipeInfo}>
-                                        <Text style={[styles.recipeName, { color: theme.textPrimary }]}>{item.name}</Text>
+                                        <View style={styles.recipeNameRow}>
+                                            <Text style={[styles.recipeName, { color: theme.textPrimary, flex: 1 }]} numberOfLines={1}>
+                                                {item.name || item.title}
+                                            </Text>
+                                            {/* Source Badge */}
+                                            <View style={[
+                                                styles.sourceBadge, 
+                                                { backgroundColor: getSourceColor() + '20' }
+                                            ]}>
+                                                <Ionicons 
+                                                    name={getSourceIcon()} 
+                                                    size={10} 
+                                                    color={getSourceColor()} 
+                                                    style={{ marginRight: 3 }} 
+                                                />
+                                                <Text style={[
+                                                    styles.sourceText, 
+                                                    { color: getSourceColor() }
+                                                ]}>
+                                                    {item.sourceDisplay}
+                                                </Text>
+                                            </View>
+                                        </View>
                                         
                                         <View style={styles.recipeMetaRow}>
                                             <View style={styles.metaBadge}>
@@ -321,21 +411,21 @@ export default function MainActions() {
                                         </View>
                                         
                                         <View style={styles.toolsRow}>
-                                            {item.tools.map((toolId, index) => (
+                                            {(item.tools || []).map((toolId, index) => (
                                                 <View key={`${item.id}-${toolId}-${index}`} style={[
                                                     styles.miniToolDot, 
                                                     { backgroundColor: selectedUtensils.includes(toolId) ? '#10B981' : theme.textTertiary } 
                                                 ]} />
                                             ))}
                                             <Text style={[styles.metaText, { fontSize: fp(10), color: theme.textTertiary, marginLeft: 4 }]}>
-                                                {item.tools.join(', ')}
+                                                {(item.tools || []).join(', ')}
                                             </Text>
                                         </View>
                                     </View>
                                     
                                     <Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />
                                 </Pressable>
-                            )}
+                            )}}
                         />
                     </View>
                 </View>
@@ -697,6 +787,39 @@ const styles = StyleSheet.create({
         height: 6,
         borderRadius: 3,
         marginRight: 4,
+    },
+    // Source badge styles for Find Recipe
+    recipeNameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: hp(4),
+    },
+    sourceBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: wp(6),
+        paddingVertical: hp(2),
+        borderRadius: wp(4),
+        marginLeft: wp(8),
+    },
+    sourceText: {
+        fontSize: fp(9),
+        fontWeight: '600',
+    },
+    emptyResults: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: hp(40),
+    },
+    emptyText: {
+        fontSize: fp(16),
+        fontWeight: '600',
+        marginTop: hp(12),
+    },
+    emptySubtext: {
+        fontSize: fp(13),
+        marginTop: hp(4),
     },
     actionModalOverlay: {
         flex: 1,

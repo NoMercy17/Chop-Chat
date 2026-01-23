@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, Modal, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Modal, ScrollView, Pressable, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { useTheme } from '../../context/ThemeContext';
 import RequestChefReviewModal from './RequestChefReviewModal';
+import { mockIngredients, mockInstructions } from '../../data/mockData';
 
 export default function DishDetailModal({ visible, onClose, dish, showChefReviewButton = false }) {
     const { theme } = useTheme();
@@ -11,28 +12,9 @@ export default function DishDetailModal({ visible, onClose, dish, showChefReview
 
     if (!dish) return null;
 
-    // Mock ingredients data
-    const mockIngredients = dish.ingredients || [
-        '2 cups all-purpose flour',
-        '1 tablespoon salt',
-        '500ml warm water',
-        '7g instant yeast',
-        '2 tablespoons olive oil',
-        'Fresh basil leaves',
-        'Mozzarella cheese',
-        'Tomato sauce',
-    ];
-
-    const mockInstructions = dish.instructions || 
-        `Mix flour and salt in a large bowl.
-Create a well in the center and add warm water and yeast.
-Gradually incorporate flour into the liquid, stirring until combined.
-
-Knead the dough on a floured surface for 10 minutes until smooth and elastic.
-Place dough in a greased bowl, cover with a damp cloth, and let rise for 1-2 hours.
-
-Divide dough and stretch into pizza bases. Add toppings and bake at 220°C for 12-15 minutes.`;
-
+    // Use dish data or fallback to mockData
+    const ingredients = dish.ingredients || mockIngredients.pizza;
+    const instructions = dish.instructions || mockInstructions.pizza;
     const kitchenUtensils = dish.utensils || ['oven', 'grill', 'stove'];
     const cookTime = dish.cookTime || '15 min';
 
@@ -69,11 +51,15 @@ Divide dough and stretch into pizza bases. Add toppings and bake at 220°C for 1
                     showsVerticalScrollIndicator={false}
                 >
                     {/* IMAGE */}
-                    <View style={[styles.dishImage, { backgroundColor: theme.imageBackground }]}>
-                        <Text style={[styles.imagePlaceholderText, { color: theme.textTertiary }]}>
-                            DISH IMAGE
-                        </Text>
-                    </View>
+                    {dish.image ? (
+                        <Image source={{ uri: dish.image }} style={styles.dishImageActual} />
+                    ) : (
+                        <View style={[styles.dishImage, { backgroundColor: theme.imageBackground }]}>
+                            <Text style={[styles.imagePlaceholderText, { color: theme.textTertiary }]}>
+                                DISH IMAGE
+                            </Text>
+                        </View>
+                    )}
 
                     {/* Content Wrapper */}
                     <View style={[styles.contentWrapper, { backgroundColor: theme.screenBackground }]}>
@@ -170,7 +156,7 @@ Divide dough and stretch into pizza bases. Add toppings and bake at 220°C for 1
                                 Ingredients
                             </Text>
                             <View style={styles.ingredientsList}>
-                                {mockIngredients.map((ingredient, index) => (
+                                {ingredients.map((ingredient, index) => (
                                     <View key={index} style={styles.ingredientItem}>
                                         <View
                                             style={[
@@ -192,7 +178,7 @@ Divide dough and stretch into pizza bases. Add toppings and bake at 220°C for 1
                         </View>
 
                         {/* INSTRUCTIONS */}
-                        {mockInstructions && (
+                        {instructions && (
                             <>
                                 <View
                                     style={[styles.divider, { backgroundColor: theme.textSecondary, opacity: 0.2 }]}
@@ -202,7 +188,7 @@ Divide dough and stretch into pizza bases. Add toppings and bake at 220°C for 1
                                         Instructions
                                     </Text>
                                     <Text style={[styles.instructionsText, { color: theme.textPrimary }]}>
-                                        {mockInstructions}
+                                        {instructions}
                                     </Text>
                                 </View>
                             </>
@@ -272,6 +258,11 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         paddingBottom: hp(40),
+    },
+    dishImageActual: {
+        width: '100%',
+        height: hp(250),
+        resizeMode: 'cover',
     },
     dishImage: {
         width: '100%',

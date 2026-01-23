@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import HomeScreen from './screens/HomeScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import OtherUserProfileScreen from './screens/OtherUserProfileScreen';
 import MyRecipes from './screens/MyRecipes';
 import FavoriteRecipes from './screens/FavoriteRecipes';
 import AllChefReviews from './screens/AllChefReviews';
@@ -15,6 +16,7 @@ import { PostsProvider } from './context/PostsContext';
 import { ChefFeedProvider } from './context/ChefFeedContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { NotificationsProvider } from './context/NotificationsContext';
+import { FollowProvider } from './context/FollowContext';
 
 
 const MainStack = createNativeStackNavigator();
@@ -55,29 +57,32 @@ function AppContent() {
   return (
     <AuthContext.Provider value={auth}>
       <NotificationsProvider>
-        <PostsProvider>
-          <ChefFeedProvider>
-            <NavigationContainer ref={navigationRef}>
-              {user ? (
-              <MainStack.Navigator
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: theme.background },
-                }}
-              >
-                <MainStack.Screen name="Home" component={HomeScreen} />
-                <MainStack.Screen name="Profile" component={ProfileScreen} />
-                <MainStack.Screen name="MyRecipes" component={MyRecipes} />
-                <MainStack.Screen name="FavoriteRecipes" component={FavoriteRecipes} />
-                <MainStack.Screen name="AllChefReviews" component={AllChefReviews} />
-                <MainStack.Screen name="AllCommunityPosts" component={AllCommunityPosts} />
-              </MainStack.Navigator>
-              ) : (
-                <AuthStack />
-              )}
-            </NavigationContainer>
-          </ChefFeedProvider>
-        </PostsProvider>
+        <FollowProvider>
+          <PostsProvider>
+            <ChefFeedProvider>
+              <NavigationContainer ref={navigationRef}>
+                {user ? (
+                <MainStack.Navigator
+                  screenOptions={{
+                    headerShown: false,
+                    contentStyle: { backgroundColor: theme.background },
+                  }}
+                >
+                  <MainStack.Screen name="Home" component={HomeScreen} />
+                  <MainStack.Screen name="Profile" component={ProfileScreen} />
+                  <MainStack.Screen name="OtherUserProfile" component={OtherUserProfileScreen} />
+                  <MainStack.Screen name="MyRecipes" component={MyRecipes} />
+                  <MainStack.Screen name="FavoriteRecipes" component={FavoriteRecipes} />
+                  <MainStack.Screen name="AllChefReviews" component={AllChefReviews} />
+                  <MainStack.Screen name="AllCommunityPosts" component={AllCommunityPosts} />
+                </MainStack.Navigator>
+                ) : (
+                  <AuthStack />
+                )}
+              </NavigationContainer>
+            </ChefFeedProvider>
+          </PostsProvider>
+        </FollowProvider>
       </NotificationsProvider>
     </AuthContext.Provider>
   );

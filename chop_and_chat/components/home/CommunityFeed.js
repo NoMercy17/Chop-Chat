@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Text, View, StyleSheet, ScrollView, Pressable, Modal, TextInput, KeyboardAvoidingView, Platform, TouchableWithoutFeedback } from 'react-native';
+import { Text, View, StyleSheet, ScrollView, Pressable, Modal, TextInput, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,8 +19,8 @@ export default function CommunityFeed() {
     const { theme } = useTheme();
     const { posts: allPosts, handleLike, handleSave, updateCommentCount } = usePosts();
     
-    // Generate 7 random post IDs on component mount
-    const randomPostIds = useMemo(() => getRandomPostIds(allPosts, 7), []);
+    // Generate 2 random post IDs for quick menu display
+    const randomPostIds = useMemo(() => getRandomPostIds(allPosts, 2), []);
     
     // Get the actual posts from context based on random IDs
     const posts = allPosts.filter(post => randomPostIds.includes(post.id));
@@ -89,16 +89,33 @@ export default function CommunityFeed() {
                             setDishDetailModalVisible(true);
                         }}
                     >
-                        <View style={[styles.dishImagePlaceholder, { backgroundColor: theme.imageBackground }]}>
-                            <Text style={[styles.imagePlaceholderText, { color: theme.textTertiary }]}>IMAGE</Text>
-                        </View>
+                        {post.image ? (
+                            <Image source={{ uri: post.image }} style={styles.dishImage} />
+                        ) : (
+                            <View style={[styles.dishImagePlaceholder, { backgroundColor: theme.imageBackground }]}>
+                                <Text style={[styles.imagePlaceholderText, { color: theme.textTertiary }]}>IMAGE</Text>
+                            </View>
+                        )}
 
                         <View style={[styles.postContent, { backgroundColor: theme.postContentBackground }]}>
                             <Text style={[styles.postTitle, { color: theme.textPrimary }]}>{post.title}</Text>
                             <Text style={[styles.postDescription, { color: theme.textPrimary }]}>{post.description}</Text>
                             
                             <View style={[styles.postMeta, { backgroundColor: theme.postMetaBackground }]}>
-                                <Text style={[styles.postAuthor, { color: theme.textSecondary }]}>by {post.author}</Text>
+                                <Pressable
+                                    onPress={(e) => {
+                                        e.stopPropagation();
+                                        navigation.navigate('OtherUserProfile', {
+                                            userId: post.authorId || post.id,
+                                            userName: post.author,
+                                            userAvatar: post.authorAvatar || null,
+                                            username: `@${post.author.replace(/\s+/g, '').toLowerCase()}`
+                                        });
+                                    }}
+                                    style={({pressed}) => pressed && {opacity: 0.7}}
+                                >
+                                    <Text style={[styles.postAuthor, { color: theme.primary }]}>by {post.author}</Text>
+                                </Pressable>
                                 <View style={styles.postStats}>
                                     <Pressable 
                                         style={({ pressed }) => [
@@ -311,6 +328,11 @@ const styles = StyleSheet.create({
     postCardPressed: {
         opacity: 0.95,
         transform: [{ scale: 0.99 }],
+    },
+    dishImage: {
+        width: '100%',
+        height: hp(140),
+        resizeMode: 'cover',
     },
     dishImagePlaceholder: {
         width: '100%',

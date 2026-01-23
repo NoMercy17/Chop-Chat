@@ -36,11 +36,17 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// Register
+
 app.post('/register', async (req, res) => {
   try {
-    const { email, password, name } = req.body;
+    const { email, password, name, role } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'email and password required' });
+    
+    // Validate role field
+    const userRole = role || 'user';
+    if (!['user', 'chef'].includes(userRole)) {
+      return res.status(400).json({ error: 'role must be "user" or "chef"' });
+    }
     
     const lower = email.toLowerCase();
     const { rows } = await pool.query('SELECT id FROM users WHERE email = $1', [lower]);
@@ -48,10 +54,11 @@ app.post('/register', async (req, res) => {
     
     const hashed = await bcrypt.hash(password, 10);
     const insert = await pool.query(
-      'INSERT INTO users (email, password, name) VALUES ($1, $2, $3) RETURNING id, email, name, created_at',
-      [lower, hashed, name || null]
+      'INSERT INTO users (email, password, name, role) VALUES ($1, $2, $3, $4) RETURNING id, email, name, role, created_at',
+      [lower, hashed, name || null, userRole]
     );
     const user = insert.rows[0];
+    console.log(`New ${user.role} registered:`, user.email);
     return res.status(201).json({ user });
   } catch (err) {
     console.error(err);
@@ -59,7 +66,7 @@ app.post('/register', async (req, res) => {
   }
 });
 
-// Login
+
 app.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -67,7 +74,7 @@ app.post('/login', async (req, res) => {
     
     const lower = email.toLowerCase();
     const { rows } = await pool.query(
-      'SELECT id, email, password, name, profile_photo FROM users WHERE email = $1', 
+      'SELECT id, email, password, name, role, profile_photo FROM users WHERE email = $1', 
       [lower]
     );
     const user = rows[0];
@@ -76,13 +83,21 @@ app.post('/login', async (req, res) => {
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).json({ error: 'invalid credentials' });
     
-    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+    // Include role in JWT payload for authorization
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role }, 
+      JWT_SECRET, 
+      { expiresIn: '7d' }
+    );
+    
+    console.log(` ${user.role} logged in:`, user.email);
     return res.json({ 
       token, 
       user: { 
         id: user.id, 
         email: user.email, 
         name: user.name,
+        role: user.role,
         profile_photo: user.profile_photo 
       } 
     });
@@ -92,11 +107,11 @@ app.post('/login', async (req, res) => {
   }
 });
 
-// Get current user info (NEW)
+// Get current user info 
 app.get('/users/me', authenticateToken, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT id, email, name, profile_photo, created_at FROM users WHERE id = $1',
+      'SELECT id, email, name, role, profile_photo, bio, created_at FROM users WHERE id = $1',
       [req.user.id]
     );
     
@@ -111,13 +126,13 @@ app.get('/users/me', authenticateToken, async (req, res) => {
   }
 });
 
-// Update profile photo (NEW)
+// Update profile photo
 app.patch('/users/profile-photo', authenticateToken, async (req, res) => {
   try {
     const { photo_url } = req.body;
     const userId = req.user.id;
     
-    console.log('📸 Profile photo update request:');
+    console.log('  Profile photo update request:');
     console.log('  User ID:', userId);
     console.log('  Photo URL:', photo_url);
     
@@ -129,7 +144,7 @@ app.patch('/users/profile-photo', authenticateToken, async (req, res) => {
       UPDATE users 
       SET profile_photo = $1 
       WHERE id = $2 
-      RETURNING id, email, name, profile_photo, created_at
+      RETURNING id, email, name, role, profile_photo, created_at
     `;
     
     const { rows } = await pool.query(query, [photo_url, userId]);
@@ -141,7 +156,7 @@ app.patch('/users/profile-photo', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'user not found' });
     }
     
-    console.log('  ✅ Profile photo saved successfully');
+    console.log('   Profile photo saved successfully');
     res.json({ user: rows[0] });
   } catch (err) {
     console.error('❌ Error updating profile photo:', err.message);
@@ -150,7 +165,7 @@ app.patch('/users/profile-photo', authenticateToken, async (req, res) => {
   }
 });
 
-// Update bio (NEW)
+// Update bio 
 app.patch('/users/bio', authenticateToken, async (req, res) => {
   try {
     const { bio } = req.body;
@@ -164,7 +179,7 @@ app.patch('/users/bio', authenticateToken, async (req, res) => {
       UPDATE users 
       SET bio = $1 
       WHERE id = $2 
-      RETURNING id, email, name, bio, profile_photo, created_at
+      RETURNING id, email, name, role, bio, profile_photo, created_at
     `;
     
     const { rows } = await pool.query(query, [bio, userId]);
@@ -181,10 +196,11 @@ app.patch('/users/bio', authenticateToken, async (req, res) => {
 });
 
 // Protected: list users 
+// REASONING: Include role so frontend can display user type badges
 app.get('/users', authenticateToken, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT id, email, name, profile_photo, created_at FROM users ORDER BY id DESC LIMIT 100'
+      'SELECT id, email, name, role, profile_photo, created_at FROM users ORDER BY id DESC LIMIT 100'
     );
     res.json({ users: rows });
   } catch (err) {

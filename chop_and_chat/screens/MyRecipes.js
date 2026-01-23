@@ -5,18 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { wp, hp, fp, SPACING } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
 import DishDetailModal from '../components/posts/DishDetailModal';
-
-// Sample comments data
-const commentsData = {
-  '1': [
-    { id: 1, author: 'Sarah M.', initials: 'SM', text: 'This pasta looks amazing! Will definitely try this recipe!', timestamp: '2h ago' },
-    { id: 2, author: 'Marco V.', initials: 'MV', text: 'Pro tip: use fresh parmesan for best results', timestamp: '1h ago' },
-  ],
-  '2': [
-    { id: 3, author: 'Tommy K.', initials: 'TK', text: 'The broth looks so rich and flavorful!', timestamp: '3h ago' },
-  ],
-  '3': [],
-};
+import { mockMyRecipes, mockMyRecipesComments } from '../data/mockData';
 
 export default function MyPostsScreen({ navigation }) {
   const { theme } = useTheme();
@@ -26,38 +15,7 @@ export default function MyPostsScreen({ navigation }) {
   const [commentsModalVisible, setCommentsModalVisible] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
   const [newComment, setNewComment] = useState('');
-  const [myPosts, setMyPosts] = useState([
-    {
-      id: '1',
-      title: 'Creamy Garlic Pasta',
-      description: 'Quick comfort pasta with garlic, butter and parmesan.',
-      likes: 124,
-      comments: 18,
-      saves: 42,
-      liked: false,
-      saved: false,
-    },
-    {
-      id: '2',
-      title: 'Homemade Ramen Bowl',
-      description: 'Slow-cooked broth, noodles, egg and fresh toppings.',
-      likes: 256,
-      comments: 34,
-      saves: 89,
-      liked: false,
-      saved: false,
-    },
-    {
-      id: '3',
-      title: 'Protein Pancakes',
-      description: 'Healthy pancakes perfect for breakfast or post-workout.',
-      likes: 98,
-      comments: 12,
-      saves: 61,
-      liked: false,
-      saved: false,
-    },
-  ]);
+  const [myPosts, setMyPosts] = useState(mockMyRecipes);
 
   const handleLike = (postId) => {
     setMyPosts(currentPosts =>
@@ -105,7 +63,7 @@ export default function MyPostsScreen({ navigation }) {
   };
 
   const getCommentsForPost = (postId) => {
-    return commentsData[postId] || [];
+    return mockMyRecipesComments[postId] || [];
   };
 
   return (
@@ -126,7 +84,8 @@ export default function MyPostsScreen({ navigation }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        {myPosts.map((post) => (
+        {myPosts.length > 0 ? (
+          myPosts.map((post) => (
           <Pressable
             key={post.id}
             style={({ pressed }) => [
@@ -216,7 +175,30 @@ export default function MyPostsScreen({ navigation }) {
               </View>
             </View>
           </Pressable>
-        ))}
+        ))
+        ) : (
+          /* Empty State */
+          <View style={styles.emptyState}>
+            <View style={[styles.emptyIconContainer, { backgroundColor: theme.inputBackground }]}>
+              <Ionicons name="restaurant-outline" size={fp(48)} color={theme.textTertiary} />
+            </View>
+            <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>No recipes yet</Text>
+            <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+              Create your first recipe and share it with the community!
+            </Text>
+            <Pressable 
+              style={({ pressed }) => [
+                styles.createButton,
+                { backgroundColor: theme.primary },
+                pressed && styles.createButtonPressed
+              ]}
+              onPress={() => navigation.navigate('Home')}
+            >
+              <Ionicons name="add" size={fp(20)} color="#FFFFFF" />
+              <Text style={styles.createButtonText}>Create Recipe</Text>
+            </Pressable>
+          </View>
+        )}
       </ScrollView>
 
       {/* Comments Modal */}
@@ -421,5 +403,50 @@ const styles = StyleSheet.create({
     paddingVertical: hp(10),
     fontSize: fp(14),
     maxHeight: hp(80),
+  },
+  // Empty State Styles
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: hp(80),
+    paddingHorizontal: wp(40),
+  },
+  emptyIconContainer: {
+    width: wp(100),
+    height: wp(100),
+    borderRadius: wp(50),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: hp(24),
+  },
+  emptyTitle: {
+    fontSize: fp(20),
+    fontWeight: '700',
+    marginBottom: hp(8),
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: fp(14),
+    textAlign: 'center',
+    lineHeight: hp(20),
+    marginBottom: hp(24),
+  },
+  createButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: hp(12),
+    paddingHorizontal: wp(24),
+    borderRadius: wp(12),
+    gap: wp(8),
+  },
+  createButtonPressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.98 }],
+  },
+  createButtonText: {
+    color: '#FFFFFF',
+    fontSize: fp(16),
+    fontWeight: '600',
   },
 });

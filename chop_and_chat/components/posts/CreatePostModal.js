@@ -9,13 +9,15 @@ import { useTheme } from '../../context/ThemeContext';
 
 const DIFFICULTY_OPTIONS = ['Easy', 'Medium', 'Hard'];
 const UTENSIL_OPTIONS = [
-    { id: 'oven', label: 'Oven', icon: 'flame-outline' },
-    { id: 'stove', label: 'Stove', icon: 'restaurant-outline' },
+    { id: 'oven', label: 'Oven', icon: 'tablet-landscape-outline' },
+    { id: 'stove', label: 'Stove', icon: 'flame-outline' },
+    { id: 'mixer', label: 'Mixer', icon: 'sync-outline' },
+    { id: 'blender', label: 'Blender', icon: 'color-wand-outline' },
+    { id: 'microwave', label: 'Microwave', icon: 'tv-outline' },
     { id: 'grill', label: 'Grill', icon: 'bonfire-outline' },
-    { id: 'microwave', label: 'Microwave', icon: 'flash-outline' },
-    { id: 'blender', label: 'Blender', icon: 'flask-outline' },
-    { id: 'mixer', label: 'Mixer', icon: 'nutrition-outline' },
     { id: 'airfryer', label: 'Air Fryer', icon: 'leaf-outline' },
+    { id: 'pot', label: 'Pot', icon: 'water-outline' },
+    { id: 'wok', label: 'Wok', icon: 'restaurant-outline' },
 ];
 
 export default function CreatePostModal({ visible, onClose, onBack, imageUri, onSubmit }) {

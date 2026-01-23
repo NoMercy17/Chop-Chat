@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Modal, TextInput, KeyboardAvoidingView, Platform, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Modal, TextInput, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Image } from 'react-native';
 import { wp, hp, fp, SPACING } from '../utils/responsive';
 import { commentsData } from '../data/postsData';
+import { mockFollowedAuthors } from '../data/mockData';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
@@ -10,9 +11,6 @@ import DishDetailModal from '../components/posts/DishDetailModal';
 
 
 const CATEGORIES = ['Following', 'All'];
-
-// Sample list of followed user IDs - in a real app this would come from your backend/context
-const FOLLOWED_AUTHORS = ['John Doe', 'Jane Smith', 'Emily Carter', 'Carlos Rivera'];
 
 export default function AllCommunityPosts({ navigation }) {
     const { theme } = useTheme();
@@ -28,7 +26,7 @@ export default function AllCommunityPosts({ navigation }) {
     // Filter posts based on selected category
     const filteredPosts = selectedCategory === 'All' 
         ? posts 
-        : posts.filter(post => FOLLOWED_AUTHORS.includes(post.author));
+        : posts.filter(post => mockFollowedAuthors.includes(post.author));
     
     const handleComment = (post) => {
         setSelectedPost(post);
@@ -96,16 +94,33 @@ export default function AllCommunityPosts({ navigation }) {
                         setDishDetailModalVisible(true);
                     }}
                 >
-                    <View style={[styles.imageplaceholder, { backgroundColor: theme.imageBackground }]}>
-                        <Text style={[styles.imagePlaceholderText, { color: theme.textTertiary }]}>IMAGE</Text>
-                    </View>
+                    {post.image ? (
+                        <Image source={{ uri: post.image }} style={styles.postImage} />
+                    ) : (
+                        <View style={[styles.imageplaceholder, { backgroundColor: theme.imageBackground }]}>
+                            <Text style={[styles.imagePlaceholderText, { color: theme.textTertiary }]}>IMAGE</Text>
+                        </View>
+                    )}
                     
                     <View style={[styles.postContent, { backgroundColor: theme.postContentBackground }]}>
                         <Text style={[styles.postTitle, { color: theme.textPrimary }]}>{post.title}</Text>
                         <Text style={[styles.postDescription, { color: theme.textPrimary }]}>{post.description}</Text>
                         
                         <View style={[styles.postMeta, { backgroundColor: theme.postMetaBackground }]}>
-                            <Text style={[styles.postAuthor, { color: theme.textSecondary }]}>by {post.author}</Text>
+                            <Pressable
+                                onPress={(e) => {
+                                    e.stopPropagation();
+                                    navigation.navigate('OtherUserProfile', {
+                                        userId: post.authorId || post.id,
+                                        userName: post.author,
+                                        userAvatar: post.authorAvatar || null,
+                                        username: `@${post.author.replace(/\s+/g, '').toLowerCase()}`
+                                    });
+                                }}
+                                style={({pressed}) => pressed && {opacity: 0.7}}
+                            >
+                                <Text style={[styles.postAuthor, { color: theme.primary }]}>by {post.author}</Text>
+                            </Pressable>
                                 <View style={styles.postStats}>
                                     <Pressable 
                                         style={({ pressed }) => [
@@ -344,6 +359,11 @@ const styles = StyleSheet.create({
     postCardPressed: {
         opacity: 0.95,
         transform: [{ scale: 0.99 }],
+    },
+    postImage: {
+        width: '100%',
+        height: hp(200),
+        resizeMode: 'cover',
     },
     imageplaceholder: {
         width: '100%',

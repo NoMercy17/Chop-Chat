@@ -1,19 +1,22 @@
 import React, { useContext, useState, useEffect } from "react";
-import { View, Text, ScrollView, Pressable, Image, StyleSheet, Modal, TextInput, Switch, Alert, TouchableWithoutFeedback, KeyboardAvoidingView, Platform, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, Pressable, Image, StyleSheet, Modal, TextInput, Switch, Alert, TouchableWithoutFeedback, KeyboardAvoidingView, Platform, ActivityIndicator, FlatList } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthContext } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
+import { useFollow } from "../context/FollowContext";
 import { wp, hp, fp, SPACING } from "../utils/responsive";
 import CameraScreen, { uploadImage } from "../utils/photoHandling";
 import { uploadToCloudinary } from "../utils/cloudinaryUploads";
 import { env } from "../utils/env";
+import { mockFollowersList, mockFollowingList, mockMyRecipes } from "../data/mockData";
 
 export default function ProfileScreen({ navigation }) {
   const auth = useContext(AuthContext);
   const { isDarkMode, toggleTheme, theme } = useTheme();
+  const { myFollowingCount } = useFollow();
   const insets = useSafeAreaInsets();
   
   // Settings Modal State
@@ -26,8 +29,15 @@ export default function ProfileScreen({ navigation }) {
   const [profileImage, setProfileImage] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   
+  // User name for display and initials
+  const [userName, setUserName] = useState("User");
+  
+  // Followers/Following Modal State
+  const [followersModalVisible, setFollowersModalVisible] = useState(false);
+  const [followModalType, setFollowModalType] = useState(null); // 'followers' or 'following'
+  
   // Bio editing
-  const [bio, setBio] = useState("Food enthusiast");
+  const [bio, setBio] = useState("Cool Chef");
   const [tempBio, setTempBio] = useState("");
   
   // Password change
@@ -42,6 +52,21 @@ export default function ProfileScreen({ navigation }) {
     likesComments: true,
     newFollowers: false,
   });
+
+  // Mock data for followers/following
+  const [followersList, setFollowersList] = useState(mockFollowersList);
+
+  const [followingList, setFollowingList] = useState(mockFollowingList);
+
+  // Get initials from name
+  const getInitials = (name) => {
+    if (!name) return 'U';
+    const parts = name.split(' ');
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
 
   // Load user data on mount
   useEffect(() => {
@@ -72,27 +97,42 @@ export default function ProfileScreen({ navigation }) {
       }
 
       console.log('📥 Loading user profile...');
+      console.log('🔗 API URL:', env.API_URL);
+      console.log('🔑 Token (first 20 chars):', token.substring(0, 20) + '...');
+      
       const response = await fetch(`${env.API_URL}/users/me`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
 
+      console.log('📊 Response status:', response.status);
+
       if (response.status === 401 || response.status === 403) {
-        console.error(' Authentication failed, status:', response.status);
-        console.log(' User needs to login again');
+        console.error('🔒 Authentication failed, status:', response.status);
+        console.log('⚠️ User needs to login again');
+        Alert.alert(
+          'Session Expired',
+          'Please log in again to continue.',
+          [{ text: 'OK', onPress: () => auth.signOut() }]
+        );
         return;
       }
 
       if (response.ok) {
         const data = await response.json();
-        console.log(' Profile loaded:', data.user);
+        console.log('✅ Profile loaded:', data.user);
+        
+        // Set user name
+        if (data.user.name) {
+          setUserName(data.user.name);
+        }
         
         if (data.user.profile_photo) {
-          console.log(' Profile photo URL:', data.user.profile_photo);
+          console.log('🖼️ Profile photo URL:', data.user.profile_photo);
           setProfileImage(data.user.profile_photo);
         } else {
-          console.log(' No profile photo');
+          console.log('📷 No profile photo');
           setProfileImage(null);
         }
         
@@ -100,10 +140,14 @@ export default function ProfileScreen({ navigation }) {
           setBio(data.user.bio);
         }
       } else {
-        console.error(' Failed to load profile, status:', response.status);
+        console.error('❌ Failed to load profile, status:', response.status);
+        const errorData = await response.text();
+        console.error('Error details:', errorData);
       }
     } catch (error) {
-      console.error(' Failed to load profile:', error);
+      console.error('❌ Failed to load profile:', error);
+      console.error('Error stack:', error.stack);
+      Alert.alert('Error', 'Failed to load profile. Please check your connection.');
     }
   };
 
@@ -211,7 +255,7 @@ export default function ProfileScreen({ navigation }) {
   };
 
   const handlePhotoTaken = async (uri) => {
-    console.log('Profile photo captured:', uri);
+    console.log('📸 Profile photo captured:', uri);
     setProfileImage(uri); // Show local image immediately
     setCameraModalVisible(false);
     
@@ -224,6 +268,7 @@ export default function ProfileScreen({ navigation }) {
     setImageSourceModalVisible(false);
     
     if (uri) {
+      console.log('🖼️ Gallery image selected:', uri);
       setProfileImage(uri); // Show local image immediately
       await uploadProfilePhoto(uri);
     }
@@ -234,22 +279,28 @@ export default function ProfileScreen({ navigation }) {
       setIsUploading(true);
       
       // Step 1: Upload to Cloudinary
-      console.log(' Uploading to CLOUDINARY...');
+      console.log('☁️ Uploading to CLOUDINARY...');
       const cloudinaryUrl = await uploadToCloudinary(localUri, 'profile_photos');
       
       if (!cloudinaryUrl) {
-        Alert.alert('Error', 'Failed to upload photo');
+        Alert.alert('Error', 'Failed to upload photo to cloud storage');
         setIsUploading(false);
+        // Revert to previous image
+        await loadUserProfile();
         return;
       }
       
+      console.log('✅ Cloudinary upload successful:', cloudinaryUrl);
+      
       // Step 2: Save URL to backend
-      console.log(' Saving to database...');
+      console.log('💾 Saving to database...');
       let token = await AsyncStorage.getItem('userToken');
       if (!token) {
         const session = await AsyncStorage.getItem('session_user');
         if (session) token = JSON.parse(session).token;
       }
+      
+      console.log('🔗 Backend URL:', `${env.API_URL}/users/profile-photo`);
       
       const response = await fetch(`${env.API_URL}/users/profile-photo`, {
         method: 'PATCH',
@@ -262,25 +313,85 @@ export default function ProfileScreen({ navigation }) {
         })
       });
       
+      console.log('📊 Backend response status:', response.status);
       const data = await response.json();
+      console.log('📦 Backend response data:', data);
       
       if (response.ok) {
-        console.log(' Profile photo saved!');
+        console.log('✅ Profile photo saved to database!');
         setProfileImage(cloudinaryUrl); // Update to use Cloudinary URL
         Alert.alert('Success', 'Profile photo updated!');
         
         // Step 3: Reload profile to ensure data persists
         await loadUserProfile();
       } else {
-        Alert.alert('Error', data.error || 'Failed to save photo');
+        Alert.alert('Error', data.error || 'Failed to save photo to profile');
+        // Revert to previous image
+        await loadUserProfile();
       }
     } catch (error) {
-      console.error('Upload error:', error);
-      Alert.alert('Error', 'Something went wrong');
+      console.error('❌ Upload error:', error);
+      console.error('Error stack:', error.stack);
+      Alert.alert('Error', 'Something went wrong while uploading the photo');
+      // Revert to previous image
+      await loadUserProfile();
     } finally {
       setIsUploading(false);
     }
   };
+
+  // Followers/Following Modal Handlers
+  const openFollowersModal = () => {
+    setFollowModalType('followers');
+    setFollowersModalVisible(true);
+  };
+
+  const openFollowingModal = () => {
+    setFollowModalType('following');
+    setFollowersModalVisible(true);
+  };
+
+  const closeFollowersModal = () => {
+    setFollowersModalVisible(false);
+    setTimeout(() => setFollowModalType(null), 300);
+  };
+
+  const renderFollowItem = ({ item }) => (
+    <Pressable 
+      style={({ pressed }) => [
+        styles.followItem,
+        { backgroundColor: isDarkMode ? 'rgba(55, 65, 81, 0.5)' : theme.inputBackground },
+        pressed && [styles.followItemPressed, { backgroundColor: isDarkMode ? 'rgba(75, 85, 99, 0.6)' : '#F3F4F6' }]
+      ]}
+      onPress={() => {
+        closeFollowersModal();
+        setTimeout(() => {
+          navigation.navigate('OtherUserProfile', {
+            userId: item.id,
+            userName: item.name,
+            userAvatar: item.avatar || null,
+            username: item.username
+          });
+        }, 300);
+      }}
+    >
+      {item.avatar ? (
+        <Image 
+          source={{ uri: item.avatar }}
+          style={[styles.followAvatar, { borderColor: isDarkMode ? '#4B5563' : theme.border }]}
+        />
+      ) : (
+        <View style={[styles.followAvatar, styles.followAvatarPlaceholder, { borderColor: isDarkMode ? '#4B5563' : theme.border, backgroundColor: theme.primary }]}>
+          <Text style={styles.followAvatarInitials}>{getInitials(item.name)}</Text>
+        </View>
+      )}
+      <View style={styles.followInfo}>
+        <Text style={[styles.followName, { color: theme.textPrimary }]}>{item.name}</Text>
+        <Text style={[styles.followUsername, { color: theme.textSecondary }]}>{item.username}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={fp(20)} color={theme.textTertiary} />
+    </Pressable>
+  );
 
   const renderSettingsContent = () => {
     if (activeSettingTab === 'bio') {
@@ -296,7 +407,7 @@ export default function ProfileScreen({ navigation }) {
               placeholder="Enter your bio..."
               placeholderTextColor={theme.placeholderText}
               multiline
-              maxLength={50}
+              maxLength={30}
             />
             <Text style={[styles.charCount, { color: theme.textTertiary }]}>{tempBio.length}/50</Text>
             <View style={styles.settingTabButtons}>
@@ -565,10 +676,16 @@ export default function ProfileScreen({ navigation }) {
               <ActivityIndicator size="large" color="#FFFFFF" />
             </View>
           )}
-          <Image 
-            source={profileImage ? { uri: profileImage } : require("../assets/favicon.png")}
-            style={[styles.profileImage, { borderColor: theme.profileImageBorder }]}
-          />
+          {profileImage ? (
+            <Image 
+              source={{ uri: profileImage }}
+              style={[styles.profileImage, { borderColor: theme.profileImageBorder }]}
+            />
+          ) : (
+            <View style={[styles.profileImage, styles.avatarPlaceholder, { borderColor: theme.profileImageBorder, backgroundColor: theme.primary }]}>
+              <Text style={styles.avatarInitials}>{getInitials(userName)}</Text>
+            </View>
+          )}
           <Pressable 
             style={[styles.editImageBadge, isDarkMode ? { backgroundColor: '#2563EB' } : { backgroundColor: theme.primary }]}
             onPress={handleChangeProfileImage}
@@ -577,28 +694,50 @@ export default function ProfileScreen({ navigation }) {
             <Ionicons name="add" size={fp(18)} color={theme.textInverse} />
           </Pressable>
         </View>
-        <Text style={[styles.username, { color: theme.profileTextPrimary }]}>Antonio</Text>
+        <Text style={[styles.username, { color: theme.profileTextPrimary }]}>{userName}</Text>
         <Text style={[styles.bio, { color: theme.profileTextSecondary }]} numberOfLines={1} ellipsizeMode="tail">
           {bio}
         </Text>
       </View>
 
-      {/* Stats Cards */}
-      <View style={styles.statsContainer}>
-        <View style={[styles.statCard, { backgroundColor: theme.cardBackground, borderColor: theme.border, shadowColor: theme.shadowColorPrimary }]}>
-          <Text style={[styles.statNumber, { color: theme.textPrimary }]}>10</Text>
-          <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Recipes posted</Text>
-        </View>
+      {/* Stats Bar */}
+      <View style={[styles.statsBar, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+        <Pressable 
+          style={({ pressed }) => [
+            styles.statItem,
+            pressed && styles.statPressed
+          ]}
+          onPress={() => navigation.navigate("MyRecipes")}
+        >
+          <Text style={[styles.statValue, { color: theme.textPrimary }]}>{mockMyRecipes.length}</Text>
+          <Text style={[styles.statText, { color: theme.textSecondary }]}>Recipes</Text>
+        </Pressable>
 
-        <View style={[styles.statCard, { backgroundColor: theme.cardBackground, borderColor: theme.border, shadowColor: theme.shadowColorPrimary }]}>
-          <Text style={[styles.statNumber, { color: theme.textPrimary }]}>23</Text>
-          <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Followers</Text>
-        </View>
+        <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
 
-        <View style={[styles.statCard, { backgroundColor: theme.cardBackground, borderColor: theme.border, shadowColor: theme.shadowColorPrimary }]}>
-          <Text style={[styles.statNumber, { color: theme.textPrimary }]}>18</Text>
-          <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Following</Text>
-        </View>
+        <Pressable 
+          style={({ pressed }) => [
+            styles.statItem,
+            pressed && styles.statPressed
+          ]}
+          onPress={openFollowersModal}
+        >
+          <Text style={[styles.statValue, { color: theme.textPrimary }]}>{followersList.length}</Text>
+          <Text style={[styles.statText, { color: theme.textSecondary }]}>Followers</Text>
+        </Pressable>
+
+        <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
+
+        <Pressable 
+          style={({ pressed }) => [
+            styles.statItem,
+            pressed && styles.statPressed
+          ]}
+          onPress={openFollowingModal}
+        >
+          <Text style={[styles.statValue, { color: theme.textPrimary }]}>{myFollowingCount}</Text>
+          <Text style={[styles.statText, { color: theme.textSecondary }]}>Following</Text>
+        </Pressable>
       </View>
 
       {/* Menu */}
@@ -654,6 +793,66 @@ export default function ProfileScreen({ navigation }) {
           <Ionicons name="chevron-forward" size={fp(20)} color={theme.textTertiary} />
         </Pressable>
       </View>
+
+      {/* Followers/Following Modal */}
+      <Modal
+        visible={followersModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={closeFollowersModal}
+      >
+        <TouchableWithoutFeedback onPress={closeFollowersModal}>
+          <View style={[styles.modalOverlay, { backgroundColor: theme.overlayBackground }]}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.modalContainer, { backgroundColor: theme.modalBackground }]}>
+                <View style={[styles.settingsMenu, { backgroundColor: theme.modalBackground }]}>
+                  <View style={[styles.settingsHeader, { borderBottomColor: theme.border }]}>
+                    <Text style={[styles.settingsTitle, { color: theme.textPrimary }]}>
+                      {followModalType === 'followers' ? 'Followers' : 'Following'}
+                    </Text>
+                    <Text style={[styles.settingsSubtitle, { color: theme.textSecondary }]}>
+                      {followModalType === 'followers' 
+                        ? `${followersList.length} people follow you`
+                        : `You follow ${myFollowingCount} people`
+                      }
+                    </Text>
+                  </View>
+
+                  <FlatList
+                    data={followModalType === 'followers' ? followersList : followingList}
+                    renderItem={renderFollowItem}
+                    keyExtractor={(item) => item.id}
+                    contentContainerStyle={styles.followList}
+                    showsVerticalScrollIndicator={false}
+                    ListEmptyComponent={
+                      <View style={styles.emptyFollowList}>
+                        <Ionicons 
+                          name={followModalType === 'followers' ? "people-outline" : "person-add-outline"} 
+                          size={fp(48)} 
+                          color={theme.textTertiary} 
+                        />
+                        <Text style={[styles.emptyFollowText, { color: theme.textSecondary }]}>
+                          {followModalType === 'followers' 
+                            ? 'No followers yet'
+                            : 'Not following anyone yet'
+                          }
+                        </Text>
+                      </View>
+                    }
+                  />
+                </View>
+
+                <Pressable 
+                  style={({ pressed }) => [styles.closeModalBtn, { backgroundColor: theme.border }, pressed && styles.btnPressed]}
+                  onPress={closeFollowersModal}
+                >
+                  <Text style={[styles.closeModalBtnText, { color: theme.textPrimary }]}>Close</Text>
+                </Pressable>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
 
       {/* Profile Image Source Modal - Compact Top Design */}
       <Modal 
@@ -810,6 +1009,15 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: "#E0EFFE",
   },
+  avatarPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInitials: {
+    color: '#FFFFFF',
+    fontSize: fp(32),
+    fontWeight: '700',
+  },
   editImageBadge: {
     position: "absolute",
     bottom: -wp(2),
@@ -843,39 +1051,43 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     marginBottom: hp(4),
   },
-  statsContainer: {
+  statsBar: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingHorizontal: SPACING.screenPadding,
-    marginTop: hp(-26),
-    gap: SPACING.itemGap,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: "#F8FAFB",
-    padding: wp(16),
-    borderRadius: SPACING.radiusLarge,
-    alignItems: "center",
-    shadowColor: "#3B82F6",
-    shadowOffset: { width: 0, height: hp(4) },
-    shadowOpacity: 0.20,
-    shadowRadius: wp(16),
-    elevation: 4,
+    backgroundColor: "rgba(255,255,255,0.75)",
+    borderRadius: wp(18),
+    paddingVertical: hp(10),
+    paddingHorizontal: wp(12),
     borderWidth: 1,
     borderColor: "#E5E7EB",
+    marginTop: hp(18),
+    marginHorizontal: SPACING.screenPadding,
   },
-  statNumber: {
-    fontSize: fp(32),
-    fontWeight: "700",
+  statItem: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statPressed: {
+    transform: [{ scale: 0.96 }],
+    opacity: 0.85,
+  },
+  statValue: {
+    fontSize: fp(22),
+    fontWeight: "800",
     color: "#111827",
-    letterSpacing: -1,
+    letterSpacing: -0.5,
   },
-  statLabel: {
-    fontSize: fp(13),
-    marginTop: hp(6),
-    color: "#6B7280",
+  statText: {
+    fontSize: fp(12),
     fontWeight: "500",
-    textAlign: "center",
+    color: "#6B7280",
+    marginTop: hp(2),
+  },
+  statDivider: {
+    width: 1,
+    height: "70%",
+    backgroundColor: "#E5E7EB",
   },
   menuContainer: {
     marginTop: SPACING.sectionGap,
@@ -940,6 +1152,63 @@ const styles = StyleSheet.create({
     color: "#dc2626c5",
     fontSize: fp(16),
     fontWeight: "700",
+  },
+
+  // Followers/Following Modal Styles
+  followList: {
+    paddingHorizontal: wp(16),
+    paddingTop: hp(12),
+    paddingBottom: hp(20),
+  },
+  followItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: wp(12),
+    borderRadius: wp(12),
+    marginBottom: hp(8),
+  },
+  followItemPressed: {
+    backgroundColor: '#F3F4F6',
+  },
+  followAvatar: {
+    width: wp(50),
+    height: wp(50),
+    borderRadius: wp(25),
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+  },
+  followAvatarPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  followAvatarInitials: {
+    color: '#FFFFFF',
+    fontSize: fp(18),
+    fontWeight: '700',
+  },
+  followInfo: {
+    flex: 1,
+    marginLeft: wp(12),
+  },
+  followName: {
+    fontSize: fp(16),
+    fontWeight: '600',
+    color: '#111827',
+  },
+  followUsername: {
+    fontSize: fp(14),
+    color: '#6B7280',
+    marginTop: hp(2),
+  },
+  emptyFollowList: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: hp(60),
+  },
+  emptyFollowText: {
+    fontSize: fp(16),
+    color: '#9CA3AF',
+    marginTop: hp(12),
   },
 
   // Compact Top Modal Styles

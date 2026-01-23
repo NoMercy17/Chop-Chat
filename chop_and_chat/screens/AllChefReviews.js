@@ -4,9 +4,11 @@ import { wp, hp, fp, SPACING } from '../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
-import { FOLLOWED_CHEF_IDS } from '../data/chefFeedData';
+import { FOLLOWED_CHEF_IDS, chefReactionComments } from '../data/chefFeedData';
 import { useChefFeed } from '../context/ChefFeedContext'; 
 import DishDetailModal from '../components/posts/DishDetailModal'; 
+import { useMemo } from 'react';
+
 
 const CATEGORIES = ['Following', 'All'];
 
@@ -27,15 +29,38 @@ export default function AllChefReviews({ navigation }) {
     const [selectedPostForComments, setSelectedPostForComments] = useState(null);
     const [newComment, setNewComment] = useState('');
 
-    // Filter feed items based on selected category
-    const filteredItems = selectedCategory === 'All' 
-        ? feedItems 
-        : feedItems.filter(item => FOLLOWED_CHEF_IDS.includes(item.chef.id));
+    // Filter feed items based on selected category AND exclude self-reviews
+    const filteredItems = useMemo(() => {
+        let items = selectedCategory === 'All' 
+            ? feedItems 
+            : feedItems.filter(item => FOLLOWED_CHEF_IDS.includes(item.chef.id));
+        
+        // Filter out self-reviews (reactions where chef is reviewing their own post)
+        return items.filter(item => {
+            if (item.contentType === 'reaction') {
+                // Exclude if chef is reacting to their own post
+                return item.reaction?.targetAuthor?.id !== item.chef.id;
+            }
+            return true;
+        });
+    }, [selectedCategory, feedItems]);
 
     // --- HANDLERS ---
 
     const handleOpenDish = (item) => {
-        setSelectedDish(item);
+        // Transform chef feed item to proper dish format for DishDetailModal
+        const isReaction = item.contentType === 'reaction';
+        const dishData = {
+            title: isReaction ? item.reaction?.targetPost?.title : item.post?.title,
+            description: isReaction ? item.reaction?.targetPost?.caption : item.post?.caption,
+            image: isReaction ? item.reaction?.targetPost?.image : item.post?.image,
+            ingredients: item.reaction?.targetPost?.ingredients || item.post?.ingredients,
+            instructions: item.reaction?.targetPost?.instructions || item.post?.instructions,
+            utensils: item.reaction?.targetPost?.utensils || item.post?.utensils,
+            cookTime: item.reaction?.targetPost?.cookTime || item.post?.cookTime,
+            difficulty: item.reaction?.targetPost?.difficulty || item.post?.difficulty,
+        };
+        setSelectedDish(dishData);
         setDishDetailModalVisible(true);
     };
 
@@ -77,7 +102,15 @@ export default function AllChefReviews({ navigation }) {
             >
                 {/* --- HEADER (Avatar + Name) --- */}
                 <View style={[styles.cardHeader, { borderBottomColor: theme.border }]}>
-                    <View style={styles.headerLeft}>
+                    <Pressable 
+                        style={styles.headerLeft}
+                        onPress={() => navigation.navigate('OtherUserProfile', {
+                            userId: item.chef.id,
+                            userName: item.chef.name,
+                            userAvatar: item.chef.avatar || null,
+                            username: `@${item.chef.name.replace(/\s+/g, '').toLowerCase()}`
+                        })}
+                    >
                         <View style={[styles.chefAvatar, { backgroundColor: theme.primary }]}>
                             <Text style={styles.chefInitial}>{item.chef.avatar}</Text>
                         </View>
@@ -85,7 +118,7 @@ export default function AllChefReviews({ navigation }) {
                             <Text style={[styles.chefName, { color: theme.textPrimary }]}>{item.chef.name}</Text>
                             <Text style={[styles.timestamp, { color: theme.textSecondary }]}>2 hours ago</Text>
                         </View>
-                    </View>
+                    </Pressable>
                 </View>
 
                 {/* --- CONTENT BODY --- */}
@@ -100,7 +133,12 @@ export default function AllChefReviews({ navigation }) {
                             </Text>
                             {/* CLICKABLE USERNAME */}
                             <Pressable 
-                                onPress={() => console.log('Navigate to profile:', item.reaction.targetAuthor.name)}
+                                onPress={() => navigation.navigate('OtherUserProfile', {
+                                    userId: item.reaction.targetAuthor.id,
+                                    userName: item.reaction.targetAuthor.name,
+                                    userAvatar: item.reaction.targetAuthor.avatar || null,
+                                    username: `@${item.reaction.targetAuthor.name.replace(/\s+/g, '').toLowerCase()}`
+                                })}
                                 style={({pressed}) => pressed && {opacity: 0.7}}
                             >
                                 <Text style={[styles.targetAuthor, { color: theme.primary }]}>
@@ -249,39 +287,23 @@ export default function AllChefReviews({ navigation }) {
                                         showsVerticalScrollIndicator={true}
                                         bounces={true}
                                     >
-                                        {/* Mock Comments - Replace with real data */}
-                                        <View style={styles.commentItem}>
-                                            <View style={[styles.commentAvatar, { backgroundColor: '#E0F2FE' }]}>
-                                                <Text style={styles.commentAvatarText}>JD</Text>
-                                            </View>
-                                            <View style={styles.commentContent}>
-                                                <Text style={[styles.commentAuthor, { color: theme.textPrimary }]}>John Doe</Text>
-                                                <Text style={[styles.commentText, { color: theme.textSecondary }]}>Great perspective, Chef!</Text>
-                                            </View>
-                                        </View>
+                                        {/* Comments from mockData */}
+                                        {selectedPostForComments && chefReactionComments[selectedPostForComments.id] && 
+                                            chefReactionComments[selectedPostForComments.id].map((comment, index) => (
+                                                <View key={comment.id || index} style={styles.commentItem}>
+                                                    <View style={[styles.commentAvatar, { backgroundColor: '#E0F2FE' }]}>
+                                                        <Text style={styles.commentAvatarText}>{comment.initials}</Text>
+                                                    </View>
+                                                    <View style={styles.commentContent}>
+                                                        <Text style={[styles.commentAuthor, { color: theme.textPrimary }]}>{comment.author}</Text>
+                                                        <Text style={[styles.commentText, { color: theme.textSecondary }]}>{comment.text}</Text>
+                                                    </View>
+                                                </View>
+                                            ))
+                                        }
 
-                                        <View style={styles.commentItem}>
-                                            <View style={[styles.commentAvatar, { backgroundColor: '#FEE2E2' }]}>
-                                                <Text style={[styles.commentAvatarText, { color: '#DC2626' }]}>AS</Text>
-                                            </View>
-                                            <View style={styles.commentContent}>
-                                                <Text style={[styles.commentAuthor, { color: theme.textPrimary }]}>Alice Smith</Text>
-                                                <Text style={[styles.commentText, { color: theme.textSecondary }]}>I tried this technique and it worked perfectly! Thanks for sharing.</Text>
-                                            </View>
-                                        </View>
-
-                                        <View style={styles.commentItem}>
-                                            <View style={[styles.commentAvatar, { backgroundColor: '#DBEAFE' }]}>
-                                                <Text style={styles.commentAvatarText}>MB</Text>
-                                            </View>
-                                            <View style={styles.commentContent}>
-                                                <Text style={[styles.commentAuthor, { color: theme.textPrimary }]}>Maria Brown</Text>
-                                                <Text style={[styles.commentText, { color: theme.textSecondary }]}>Would love to see more content like this!</Text>
-                                            </View>
-                                        </View>
-
-                                        {/* Empty state when no real comments */}
-                                        {selectedPostForComments && selectedPostForComments.comments === 0 && (
+                                        {/* Empty state when no comments */}
+                                        {selectedPostForComments && (!chefReactionComments[selectedPostForComments.id] || chefReactionComments[selectedPostForComments.id].length === 0) && (
                                             <View style={styles.emptyCommentsState}>
                                                 <Ionicons name="chatbubble-outline" size={fp(38)} color={theme.textTertiary} />
                                                 <Text style={[styles.emptyCommentsText, { color: theme.textSecondary }]}>No comments yet</Text>

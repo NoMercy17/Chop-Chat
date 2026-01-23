@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Modal, Pressable, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -14,6 +15,7 @@ export default function ChefPostDetailModal({
     onComment 
 }) {
     const { theme } = useTheme();
+    const navigation = useNavigation();
 
     if (!item) return null;
 
@@ -22,6 +24,18 @@ export default function ChefPostDetailModal({
     
     const displayTitle = isReaction ? item.reaction.targetPost?.title : item.post?.title;
     const displayText = isReaction ? item.reaction.text : item.post?.caption;
+
+    const handleUserPress = (user) => {
+        onClose(); // Close the modal first
+        setTimeout(() => {
+            navigation.navigate('OtherUserProfile', {
+                userId: user.id,
+                userName: user.name,
+                userAvatar: user.avatar || null,
+                username: `@${user.name.replace(/\s+/g, '').toLowerCase()}`
+            });
+        }, 200);
+    };
 
     return (
         <Modal
@@ -38,7 +52,10 @@ export default function ChefPostDetailModal({
                         
                         {/* --- HEADER --- */}
                         <View style={[styles.header, { borderBottomColor: theme.border }]}>
-                            <View style={styles.headerLeft}>
+                            <Pressable 
+                                style={styles.headerLeft}
+                                onPress={() => handleUserPress(item.chef)}
+                            >
                                 <View style={[styles.avatar, { backgroundColor: theme.primary }]}>
                                     <Text style={styles.avatarText}>{item.chef.avatar}</Text>
                                 </View>
@@ -46,7 +63,7 @@ export default function ChefPostDetailModal({
                                     <Text style={[styles.chefName, { color: theme.textPrimary }]}>{item.chef.name}</Text>
                                     <Text style={[styles.timestamp, { color: theme.textSecondary }]}>2 hours ago</Text>
                                 </View>
-                            </View>
+                            </Pressable>
                             <Pressable onPress={onClose} style={styles.closeButton}>
                                 <Ionicons name="close" size={fp(24)} color={theme.textSecondary} />
                             </Pressable>
@@ -63,7 +80,7 @@ export default function ChefPostDetailModal({
                                     </Text>
                                     {/* CLICKABLE USERNAME */}
                                     <Pressable 
-                                        onPress={() => console.log('Navigate to profile:', item.reaction.targetAuthor.name)}
+                                        onPress={() => handleUserPress(item.reaction.targetAuthor)}
                                         style={({pressed}) => pressed && {opacity: 0.7}}
                                     >
                                         <Text style={[styles.targetAuthor, { color: theme.primary }]}>

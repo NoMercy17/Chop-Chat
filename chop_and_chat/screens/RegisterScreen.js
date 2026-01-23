@@ -3,7 +3,7 @@ import { View, Text, TextInput, StyleSheet, Pressable, Alert, KeyboardAvoidingVi
 import { StatusBar } from 'expo-status-bar';
 import { wp, hp, fp } from '../utils/responsive';
 
-const BASE_URL = 'http://192.168.0.107:4000';
+const BASE_URL = 'http://192.168.1.138:4000';
 
 //const BASE_URL_ANDROID = 'http://10.0.2.2:4000';
 
@@ -11,6 +11,7 @@ export default function RegisterScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [role, setRole] = useState('user'); // 'user' or 'chef'
 
   const onRegister = async () => {
     if (!name || !email || !password) {
@@ -22,7 +23,7 @@ export default function RegisterScreen({ navigation }) {
       const res = await fetch(`${BASE_URL}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name }),
+        body: JSON.stringify({ email, password, name, role }),
       });
 
       if (res.status === 201) {
@@ -63,6 +64,40 @@ export default function RegisterScreen({ navigation }) {
           <Text style={styles.formTitle}>Create account</Text>
           <Text style={styles.formSubtitle}>Fill in your details to get started</Text>
 
+        {/* Account Type Selector */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Account Type</Text>
+
+          <View style={styles.radioRowContainer}>
+            <Pressable 
+              style={styles.radioRow} 
+              onPress={() => setRole('user')}
+            >
+              <View style={[
+                styles.radioOuter,
+                role === 'user' && styles.radioOuterSelected
+              ]}>
+                {role === 'user' && <View style={styles.radioInner} />}
+              </View>
+              <Text style={styles.radioLabel}>Regular User</Text>
+            </Pressable>
+
+            <Pressable 
+              style={styles.radioRow} 
+              onPress={() => setRole('chef')}
+            >
+              <View style={[
+                styles.radioOuter,
+                role === 'chef' && styles.radioOuterSelected
+              ]}>
+                {role === 'chef' && <View style={styles.radioInner} />}
+              </View>
+              <Text style={styles.radioLabel}>Chef User</Text>
+            </Pressable>
+          </View>
+        </View>
+
+          {/* Name */}
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Name</Text>
             <TextInput
@@ -74,6 +109,7 @@ export default function RegisterScreen({ navigation }) {
             />
           </View>
 
+          {/* Email */}
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Email</Text>
             <TextInput
@@ -87,6 +123,7 @@ export default function RegisterScreen({ navigation }) {
             />
           </View>
 
+          {/* Password */}
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Password</Text>
             <TextInput
@@ -99,6 +136,7 @@ export default function RegisterScreen({ navigation }) {
             />
           </View>
 
+          {/* Register Button */}
           <Pressable 
             style={({ pressed }) => [
               styles.registerButton,
@@ -196,6 +234,48 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
+
+  radioRowContainer: {
+    flexDirection: 'row',
+    gap: wp(24),
+    alignItems: 'center',
+  },
+
+  /* Radio Role Selector */
+  radioRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingVertical: hp(6),  
+  gap: wp(8),              
+},
+
+  radioOuter: {
+  width: wp(16),
+  height: wp(16),
+  borderRadius: wp(8),
+  borderWidth: 2,
+  borderColor: '#9CA3AF',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+
+  radioOuterSelected: {
+    borderColor: '#3B82F6',
+  },
+
+  radioInner: {
+    width: wp(7),
+    height: wp(7),
+    borderRadius: wp(3.5),
+    backgroundColor: '#3B82F6',
+  },
+
+  radioLabel: {
+    fontSize: fp(14),
+    fontWeight: '600',
+    color: '#111827',
+  },
+
   registerButton: {
     backgroundColor: '#3B82F6',
     paddingVertical: hp(16),
