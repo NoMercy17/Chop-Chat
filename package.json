@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@cloudinary/url-gen": "^1.22.0",
+    "cloudinary-react-native": "^1.3.0"
+  }
+}
