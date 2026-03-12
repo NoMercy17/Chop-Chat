@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+chop_and_chat/node_modules/
+chop_and_chat/backend/node_modules/
+
+# React Native
+chop_and_chat/android/app/build/
+chop_and_chat/android/build/
+chop_and_chat/android/.gradle/
+chop_and_chat/android/local.properties
+*.apk
+*.aab
+*.keystore
+!debug.keystore
+
+# iOS
+chop_and_chat/ios/Pods/
+chop_and_chat/ios/build/
+
+# Metro
+.metro-health-check*
+
+# Conductor
+conductor/
+
+# Misc
+.DS_Store
+*.log
+.env
+.env.local
+*.tgz
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
