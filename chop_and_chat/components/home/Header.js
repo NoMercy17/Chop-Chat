@@ -54,12 +54,15 @@ export default function Header({ navigation }) {
     }, [deleteNotification]);
 
     const handleClaimReview = useCallback(() => {
-        if (selectedNotification) {
+        // Added currentUser check to prevent "Cannot read property 'id' of undefined"
+        // which happens if the user object hasn't loaded perfectly from context yet
+        if (selectedNotification && currentUser) {
             claimReviewRequest(selectedNotification.id, currentUser.id);
             setDetailModalVisible(false);
             setReviewModalVisible(true);
         }
-    }, [selectedNotification, claimReviewRequest, currentUser.id]);
+        // Used optional chainingto safely handle undefined currentUser
+    }, [selectedNotification, claimReviewRequest, currentUser?.id]);
 
     const handleCancelReview = useCallback(() => {
         setDetailModalVisible(false);

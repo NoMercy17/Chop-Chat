@@ -4,21 +4,28 @@ import { Dimensions } from 'react-native';
 const BASE_WIDTH = 393;
 const BASE_HEIGHT = 852;
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+// Get dynamic width/height on demand inside the functions instead of a static top-level call. Allows responding to orientation changes dynamically.
 
 // Scale width-based values (padding, margins, widths, borderRadius)
-export const wp = (size) => Math.round((size / BASE_WIDTH) * SCREEN_WIDTH);
+export const wp = (size) => {
+  const { width } = Dimensions.get('window');
+  return Math.round((size / BASE_WIDTH) * width);
+};
 
 // Scale height-based values (vertical padding, heights)
-export const hp = (size) => Math.round((size / BASE_HEIGHT) * SCREEN_HEIGHT);
+export const hp = (size) => {
+  const { height } = Dimensions.get('window');
+  return Math.round((size / BASE_HEIGHT) * height);
+};
 
 // Scale fonts (capped at 1.3x for tablets)
 export const fp = (size) => {
-  const scale = SCREEN_WIDTH / BASE_WIDTH;
+  const { width } = Dimensions.get('window');
+  const scale = width / BASE_WIDTH;
   return Math.round(size * Math.min(scale, 1.3));
 };
 
-// Spacing constants for consistency
+// Constants that rely on functions which now compute dynamically
 export const SPACING = {
   screenPadding: wp(16),
   sectionGap: hp(20),
@@ -29,4 +36,5 @@ export const SPACING = {
   radiusLarge: wp(16),
 };
 
-export { SCREEN_WIDTH, SCREEN_HEIGHT };
+export const getScreenWidth = () => Dimensions.get('window').width;
+export const getScreenHeight = () => Dimensions.get('window').height;

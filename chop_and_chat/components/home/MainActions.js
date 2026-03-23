@@ -3,7 +3,8 @@ import { Text, View, StyleSheet, Pressable, Modal, TextInput, FlatList, ScrollVi
 import { Ionicons } from '@expo/vector-icons';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { useTheme } from '../../context/ThemeContext';
-import CameraScreen, { uploadImage } from '../../utils/photoHandling';
+import CameraScreen from '../media/CameraScreen';
+import { uploadImage } from '../../utils/photoHandling';
 import CreatePostModal from '../posts/CreatePostModal';
 import RequestChefReviewModal from '../posts/RequestChefReviewModal';
 import { mockMyRecipes, mockFavoriteRecipes, mockCommunityPosts } from '../../data/mockData';

@@ -1,17 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { View, Text, TextInput, StyleSheet, Pressable, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { wp, hp, fp } from '../utils/responsive';
-
-const BASE_URL = 'http://192.168.1.138:4000';
-
-//const BASE_URL_ANDROID = 'http://10.0.2.2:4000';
+import { AuthContext } from '../context/AuthContext';
 
 export default function RegisterScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState('user'); // 'user' or 'chef'
+  const { register } = useContext(AuthContext);
 
   const onRegister = async () => {
     if (!name || !email || !password) {
@@ -19,25 +17,14 @@ export default function RegisterScreen({ navigation }) {
       return;
     }
 
-    try {
-      const res = await fetch(`${BASE_URL}/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name, role }),
-      });
+    const result = await register({ email, password, name, role });
 
-      if (res.status === 201) {
-        Alert.alert('Success', 'Account created. Please login.', [
-          { text: 'OK', onPress: () => navigation.navigate('Login') },
-        ]);
-      } else {
-        const body = await res.json().catch(() => ({}));
-        const msg = body.error || 'Registration failed';
-        Alert.alert('Error', msg);
-      }
-    } catch (err) {
-      console.warn(err);
-      Alert.alert('Error', 'Could not reach server');
+    if (result.success) {
+      Alert.alert('Success', 'Account created. Please login.', [
+        { text: 'OK', onPress: () => navigation.navigate('Login') },
+      ]);
+    } else {
+      Alert.alert('Registration failed', result.error || 'Could not create account');
     }
   };
 
@@ -55,114 +42,83 @@ export default function RegisterScreen({ navigation }) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.formSection}
       >
-        <ScrollView 
-          style={styles.formCard}
-          contentContainerStyle={styles.formCardContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Text style={styles.formTitle}>Create account</Text>
-          <Text style={styles.formSubtitle}>Fill in your details to get started</Text>
+        <View style={styles.formCard}>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <Text style={styles.formTitle}>Create Account</Text>
+            <Text style={styles.formSubtitle}>Join our culinary community</Text>
 
-        {/* Account Type Selector */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Account Type</Text>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Full Name</Text>
+              <TextInput
+                placeholder="John Doe"
+                placeholderTextColor="#9CA3AF"
+                value={name}
+                onChangeText={setName}
+                style={styles.input}
+              />
+            </View>
 
-          <View style={styles.radioRowContainer}>
-            <Pressable 
-              style={styles.radioRow} 
-              onPress={() => setRole('user')}
-            >
-              <View style={[
-                styles.radioOuter,
-                role === 'user' && styles.radioOuterSelected
-              ]}>
-                {role === 'user' && <View style={styles.radioInner} />}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Email</Text>
+              <TextInput
+                placeholder="your@email.com"
+                placeholderTextColor="#9CA3AF"
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                style={styles.input}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Password</Text>
+              <TextInput
+                placeholder="Minimum 6 characters"
+                placeholderTextColor="#9CA3AF"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                style={styles.input}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>I am a...</Text>
+              <View style={styles.roleContainer}>
+                <Pressable 
+                  style={[styles.roleButton, role === 'user' && styles.roleButtonActive]}
+                  onPress={() => setRole('user')}
+                >
+                  <Text style={[styles.roleButtonText, role === 'user' && styles.roleButtonTextActive]}>Home Cook</Text>
+                </Pressable>
+                <Pressable 
+                  style={[styles.roleButton, role === 'chef' && styles.roleButtonActive]}
+                  onPress={() => setRole('chef')}
+                >
+                  <Text style={[styles.roleButtonText, role === 'chef' && styles.roleButtonTextActive]}>Professional Chef</Text>
+                </Pressable>
               </View>
-              <Text style={styles.radioLabel}>Regular User</Text>
+            </View>
+
+            <Pressable 
+              style={({ pressed }) => [
+                styles.registerButton,
+                pressed && styles.buttonPressed
+              ]}
+              onPress={onRegister}
+            >
+              <Text style={styles.registerButtonText}>Create Account</Text>
             </Pressable>
 
-            <Pressable 
-              style={styles.radioRow} 
-              onPress={() => setRole('chef')}
-            >
-              <View style={[
-                styles.radioOuter,
-                role === 'chef' && styles.radioOuterSelected
-              ]}>
-                {role === 'chef' && <View style={styles.radioInner} />}
-              </View>
-              <Text style={styles.radioLabel}>Chef User</Text>
-            </Pressable>
-          </View>
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>Already have an account? </Text>
+              <Pressable onPress={() => navigation.navigate('Login')}>
+                <Text style={styles.loginLink}>Sign In</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
         </View>
-
-          {/* Name */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Name</Text>
-            <TextInput
-              placeholder="Enter a username"
-              placeholderTextColor="#9CA3AF"
-              value={name}
-              onChangeText={setName}
-              style={styles.input}
-            />
-          </View>
-
-          {/* Email */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Email</Text>
-            <TextInput
-              placeholder="your@email.com"
-              placeholderTextColor="#9CA3AF"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              style={styles.input}
-            />
-          </View>
-
-          {/* Password */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Password</Text>
-            <TextInput
-              placeholder="Create a password"
-              placeholderTextColor="#9CA3AF"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              style={styles.input}
-            />
-          </View>
-
-          {/* Register Button */}
-          <Pressable 
-            style={({ pressed }) => [
-              styles.registerButton,
-              pressed && styles.buttonPressed
-            ]}
-            onPress={onRegister}
-          >
-            <Text style={styles.registerButtonText}>Create Account</Text>
-          </Pressable>
-
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>already have an account?</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          <Pressable 
-            style={({ pressed }) => [
-              styles.backButton,
-              pressed && styles.secondaryButtonPressed
-            ]}
-            onPress={() => navigation.navigate('Login')}
-          >
-            <Text style={styles.backButtonText}>Sign In</Text>
-          </Pressable>
-        </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
@@ -192,16 +148,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: wp(32),
     borderTopRightRadius: wp(32),
+    paddingHorizontal: wp(24),
+    paddingTop: hp(32),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: hp(-4) },
     shadowOpacity: 0.08,
     shadowRadius: wp(16),
     elevation: 8,
-  },
-  formCardContent: {
-    paddingHorizontal: wp(24),
-    paddingTop: hp(28),
-    paddingBottom: hp(40),
   },
   formTitle: {
     fontSize: fp(24),
@@ -234,54 +187,38 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
-
-  radioRowContainer: {
+  roleContainer: {
     flexDirection: 'row',
-    gap: wp(24),
-    alignItems: 'center',
+    gap: wp(12),
   },
-
-  /* Radio Role Selector */
-  radioRow: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  paddingVertical: hp(6),  
-  gap: wp(8),              
-},
-
-  radioOuter: {
-  width: wp(16),
-  height: wp(16),
-  borderRadius: wp(8),
-  borderWidth: 2,
-  borderColor: '#9CA3AF',
-  justifyContent: 'center',
-  alignItems: 'center',
-},
-
-  radioOuterSelected: {
+  roleButton: {
+    flex: 1,
+    paddingVertical: hp(12),
+    borderRadius: wp(10),
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+  },
+  roleButtonActive: {
+    backgroundColor: '#EFF6FF',
     borderColor: '#3B82F6',
   },
-
-  radioInner: {
-    width: wp(7),
-    height: wp(7),
-    borderRadius: wp(3.5),
-    backgroundColor: '#3B82F6',
-  },
-
-  radioLabel: {
+  roleButtonText: {
     fontSize: fp(14),
-    fontWeight: '600',
-    color: '#111827',
+    color: '#6B7280',
+    fontWeight: '500',
   },
-
+  roleButtonTextActive: {
+    color: '#3B82F6',
+    fontWeight: '600',
+  },
   registerButton: {
     backgroundColor: '#3B82F6',
     paddingVertical: hp(16),
     borderRadius: wp(12),
     alignItems: 'center',
-    marginTop: hp(8),
+    marginTop: hp(16),
     shadowColor: '#3B82F6',
     shadowOffset: { width: 0, height: hp(4) },
     shadowOpacity: 0.3,
@@ -298,35 +235,19 @@ const styles = StyleSheet.create({
     opacity: 0.9,
     transform: [{ scale: 0.98 }],
   },
-  divider: {
+  footer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: hp(24),
+    justifyContent: 'center',
+    marginTop: hp(24),
+    marginBottom: hp(32),
   },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E5E7EB',
+  footerText: {
+    fontSize: fp(14),
+    color: '#6B7280',
   },
-  dividerText: {
-    paddingHorizontal: wp(12),
-    fontSize: fp(12),
-    color: '#9CA3AF',
-    fontWeight: '500',
-  },
-  backButton: {
-    backgroundColor: '#F3F4F6',
-    paddingVertical: hp(16),
-    borderRadius: wp(12),
-    alignItems: 'center',
-  },
-  backButtonText: {
+  loginLink: {
+    fontSize: fp(14),
     color: '#3B82F6',
-    fontSize: fp(16),
     fontWeight: '600',
-  },
-  secondaryButtonPressed: {
-    opacity: 0.8,
-    backgroundColor: '#E5E7EB',
   },
 });

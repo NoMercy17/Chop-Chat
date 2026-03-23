@@ -1,18 +1,13 @@
 import React, { useState, useContext } from 'react';
 import { View, Text, TextInput, StyleSheet, Pressable, Alert, KeyboardAvoidingView, Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthContext, navigationRef } from '../context/AuthContext';
 import { StatusBar } from 'expo-status-bar';
 import { wp, hp, fp } from '../utils/responsive';
 
-const BASE_URL = 'http://192.168.1.138:4000';
-
-//const BASE_URL_ANDROID = 'http://10.0.2.2:4000';
-
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const auth = useContext(AuthContext);
+  const { login } = useContext(AuthContext);
 
   const onLogin = async () => {
     if (!email || !password) {
@@ -20,40 +15,20 @@ export default function LoginScreen({ navigation }) {
       return;
     }
 
-    try {
-      const res = await fetch(`${BASE_URL}/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
+    const result = await login(email, password);
 
-      const body = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        Alert.alert('Login failed', body.error || 'Invalid credentials');
-        return;
-      }
-
-      const { token, user } = body;
-      if (!token || !user) {
-        Alert.alert('Login failed', 'Server response missing token/user');
-        return;
-      }
-
-      const session = { token, user };
-      await AsyncStorage.setItem('session_user', JSON.stringify(session));
-      await auth.signIn(session);
-
+    if (result.success) {
+      // If login successful, context handles user state, and App.js should re-render to Home
+      // But we still have the resetRoot logic if needed for explicit navigation
       try {
         if (navigationRef && navigationRef.current && navigationRef.current.resetRoot) {
           navigationRef.current.resetRoot({ index: 0, routes: [{ name: 'Home' }] });
-          return;
         }
       } catch (e) {
+        // App.js likely handles it via state change
       }
-    } catch (err) {
-      console.warn(err);
-      Alert.alert('Error', 'Could not reach server');
+    } else {
+      Alert.alert('Login failed', result.error || 'Invalid credentials');
     }
   };
 
