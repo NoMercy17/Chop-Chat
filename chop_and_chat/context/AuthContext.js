@@ -10,6 +10,19 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(null);
 
+  /**
+   * Step 1: Role Normalization Helper
+   * Ensures that if the backend returns a 'role' string, we also have a consistent 'isChef' boolean
+   * for the UI logic to use throughout the app.
+   */
+  const normalizeUser = (userData) => {
+    if (!userData) return null;
+    return {
+      ...userData,
+      isChef: userData.isChef || userData.role === 'chef'
+    };
+  };
+
   useEffect(() => {
     // Check for existing session on mount
     const loadSession = async () => {
@@ -17,7 +30,8 @@ export function AuthProvider({ children }) {
         const raw = await AsyncStorage.getItem('session_user');
         if (raw) {
           const session = JSON.parse(raw);
-          setUser(session.user);
+          // Step 2: Normalize user data when restoring session
+          setUser(normalizeUser(session.user));
           setToken(session.token);
         }
       } catch (e) {
@@ -31,9 +45,12 @@ export function AuthProvider({ children }) {
 
   const signIn = useCallback(async (sessionData) => {
     try {
-      // sessionData should contain { user, token }
-      await AsyncStorage.setItem('session_user', JSON.stringify(sessionData));
-      setUser(sessionData.user);
+      // Step 3: Normalize user data before saving to AsyncStorage and State
+      const normalizedUser = normalizeUser(sessionData.user);
+      const dataToSave = { ...sessionData, user: normalizedUser };
+      
+      await AsyncStorage.setItem('session_user', JSON.stringify(dataToSave));
+      setUser(normalizedUser);
       setToken(sessionData.token);
     } catch (error) {
       console.error('[AuthContext:signIn] Failed to save session:', error.message);
