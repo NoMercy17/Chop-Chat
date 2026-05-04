@@ -20,8 +20,13 @@ chop_and_chat/ios/build/
 # Metro
 .metro-health-check*
 
-# Conductor
+# Conductor (Gemini)
 conductor/
+
+# Claude Code (all Claude-specific files - local only)
+.claude/
+CLAUDE.md
+.claudeignore
 
 # Misc
 .DS_Store

@@ -1,4 +1,7 @@
-import React, { createContext, useState, useContext, useCallback } from 'react';
+import React, { createContext, useState, useContext, useCallback, useMemo, useEffect } from 'react';
+import { AuthContext } from './AuthContext';
+import { api } from '../services/api';
+import { ChefService } from '../services/ChefService';
 
 const NotificationsContext = createContext();
 
@@ -10,308 +13,156 @@ export const NOTIFICATION_TYPES = {
   CHEF_REVIEW_REQUEST: 'chef_review_request', // Claimable - for chefs only
 };
 
-// Mock user data - in real app would come from auth context/backend
-const MOCK_CURRENT_USER = {
-  id: 'user_1',
-  username: 'Antonio',
-  isChef: true, // Toggle this to test chef functionality
-};
-
-// Sample notifications data
-const INITIAL_NOTIFICATIONS = [
-  {
-    id: 'notif_1',
-    type: NOTIFICATION_TYPES.NEW_FOLLOWER,
-    title: 'New Follower',
-    subtitle: 'Chef Maria started following you',
-    data: {
-      followerId: 'chef_maria',
-      followerName: 'Chef Maria',
-      followerAvatar: 'CM',
-    },
-    time: '2m ago',
-    timestamp: Date.now() - 2 * 60 * 1000,
-    unread: true,
-    read: false,
-  },
-  {
-    id: 'notif_2',
-    type: NOTIFICATION_TYPES.POST_LIKES,
-    title: 'Your post is getting attention!',
-    subtitle: 'Your Pasta Carbonara reached 10 likes',
-    data: {
-      postId: 'post_1',
-      postTitle: 'Pasta Carbonara',
-      likesCount: 10,
-      daysSincePost: 0, // Day 1
-    },
-    time: '1h ago',
-    timestamp: Date.now() - 60 * 60 * 1000,
-    unread: true,
-    read: false,
-  },
-  {
-    id: 'notif_3',
-    type: NOTIFICATION_TYPES.CHEF_REVIEW_RECEIVED,
-    title: 'Chef Review Received!',
-    subtitle: 'Chef Gordon reviewed your Beef Wellington',
-    data: {
-      postId: 'post_3',
-      postTitle: 'Beef Wellington',
-      postImage: null,
-      chefId: 'chef_gordon',
-      chefName: 'Chef Gordon',
-      chefAvatar: 'CG',
-      reviewMessage: "Excellent execution on this Beef Wellington! The sear on the beef looks perfect - you've achieved a beautiful golden crust which tells me the pan was properly heated. The mushroom duxelles appears well-cooked and dry, which is crucial to prevent soggy pastry.\n\nA few notes for improvement:\n1. Try to get a more even layer of the duxelles - I can see some thicker patches\n2. The pastry could benefit from a few more minutes in the oven for that deep golden color\n3. Consider adding a thin layer of mustard on the beef before the duxelles for an extra flavor dimension\n\nOverall, this is restaurant-quality work. You should be proud! Keep pushing your skills and don't be afraid to experiment with different mushroom varieties in your duxelles. Well done! ⭐⭐⭐⭐",
-      rating: 4,
-    },
-    time: '3h ago',
-    timestamp: Date.now() - 3 * 60 * 60 * 1000,
-    unread: true,
-    read: false,
-  },
-  {
-    id: 'notif_4',
-    type: NOTIFICATION_TYPES.NEW_FOLLOWER,
-    title: 'New Follower',
-    subtitle: 'Elena started following you',
-    data: {
-      followerId: 'user_elena',
-      followerName: 'Elena',
-      followerAvatar: 'E',
-    },
-    time: '5h ago',
-    timestamp: Date.now() - 5 * 60 * 60 * 1000,
-    unread: false,
-    read: true,
-  },
-  {
-    id: 'notif_5',
-    type: NOTIFICATION_TYPES.POST_LIKES,
-    title: 'People love your recipe!',
-    subtitle: 'Your Chicken Tacos reached 20 likes',
-    data: {
-      postId: 'post_7',
-      postTitle: 'Chicken Tacos',
-      likesCount: 20,
-      daysSincePost: 2, // Day 3+
-    },
-    time: '1d ago',
-    timestamp: Date.now() - 24 * 60 * 60 * 1000,
-    unread: false,
-    read: true,
-  },
-];
-
-// Sample claimable review requests (for chefs only)
-const INITIAL_CHEF_NOTIFICATIONS = [
-  {
-    id: 'chef_notif_1',
-    type: NOTIFICATION_TYPES.CHEF_REVIEW_REQUEST,
-    title: 'Review Request',
-    subtitle: 'Maria wants your feedback on their dish',
-    data: {
-      requestId: 'req_1',
-      requesterId: 'user_maria',
-      requesterName: 'Maria',
-      requesterAvatar: 'M',
-      postId: 'req_post_1',
-      postTitle: 'Homemade Ramen Bowl',
-      postDescription: 'Slow-cooked broth, handmade noodles, soft boiled egg and fresh toppings.',
-      postImage: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=800',
-      ingredients: [
-        '1L chicken bone broth',
-        '200g fresh ramen noodles',
-        '2 soft-boiled eggs',
-        '100g chashu pork',
-        'Nori sheets',
-        'Green onions',
-        'Sesame seeds',
-      ],
-      instructions: 'Simmer bone broth for 4 hours with ginger and garlic.\n\nSeason with soy sauce, mirin, and sesame oil.\n\nCook noodles according to package, drain.\n\nAssemble bowl: noodles, hot broth, toppings.\n\nAdd soft-boiled egg cut in half.\n\nGarnish with green onions and sesame seeds.',
-      utensils: ['pot', 'stove'],
-      difficulty: 'Medium',
-      cookTime: '4h 30min',
-      context: 'I tried making ramen for the first time. Used chicken bones and simmered for 4 hours. Not sure if my broth is rich enough or if my egg timing (6 minutes) is right.',
-      targetChefs: 'Following',
-    },
-    time: '10m ago',
-    timestamp: Date.now() - 10 * 60 * 1000,
-    unread: true,
-    read: false,
-    claimedBy: null, // null means available for claiming
-  },
-  {
-    id: 'chef_notif_2',
-    type: NOTIFICATION_TYPES.CHEF_REVIEW_REQUEST,
-    title: 'Review Request',
-    subtitle: 'Diego needs expert advice on their creation',
-    data: {
-      requestId: 'req_2',
-      requesterId: 'user_diego',
-      requesterName: 'Diego',
-      requesterAvatar: 'D',
-      postId: 'req_post_2',
-      postTitle: 'Mole Poblano',
-      postDescription: 'Traditional Mexican sauce with chocolate and chilies served over chicken.',
-      postImage: 'https://images.unsplash.com/photo-1534352956036-cd81e27dd615?w=800',
-      ingredients: [
-        '4 dried ancho chilies',
-        '2 dried pasilla chilies',
-        '50g Mexican chocolate',
-        '1/4 cup almonds',
-        '1/4 cup sesame seeds',
-        'Cinnamon stick',
-        'Chicken thighs',
-      ],
-      instructions: 'Toast and rehydrate dried chilies.\n\nBlend chilies with almonds, sesame, spices.\n\nCook sauce for 30 minutes, stirring constantly.\n\nAdd chocolate, stir until melted.\n\nSimmer chicken in sauce until cooked through.\n\nGarnish with sesame seeds.',
-      utensils: ['blender', 'pot', 'stove'],
-      difficulty: 'Hard',
-      cookTime: '2h',
-      context: 'This is my grandmother\'s recipe but something is off. The sauce tastes bitter. Did I burn the chilies? Should the chocolate be added earlier?',
-      targetChefs: 'All Chefs',
-    },
-    time: '25m ago',
-    timestamp: Date.now() - 25 * 60 * 1000,
-    unread: true,
-    read: false,
-    claimedBy: null,
-  },
-];
-
 export function NotificationsProvider({ children }) {
-  const [currentUser, setCurrentUser] = useState(MOCK_CURRENT_USER);
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
-  const [chefNotifications, setChefNotifications] = useState(INITIAL_CHEF_NOTIFICATIONS);
+  const { user, token } = useContext(AuthContext);
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  // Get all notifications based on user type
-  const getAllNotifications = useCallback(() => {
-    if (currentUser.isChef) {
-      // Chefs see their own notifications plus claimable review requests
-      return [...chefNotifications, ...notifications].sort((a, b) => b.timestamp - a.timestamp);
+  // Derive if current user is chef from AuthContext
+  const isChef = user?.isChef || false;
+
+  const formatTime = (timestamp) => {
+    const now = new Date();
+    const then = new Date(timestamp);
+    const diffInSeconds = Math.floor((now - then) / 1000);
+
+    if (diffInSeconds < 60) return 'Just now';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    return `${Math.floor(diffInSeconds / 86400)}d ago`;
+  };
+
+  const refreshNotifications = useCallback(async () => {
+    if (!token) return;
+    try {
+      const data = await api.get('/notifications', token);
+      const backendNotifs = (data.notifications || []).map(n => ({
+        id: n.id,
+        type: n.type,
+        title: n.title,
+        subtitle: n.subtitle,
+        data: n.data,
+        unread: !n.is_read,
+        read: n.is_read,
+        timestamp: new Date(n.created_at).getTime(),
+        time: formatTime(n.created_at),
+        claimedBy: n.data?.claimedBy || null,
+      }));
+      setNotifications(backendNotifs);
+    } catch (error) {
+      console.error('[NotificationsContext:refreshNotifications] Failed:', error.message);
     }
-    return notifications.sort((a, b) => b.timestamp - a.timestamp);
-  }, [currentUser.isChef, notifications, chefNotifications]);
+  }, [token]);
+
+  // Initial load and polling
+  useEffect(() => {
+    refreshNotifications();
+    const interval = setInterval(refreshNotifications, 30000); // Poll every 30s
+    return () => clearInterval(interval);
+  }, [refreshNotifications]);
 
   // Get unread count
-  const getUnreadCount = useCallback(() => {
-    const allNotifs = getAllNotifications();
-    return allNotifs.filter(n => n.unread && !n.claimedBy).length;
-  }, [getAllNotifications]);
+  const unreadCount = useMemo(() => {
+    return notifications.filter(n => n.unread).length;
+  }, [notifications]);
 
   // Mark notification as read
-  const markAsRead = useCallback((notificationId) => {
-    setNotifications(prev =>
-      prev.map(n =>
-        n.id === notificationId ? { ...n, unread: false, read: true } : n
-      )
-    );
-    setChefNotifications(prev =>
-      prev.map(n =>
-        n.id === notificationId ? { ...n, unread: false, read: true } : n
-      )
-    );
-  }, []);
+  const markAsRead = useCallback(async (notificationId) => {
+    if (!token) return;
+    try {
+      // Optimistic update
+      setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, unread: false, read: true } : n));
+      await api.patch(`/notifications/${notificationId}/read`, {}, token);
+    } catch (error) {
+      console.error(`[NotificationsContext:markAsRead] Failed:`, error.message);
+      refreshNotifications();
+    }
+  }, [token, refreshNotifications]);
 
   // Delete notification
-  const deleteNotification = useCallback((notificationId) => {
-    setNotifications(prev => prev.filter(n => n.id !== notificationId));
-    setChefNotifications(prev => prev.filter(n => n.id !== notificationId));
-  }, []);
+  const deleteNotification = useCallback(async (notificationId) => {
+    if (!token) return;
+    try {
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      // Optionally add DELETE /notifications/:id to backend
+    } catch (error) {
+      console.error(`[NotificationsContext:deleteNotification] Failed:`, error.message);
+    }
+  }, [token]);
 
   // Claim a review request (for chefs)
-  const claimReviewRequest = useCallback((notificationId, chefId) => {
-    setChefNotifications(prev =>
-      prev.map(n =>
-        n.id === notificationId ? { ...n, claimedBy: chefId } : n
-      )
-    );
-    // In real app, this would also notify other chefs via WebSocket/backend
-    // to remove the notification from their list
-  }, []);
-
-  // Submit chef review (after claiming)
-  const submitChefReview = useCallback((notificationId, reviewMessage) => {
-    // Get the notification data before removing it
-    const notification = chefNotifications.find(n => n.id === notificationId);
-    
-    // Remove the claimable notification from this chef's list
-    setChefNotifications(prev => prev.filter(n => n.id !== notificationId));
-    
-    // TODO: Backend integration skeleton
-    // In real app, this would:
-    // 1. POST to /api/reviews/submit with:
-    //    - notificationId
-    //    - reviewMessage
-    //    - chefId (currentUser.id)
-    //    - requesterId (notification.data.requesterId)
-    //    - postId (notification.data.postId)
-    // 
-    // 2. Backend should then:
-    //    a) Save the review to database
-    //    b) Create a new CHEF_REVIEW_RECEIVED notification for the requester
-    //    c) Broadcast via WebSocket to ALL CHEFS to remove this notification
-    //       (so other chefs no longer see this claimable request)
-    //    d) Return success/failure
-    //
-    // 3. WebSocket listener (to be implemented):
-    //    socket.on('review_request_claimed', (data) => {
-    //      setChefNotifications(prev => prev.filter(n => n.id !== data.notificationId));
-    //    });
-    
-    console.log('Review submitted:', { 
-      notificationId, 
-      reviewMessage,
-      requesterData: notification?.data 
-    });
-    
-    return true;
-  }, [chefNotifications]);
-
-  // Cancel review claim
-  const cancelReviewClaim = useCallback((notificationId) => {
-    setChefNotifications(prev =>
-      prev.map(n =>
-        n.id === notificationId ? { ...n, claimedBy: null } : n
-      )
-    );
-  }, []);
-
-  // Add new notification (for testing/mock purposes)
-  const addNotification = useCallback((notification) => {
-    const newNotif = {
-      ...notification,
-      id: `notif_${Date.now()}`,
-      timestamp: Date.now(),
-      unread: true,
-      read: false,
-    };
-    
-    if (notification.type === NOTIFICATION_TYPES.CHEF_REVIEW_REQUEST) {
-      setChefNotifications(prev => [newNotif, ...prev]);
-    } else {
-      setNotifications(prev => [newNotif, ...prev]);
+  const claimReviewRequest = useCallback(async (notificationId, requestId) => {
+    if (!token || !isChef) return;
+    try {
+      // 1. Claim in backend
+      await ChefService.claimRequest(requestId, token);
+      
+      // 2. Mark notification as read and claimed locally
+      setNotifications(prev =>
+        prev.map(n => n.id === notificationId ? { ...n, unread: false, read: true, claimedBy: user.id } : n)
+      );
+      
+      // 3. Mark read in backend
+      await api.patch(`/notifications/${notificationId}/read`, {}, token);
+    } catch (error) {
+      console.error(`[NotificationsContext:claimReviewRequest] Failed:`, error.message);
+      refreshNotifications();
+      throw error;
     }
-  }, []);
+  }, [token, isChef, user?.id, refreshNotifications]);
 
-  // Toggle user type (for testing)
-  const toggleChefMode = useCallback(() => {
-    setCurrentUser(prev => ({ ...prev, isChef: !prev.isChef }));
-  }, []);
+  // Submit a chef review
+  const submitChefReview = useCallback(async (notificationId, requestId, postId, reviewText) => {
+    if (!token || !isChef) return;
+    try {
+      // 1. Post the review to backend
+      await ChefService.postReview({
+        post_id: postId,
+        reaction_text: reviewText,
+        request_id: requestId
+      }, token);
 
-  const value = {
-    currentUser,
-    notifications: getAllNotifications(),
-    unreadCount: getUnreadCount(),
+      // 2. Mark notification as read (if not already)
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      
+      // 3. Optional: Mark read in backend if it wasn't
+      await api.patch(`/notifications/${notificationId}/read`, {}, token);
+    } catch (error) {
+      console.error(`[NotificationsContext:submitChefReview] Failed:`, error.message);
+      refreshNotifications();
+      throw error;
+    }
+  }, [token, isChef, refreshNotifications]);
+
+  // Cancel a claim (for Chefs who claimed but haven't reviewed yet)
+  const cancelReviewClaim = useCallback(async (notificationId) => {
+    // For now, this just refreshes notifications to sync with backend
+    // A more advanced version would call an unclaim endpoint
+    refreshNotifications();
+  }, [refreshNotifications]);
+
+  const value = useMemo(() => ({
+    notifications,
+    unreadCount,
+    currentUser: user,
     markAsRead,
     deleteNotification,
     claimReviewRequest,
     submitChefReview,
     cancelReviewClaim,
-    addNotification,
-    toggleChefMode,
+    refreshNotifications,
     NOTIFICATION_TYPES,
-  };
+  }), [
+    notifications, 
+    unreadCount, 
+    user,
+    markAsRead, 
+    deleteNotification, 
+    claimReviewRequest, 
+    submitChefReview,
+    cancelReviewClaim,
+    refreshNotifications
+  ]);
 
   return (
     <NotificationsContext.Provider value={value}>
@@ -323,7 +174,7 @@ export function NotificationsProvider({ children }) {
 export function useNotifications() {
   const context = useContext(NotificationsContext);
   if (!context) {
-    throw new Error('useNotifications must be used within a NotificationsProvider');
+    throw new Error('[NotificationsContext] useNotifications must be used within a NotificationsProvider');
   }
   return context;
 }

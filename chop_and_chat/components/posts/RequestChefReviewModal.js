@@ -11,7 +11,8 @@ import {
     Platform,
     ScrollView,
     Image,
-    Animated
+    Animated,
+    ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
@@ -32,6 +33,7 @@ export default function RequestChefReviewModal({
     const [feedbackContext, setFeedbackContext] = useState('');
     const [imageExpanded, setImageExpanded] = useState(false);
     const [rotateAnim] = useState(new Animated.Value(0));
+    const [loading, setLoading] = useState(false);
 
     const toggleImageExpanded = () => {
         const toValue = imageExpanded ? 0 : 1;
@@ -50,7 +52,7 @@ export default function RequestChefReviewModal({
         outputRange: ['0deg', '180deg'],
     });
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (!feedbackContext.trim()) {
             Alert.alert(
                 'Context Required',
@@ -60,27 +62,27 @@ export default function RequestChefReviewModal({
             return;
         }
 
-        onSubmit?.({
-            dishId: dish?.id,
-            dishTitle: dish?.title,
-            context: feedbackContext.trim(),
-            chefFilter: selectedFilter,
-            timestamp: new Date().toISOString()
-        });
+        setLoading(true);
+        try {
+            await onSubmit?.({
+                dishId: dish?.id,
+                dishTitle: dish?.title,
+                context: feedbackContext.trim(),
+                chefFilter: selectedFilter,
+                timestamp: new Date().toISOString()
+            });
 
-        setFeedbackContext('');
-        setSelectedFilter('Following');
-        setImageExpanded(false);
-        rotateAnim.setValue(0);
-        onClose();
-
-        Alert.alert(
-            'Request Sent!!',
-            selectedFilter === 'Following' 
-                ? 'Chefs you follow will be notified about your review request.'
-                : 'All chefs in the community will be notified about your review request.',
-            [{ text: 'OK' }]
-        );
+            setFeedbackContext('');
+            setSelectedFilter('Following');
+            setImageExpanded(false);
+            rotateAnim.setValue(0);
+            onClose();
+        } catch (error) {
+            // Error is usually handled by the parent's onSubmit
+            console.error('[RequestChefReviewModal:handleSubmit] Error:', error.message);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleClose = () => {
@@ -92,7 +94,6 @@ export default function RequestChefReviewModal({
     };
 
     const handleBackPress = () => {
-        console.log('Back pressed in RequestChefReviewModal, calling onBack');
         setFeedbackContext('');
         setSelectedFilter('Following');
         setImageExpanded(false);
@@ -243,11 +244,22 @@ export default function RequestChefReviewModal({
 
                             {/* Submit Button inside ScrollView */}
                             <Pressable
-                                style={[styles.submitButton, { backgroundColor: '#2563EB' }]}
+                                style={({ pressed }) => [
+                                    styles.submitButton, 
+                                    { backgroundColor: theme.primary },
+                                    (pressed || loading) && { opacity: 0.8 }
+                                ]}
                                 onPress={handleSubmit}
+                                disabled={loading}
                             >
-                                <Ionicons name="paper-plane" size={fp(18)} color="#FFFFFF" />
-                                <Text style={styles.submitButtonText}>Send Request</Text>
+                                {loading ? (
+                                    <ActivityIndicator color="#FFF" />
+                                ) : (
+                                    <>
+                                        <Ionicons name="paper-plane" size={fp(18)} color="#FFFFFF" />
+                                        <Text style={styles.submitButtonText}>Send Request</Text>
+                                    </>
+                                )}
                             </Pressable>
                         </ScrollView>
                     </View>

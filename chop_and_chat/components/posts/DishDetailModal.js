@@ -1,22 +1,54 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, Modal, ScrollView, Pressable, Image } from 'react-native';
+import { useState, useContext } from 'react';
+import { View, Text, StyleSheet, Modal, ScrollView, Pressable, Image, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { useTheme } from '../../context/ThemeContext';
+import { AuthContext } from '../../context/AuthContext';
+import { ChefService } from '../../services/ChefService';
 import RequestChefReviewModal from './RequestChefReviewModal';
-import { mockIngredients, mockInstructions } from '../../data/mockData';
 
 export default function DishDetailModal({ visible, onClose, dish, showChefReviewButton = false }) {
     const { theme } = useTheme();
+    const { token } = useContext(AuthContext);
     const [reviewModalVisible, setReviewModalVisible] = useState(false);
+    const [requestLoading, setRequestLoading] = useState(false);
 
     if (!dish) return null;
 
-    // Use dish data or fallback to mockData
-    const ingredients = dish.ingredients || mockIngredients.pizza;
-    const instructions = dish.instructions || mockInstructions.pizza;
-    const kitchenUtensils = dish.utensils || ['oven', 'grill', 'stove'];
-    const cookTime = dish.cookTime || '15 min';
+    const handleReviewSubmit = async (reviewRequest) => {
+        if (!token) {
+            Alert.alert('Error', 'You must be logged in to request a review.');
+            return;
+        }
+
+        setRequestLoading(true);
+        try {
+            await ChefService.requestReview({
+                post_id: dish.id,
+                context: reviewRequest.context,
+                chef_filter: reviewRequest.chefFilter
+            }, token);
+            
+            Alert.alert(
+                'Request Sent!',
+                reviewRequest.chefFilter === 'Following' 
+                    ? 'Chefs you follow will be notified about your review request.'
+                    : 'All chefs in the community will be notified about your review request.',
+                [{ text: 'OK' }]
+            );
+            setReviewModalVisible(false);
+        } catch (error) {
+            Alert.alert('Error', error.message || 'Failed to send review request.');
+        } finally {
+            setRequestLoading(false);
+        }
+    };
+
+    // Use dish data or fallback 
+    const ingredients = dish.ingredients || [];
+    const instructions = dish.instructions || '';
+    const kitchenUtensils = dish.utensils || [];
+    const cookTime = dish.cookTime || dish.time || '15 min';
 
     const difficulty = dish.difficulty || 'Medium';
     const difficultyColor = 
@@ -223,10 +255,7 @@ export default function DishDetailModal({ visible, onClose, dish, showChefReview
                     visible={reviewModalVisible}
                     onClose={() => setReviewModalVisible(false)}
                     dish={dish}
-                    onSubmit={(reviewRequest) => {
-                        console.log('Chef review request submitted:', reviewRequest);
-                        // TODO: Send to backend and trigger notifications
-                    }}
+                    onSubmit={handleReviewSubmit}
                 />
             </View>
         </Modal>

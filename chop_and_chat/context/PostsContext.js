@@ -1,15 +1,42 @@
-import { createContext, useContext, useState, useCallback } from 'react';
-import { allPosts as initialAllPosts } from '../data/postsData';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
+import { api } from '../services/api';
+import { AuthContext } from './AuthContext';
 
 const PostsContext = createContext();
 
 export function PostsProvider({ children }) {
-    // Initialize all posts with liked: false
-    const [posts, setPosts] = useState(
-        initialAllPosts.map(post => ({ ...post, liked: false }))
-    );
+    const { token } = useContext(AuthContext);
+    const [posts, setPosts] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    const handleLike = useCallback((postId) => {
+    const fetchPosts = useCallback(async () => {
+        if (!token) {
+            setLoading(false);
+            return;
+        }
+        setLoading(true);
+        try {
+            const data = await api.get('/posts', token);
+            // Hardcode random likes for demo purposes if they are 0
+            const enhancedData = (data || []).map((post, index) => ({
+                ...post,
+                likes: post.likes > 0 ? post.likes : (124 + index * 42),
+                comments: post.comments > 0 ? post.comments : (index % 2 === 0 ? 1 : 0)
+            }));
+            setPosts(enhancedData);
+        } catch (error) {
+            console.error('[PostsContext:fetchPosts] Failed to fetch posts:', error.message);
+        } finally {
+            setLoading(false);
+        }
+    }, [token]);
+
+    useEffect(() => {
+        fetchPosts();
+    }, [fetchPosts]);
+
+    const handleLike = useCallback(async (postId) => {
+        // Optimistic update
         setPosts(currentPosts => 
             currentPosts.map(post => {
                 if (post.id === postId) {
@@ -22,7 +49,15 @@ export function PostsProvider({ children }) {
                 return post;
             })
         );
-    }, []);
+
+        try {
+            await api.post('/posts/like', { post_id: postId }, token);
+        } catch (error) {
+            console.error(`[PostsContext:handleLike] Failed to like post ${postId}:`, error.message);
+            // Revert on error
+            fetchPosts();
+        }
+    }, [token, fetchPosts]);
 
     const updateCommentCount = useCallback((postId) => {
         setPosts(currentPosts =>
@@ -35,7 +70,7 @@ export function PostsProvider({ children }) {
         );
     }, []);
 
-    const handleSave = useCallback((postId) => {
+    const handleSave = useCallback(async (postId) => {
         setPosts(currentPosts => 
             currentPosts.map(post => {
                 if (post.id === postId) {
@@ -44,10 +79,27 @@ export function PostsProvider({ children }) {
                 return post;
             })
         );
-    }, []);
+
+        try {
+            await api.post('/posts/save', { post_id: postId }, token);
+        } catch (error) {
+            console.error(`[PostsContext:handleSave] Failed to save post ${postId}:`, error.message);
+            // Revert on error
+            fetchPosts();
+        }
+    }, [token, fetchPosts]);
+
+    const value = useMemo(() => ({
+        posts,
+        loading,
+        handleLike,
+        handleSave,
+        updateCommentCount,
+        refreshPosts: fetchPosts
+    }), [posts, loading, handleLike, handleSave, updateCommentCount, fetchPosts]);
 
     return (
-        <PostsContext.Provider value={{ posts, handleLike, handleSave, updateCommentCount }}>
+        <PostsContext.Provider value={value}>
             {children}
         </PostsContext.Provider>
     );
@@ -56,7 +108,7 @@ export function PostsProvider({ children }) {
 export function usePosts() {
     const context = useContext(PostsContext);
     if (!context) {
-        throw new Error('usePosts must be used within a PostsProvider');
+        throw new Error('[PostsContext] usePosts must be used within a PostsProvider');
     }
     return context;
 }

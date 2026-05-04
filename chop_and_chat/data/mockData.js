@@ -109,18 +109,18 @@ Let cool before serving.`,
 };
 
 // ========================================
-// COMMUNITY POSTS (4 total)
+// COMMUNITY POSTS (2 seed posts: 1 with 1 comment, 1 with 2 comments)
 // ========================================
 
 export const mockCommunityPosts = [
-    { 
-        id: 1, 
-        title: "Homemade Pizza Margherita", 
-        description: "Just made my first pizza from scratch! The dough came out perfect.", 
+    {
+        id: 1,
+        title: "Homemade Pizza Margherita",
+        description: "Just made my first pizza from scratch! The dough came out perfect.",
         author: "John Doe",
         authorId: 'user-1',
-        likes: 42, 
-        comments: 3,
+        likes: 42,
+        comments: 1,
         saved: false,
         image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=800',
         caption: 'Just made my first pizza from scratch!',
@@ -130,13 +130,13 @@ export const mockCommunityPosts = [
         cookTime: '90 min',
         difficulty: 'Medium',
     },
-    { 
-        id: 2, 
-        title: "Grandma's Secret Pasta Recipe", 
-        description: "Finally convinced grandma to share her famous carbonara recipe.", 
+    {
+        id: 2,
+        title: "Grandma's Secret Pasta Recipe",
+        description: "Finally convinced grandma to share her famous carbonara recipe.",
         author: "Jane Smith",
         authorId: 'user-2',
-        likes: 67, 
+        likes: 67,
         comments: 2,
         saved: false,
         image: 'https://images.unsplash.com/photo-1612874742237-6526221588e3?w=800',
@@ -147,59 +147,16 @@ export const mockCommunityPosts = [
         cookTime: '30 min',
         difficulty: 'Easy',
     },
-    { 
-        id: 3, 
-        title: "Vegan Chocolate Cake", 
-        description: "Who said vegan desserts can't be delicious? This cake is amazing!", 
-        author: "Mike Johnson",
-        authorId: 'user-3',
-        likes: 35, 
-        comments: 1,
-        saved: false,
-        image: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800',
-        caption: 'Who said vegan cannot be delicious?',
-        ingredients: mockIngredients.cake,
-        instructions: mockInstructions.cake,
-        utensils: ['oven', 'mixer', 'blender'],
-        cookTime: '45 min',
-        difficulty: 'Easy',
-    },
-    { 
-        id: 4, 
-        title: "Thai Green Curry Adventure", 
-        description: "First time making green curry. The spice level is just right!", 
-        author: "Sarah Lee",
-        authorId: 'user-4',
-        likes: 28, 
-        comments: 2,
-        saved: false,
-        image: 'https://images.unsplash.com/photo-1455619452474-d2be8b1e70cd?w=800',
-        caption: 'Spicy and delicious!',
-        ingredients: mockIngredients.curry,
-        instructions: mockInstructions.curry,
-        utensils: ['stove', 'wok'],
-        cookTime: '45 min',
-        difficulty: 'Medium',
-    },
 ];
 
 
 export const mockComments = {
     1: [
         { id: 1, author: "Maria Garcia", initials: "MG", text: "This looks absolutely delicious! Can you share the dough recipe?", timestamp: "2h ago" },
-        { id: 2, author: "Tom Wilson", initials: "TW", text: "Made this last night, my family loved it!", timestamp: "5h ago" },
-        { id: 3, author: "Sarah Kim", initials: "SK", text: "The crust looks perfect!", timestamp: "1d ago" },
     ],
     2: [
         { id: 1, author: "Chef Marco", initials: "CM", text: "Traditional carbonara is the best! No cream, right?", timestamp: "1h ago" },
         { id: 2, author: "Lisa Brown", initials: "LB", text: "Your grandma is a treasure!", timestamp: "3h ago" },
-    ],
-    3: [
-        { id: 1, author: "Healthy Eats", initials: "HE", text: "What did you use instead of eggs?", timestamp: "30m ago" },
-    ],
-    4: [
-        { id: 1, author: "John Doe", initials: "JD", text: "Looks amazing! How spicy is it?", timestamp: "1h ago" },
-        { id: 2, author: "Thai Food Fan", initials: "TF", text: "Love green curry! Great job!", timestamp: "4h ago" },
     ],
 };
 
@@ -231,33 +188,25 @@ export const chefReactionTargetPosts = {
     post4: { id: 'post-4', title: 'Thai Green Curry Adventure', image: 'https://images.unsplash.com/photo-1455619452474-d2be8b1e70cd?w=800', caption: 'Spicy and delicious!' },
 };
 
-// Chef reactions comments (matching the counts in feedItems)
+// Chef reactions comments (matching the counts in feedItems: 2 + 1)
 export const mockChefReactionComments = {
     'feed-1': [
         { id: 1, author: "John Doe", initials: "JD", text: "Great perspective, Chef!", timestamp: "2h ago" },
         { id: 2, author: "Alice Smith", initials: "AS", text: "I tried this technique and it worked perfectly! Thanks for sharing.", timestamp: "4h ago" },
-        { id: 3, author: "Maria Brown", initials: "MB", text: "Would love to see more content like this!", timestamp: "6h ago" },
-    ],
-    'feed-2': [
-        { id: 1, author: "Tom Wilson", initials: "TW", text: "Chef Maria always gives the best tips!", timestamp: "1h ago" },
-        { id: 2, author: "Sarah Kim", initials: "SK", text: "I'm going to try this recipe next week.", timestamp: "3h ago" },
     ],
     'feed-3': [
         { id: 1, author: "Mike Johnson", initials: "MJ", text: "Thank you for the kind words, Chef!", timestamp: "30m ago" },
     ],
-    'feed-4': [
-        { id: 1, author: "Jane Smith", initials: "JS", text: "Appreciate the professional feedback!", timestamp: "45m ago" },
-        { id: 2, author: "Cooking Fan", initials: "CF", text: "Chef Linda has great taste!", timestamp: "2h ago" },
-    ],
 };
 
+// 2 chef reactions: feed-1 has 2 comments, feed-3 has 1 comment.
 export const mockChefFeedItems = [
     {
         id: 'feed-1',
         chef: mockChefs[0],
         contentType: 'reaction',
         likes: 45,
-        comments: 3,
+        comments: 2,
         liked: false,
         saved: false,
         reaction: {
@@ -268,23 +217,6 @@ export const mockChefFeedItems = [
         },
         post: null,
         createdAt: '2026-01-11T10:30:00Z',
-    },
-    {
-        id: 'feed-2',
-        chef: mockChefs[1],
-        contentType: 'reaction',
-        likes: 38,
-        comments: 2,
-        liked: false,
-        saved: false,
-        reaction: {
-            text: "My kids absolutely love this dish. It's become our weekly staple. The seasoning is perfectly balanced!",
-            targetPostId: chefReactionTargetPosts.post2.id,
-            targetPost: chefReactionTargetPosts.post2,
-            targetAuthor: mockUsers[1],
-        },
-        post: null,
-        createdAt: '2026-01-11T09:15:00Z',
     },
     {
         id: 'feed-3',
@@ -302,23 +234,6 @@ export const mockChefFeedItems = [
         },
         post: null,
         createdAt: '2026-01-10T14:20:00Z',
-    },
-    {
-        id: 'feed-4',
-        chef: mockChefs[3],
-        contentType: 'reaction',
-        likes: 22,
-        comments: 2,
-        liked: false,
-        saved: false,
-        reaction: {
-            text: "The spice balance in this curry is exceptional. You've really captured the authentic Thai flavors here!",
-            targetPostId: chefReactionTargetPosts.post4.id,
-            targetPost: chefReactionTargetPosts.post4,
-            targetAuthor: mockUsers[3],
-        },
-        post: null,
-        createdAt: '2026-01-10T11:45:00Z',
     },
 ];
 

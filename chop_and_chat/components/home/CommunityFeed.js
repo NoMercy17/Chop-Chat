@@ -1,29 +1,19 @@
 import { useState, useMemo } from 'react';
-import { Text, View, StyleSheet, ScrollView, Pressable, Modal, TextInput, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Image } from 'react-native';
+import { Text, View, StyleSheet, ScrollView, Pressable, Modal, TextInput, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Image, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { usePosts } from '../../context/PostsContext';
-import { commentsData } from '../../data/postsData';
 import DishDetailModal from '../posts/DishDetailModal';
-
-// Helper function to randomly select n post IDs
-const getRandomPostIds = (posts, count) => {
-    const shuffled = [...posts].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, count).map(post => post.id);
-};
 
 export default function CommunityFeed() {
     const navigation = useNavigation();
     const { theme } = useTheme();
     const { posts: allPosts, handleLike, handleSave, updateCommentCount } = usePosts();
     
-    // Generate 2 random post IDs for quick menu display
-    const randomPostIds = useMemo(() => getRandomPostIds(allPosts, 2), []);
-    
-    // Get the actual posts from context based on random IDs
-    const posts = allPosts.filter(post => randomPostIds.includes(post.id));
+    // Show only the 2 most recent posts in the home screen feed
+    const posts = useMemo(() => allPosts.slice(0, 2), [allPosts]);
     
     const [commentsModalVisible, setCommentsModalVisible] = useState(false);
     const [selectedPost, setSelectedPost] = useState(null);
@@ -32,30 +22,22 @@ export default function CommunityFeed() {
     const [newComment, setNewComment] = useState('');
 
     const handleComment = (post) => {
-        // Set the selected post and open the modal
         setSelectedPost(post);
         setCommentsModalVisible(true);
     };
 
     const handleAddComment = () => {
         if (newComment.trim() && selectedPost) {
-            // send this to your backend
-            console.log('New comment for post', selectedPost.id, ':', newComment);
-            // Update the comment count using context
+            // TODO: Wire to backend POST /comments
             updateCommentCount(selectedPost.id);
             setNewComment('');
         }
-    };
-
-    const getCommentsForPost = (postId) => {
-        return commentsData[postId] || [];
     };
 
     return (
         <View style={styles.container}>
             <View style={styles.header}>
                 <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Community Feed</Text>
-
                 <Pressable 
                    style={({ pressed }) => [
                        styles.subtitleButton,
@@ -68,7 +50,6 @@ export default function CommunityFeed() {
                         <Ionicons name="arrow-forward" size={fp(14)} color={theme.textSecondary} />
                     </View>
                 </Pressable>  
-
             </View>
 
             <ScrollView 
@@ -76,7 +57,7 @@ export default function CommunityFeed() {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
             >
-                {posts.map((post) => (
+                {posts.length > 0 ? posts.map((post) => (
                     <Pressable 
                         key={post.id} 
                         style={({ pressed }) => [
@@ -107,9 +88,7 @@ export default function CommunityFeed() {
                                         e.stopPropagation();
                                         navigation.navigate('OtherUserProfile', {
                                             userId: post.authorId || post.id,
-                                            userName: post.author,
-                                            userAvatar: post.authorAvatar || null,
-                                            username: `@${post.author.replace(/\s+/g, '').toLowerCase()}`
+                                            userName: post.author
                                         });
                                     }}
                                     style={({pressed}) => pressed && {opacity: 0.7}}
@@ -162,7 +141,11 @@ export default function CommunityFeed() {
                             </View>
                         </View>
                     </Pressable>
-                ))}
+                )) : (
+                    <View style={{alignItems: 'center', paddingVertical: hp(20)}}>
+                        <Text style={{ color: theme.textTertiary }}>No recent posts</Text>
+                    </View>
+                )}
                 
                 {/* More Button */}
                 <Pressable 
@@ -172,7 +155,7 @@ export default function CommunityFeed() {
                     ]}
                     onPress={() => navigation.navigate('AllCommunityPosts')}
                 >
-                    <View style={styles.glassBackground}>
+                    <View style={[styles.glassBackground, { backgroundColor: theme.primary }]}>
                         <View style={styles.moreCardContent}>
                             <Text style={styles.moreCardText}>More</Text>
                         </View>
@@ -215,32 +198,13 @@ export default function CommunityFeed() {
                                         style={{maxHeight: hp(300), padding: wp(20)}}
                                         showsVerticalScrollIndicator={false}
                                     >
-                                        {selectedPost && getCommentsForPost(selectedPost.id).map((comment) => (
-                                            <View key={comment.id} style={{marginBottom: hp(15), flexDirection:'row', gap: wp(10)}}>
-                                                <View style={{width: wp(30), height: wp(30), borderRadius: wp(15), backgroundColor: theme.primary, alignItems:'center', justifyContent:'center'}}>
-                                                    <Text style={{color: '#FFFFFF', fontSize: fp(10), fontWeight:'700'}}>{comment.initials}</Text>
-                                                </View>
-                                                <View style={{flex: 1}}>
-                                                    <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
-                                                        <Text style={{color: theme.textPrimary, fontWeight:'600', fontSize: fp(13)}}>{comment.author}</Text>
-                                                        <Text style={{color: theme.textTertiary, fontSize: fp(11)}}>{comment.timestamp}</Text>
-                                                    </View>
-                                                    <Text style={{color: theme.textSecondary, fontSize: fp(13), marginTop: hp(2)}}>{comment.text}</Text>
-                                                </View>
-                                            </View>
-                                        ))}
-                                        
-                                        {/* Empty state when no comments */}
-                                        {selectedPost && getCommentsForPost(selectedPost.id).length === 0 && (
-                                            <View style={{alignItems: 'center', paddingVertical: hp(40)}}>
-                                                <Ionicons name="chatbubble-outline" size={fp(38)} color={theme.textTertiary} />
-                                                <Text style={{color: theme.textSecondary, fontSize: fp(16), marginTop: hp(12)}}>No comments yet</Text>
-                                                <Text style={{color: theme.textTertiary, fontSize: fp(13), marginTop: hp(4)}}>Be the first to comment!</Text>
-                                            </View>
-                                        )}
+                                        <View style={{alignItems: 'center', paddingVertical: hp(40)}}>
+                                            <Ionicons name="chatbubble-outline" size={fp(38)} color={theme.textTertiary} />
+                                            <Text style={{color: theme.textSecondary, fontSize: fp(16), marginTop: hp(12)}}>Comments coming soon</Text>
+                                            <Text style={{color: theme.textTertiary, fontSize: fp(13), marginTop: hp(4)}}>We're wiring up the live discussion!</Text>
+                                        </View>
                                     </ScrollView>
 
-                                    {/* Add new comment */}
                                     <View style={[styles.addCommentContainer, { backgroundColor: theme.cardBackground, borderTopColor: theme.border }]}>
                                         <TextInput
                                             style={[styles.commentInput, { backgroundColor: theme.inputBackground, color: theme.textPrimary }]}
@@ -263,7 +227,6 @@ export default function CommunityFeed() {
                 </TouchableWithoutFeedback>
             </Modal>
 
-            {/* Dish Detail Modal */}
             <DishDetailModal
                 visible={dishDetailModalVisible}
                 onClose={() => {
@@ -394,24 +357,19 @@ const styles = StyleSheet.create({
         color: '#6B7280',
         fontWeight: '600',
     },
-    statTextLiked: {
-        color: "#b90808ff",
-    },
     moreCard: {
         alignSelf: 'center',
         width: wp(110),
         marginTop: hp(8),
         marginBottom: hp(16),
         overflow: 'hidden',
+        borderRadius: wp(25),
     },
     moreCardPressed: {
         opacity: 0.85,
         transform: [{ scale: 0.96 }],
     },
     glassBackground: {
-        backgroundColor: 'rgba(255, 255, 255, 0.18)',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.35)',
         borderRadius: wp(25),
     },
     moreCardContent: {
@@ -427,18 +385,12 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         letterSpacing: 0.3,
     },
-    
-    // Modal Styles 
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'flex-end',
     },
-    modalKeyboardView: {
-        width: '100%',
-    },
     modalContainer: {
-        backgroundColor: '#F8FAFB',
         borderTopLeftRadius: wp(24),
         borderTopRightRadius: wp(24),
         paddingTop: hp(20),
@@ -455,120 +407,20 @@ const styles = StyleSheet.create({
         fontSize: fp(18),
         fontWeight: '700',
     },
-    modalSubtitle: {
-        fontSize: fp(14),
-        color: '#6B7280',
-    },
-    commentsList: {
-        maxHeight: hp(350),
-        paddingHorizontal: wp(20),
-    },
-    commentItem: {
-        flexDirection: 'row',
-        paddingVertical: hp(14),
-        borderBottomWidth: 1,
-        borderBottomColor: '#d8d9dbf8',
-    },
-    commentAvatar: {
-        width: wp(40),
-        height: wp(40),
-        borderRadius: wp(20),
-        backgroundColor: '#E0F2FE',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: wp(12),
-    },
-    commentAvatarText: {
-        fontSize: fp(14),
-        fontWeight: '600',
-        color: '#0284C7',
-    },
-    commentContent: {
-        flex: 1,
-    },
-    commentHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: hp(4),
-    },
-    commentAuthor: {
-        fontSize: fp(14),
-        fontWeight: '600',
-        color: '#111827',
-    },
-    commentTime: {
-        fontSize: fp(12),
-        color: '#9CA3AF',
-    },
-    commentText: {
-        fontSize: fp(14),
-        color: '#374151',
-        lineHeight: hp(20),
-    },
-    emptyComments: {
-        alignItems: 'center',
-        paddingVertical: hp(40),
-    },
-    emptyCommentsText: {
-        fontSize: fp(16),
-        fontWeight: '600',
-        color: '#6B7280',
-        marginTop: hp(12),
-    },
-    emptyCommentsSubtext: {
-        fontSize: fp(14),
-        color: '#9CA3AF',
-        marginTop: hp(4),
-    },
     addCommentContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: wp(20),
         paddingTop: hp(16),
         borderTopWidth: 1,
-        borderTopColor: '#F3F4F6',
         gap: wp(12),
     },
     commentInput: {
         flex: 1,
-        backgroundColor: '#F3F4F6',
         borderRadius: wp(20),
         paddingHorizontal: wp(16),
         paddingVertical: hp(10),
         fontSize: fp(14),
-        color: '#111827',
         maxHeight: hp(80),
-    },
-    sendButton: {
-        width: wp(44),
-        height: wp(44),
-        borderRadius: wp(22),
-        backgroundColor: '#3B82F6',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    sendButtonPressed: {
-        opacity: 0.8,
-        transform: [{ scale: 0.95 }],
-    },
-    sendButtonDisabled: {
-        backgroundColor: '#E5E7EB',
-    },
-    closeButton: {
-        marginTop: hp(16),
-        marginHorizontal: wp(20),
-        paddingVertical: hp(14),
-        backgroundColor: '#F3F4F6',
-        borderRadius: wp(12),
-        alignItems: 'center',
-    },
-    closeButtonPressed: {
-        backgroundColor: '#E5E7EB',
-    },
-    closeButtonText: {
-        fontSize: fp(16),
-        fontWeight: '600',
-        color: '#374151',
     },
 });
