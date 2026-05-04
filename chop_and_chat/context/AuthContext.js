@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, createRef, useMemo, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DeviceEventEmitter } from 'react-native';
 import { api } from '../services/api';
 
 export const AuthContext = createContext();
@@ -23,6 +24,16 @@ export function AuthProvider({ children }) {
     };
   };
 
+  const signOut = useCallback(async () => {
+    try {
+      await AsyncStorage.removeItem('session_user');
+      setUser(null);
+      setToken(null);
+    } catch (error) {
+      console.error('[AuthContext:signOut] Failed to clear session:', error.message);
+    }
+  }, []);
+
   useEffect(() => {
     // Check for existing session on mount
     const loadSession = async () => {
@@ -41,7 +52,17 @@ export function AuthProvider({ children }) {
       }
     };
     loadSession();
-  }, []);
+
+    // Listen for global auth errors
+    const subscription = DeviceEventEmitter.addListener('auth_error_logout', () => {
+      console.warn('[AuthContext] Global auth error received. Logging out.');
+      signOut();
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [signOut]);
 
   const signIn = useCallback(async (sessionData) => {
     try {
@@ -54,16 +75,6 @@ export function AuthProvider({ children }) {
       setToken(sessionData.token);
     } catch (error) {
       console.error('[AuthContext:signIn] Failed to save session:', error.message);
-    }
-  }, []);
-
-  const signOut = useCallback(async () => {
-    try {
-      await AsyncStorage.removeItem('session_user');
-      setUser(null);
-      setToken(null);
-    } catch (error) {
-      console.error('[AuthContext:signOut] Failed to clear session:', error.message);
     }
   }, []);
 

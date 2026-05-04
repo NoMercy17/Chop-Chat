@@ -1,4 +1,6 @@
 import { env } from '../utils/env';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert, DeviceEventEmitter } from 'react-native';
 
 /**
  * Core API Service for handling network requests to the backend.
@@ -90,6 +92,15 @@ async function handleResponse(response) {
     }
 
     if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+            const errStr = data?.error || '';
+            if (errStr.includes('invalid token') || errStr.includes('missing token') || errStr.includes('malformed token')) {
+                console.warn('[api.js] Invalid token detected. Clearing session.');
+                await AsyncStorage.removeItem('session_user');
+                DeviceEventEmitter.emit('auth_error_logout');
+            }
+        }
+
         const error = new Error(data.message || data.error || 'API request failed');
         error.status = response.status;
         error.data = data;
