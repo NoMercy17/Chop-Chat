@@ -1,11 +1,22 @@
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || 'change_me';
+
+// REASONING: Reusable middleware to protect routes with JWT
+function authenticateToken(req, res, next) {
+  const auth = req.headers['authorization'];
+  if (!auth) return res.status(401).json({ error: 'missing token' });
+  const token = auth.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'malformed token' });
+  
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ error: 'invalid token' });
+    req.user = user;
+    next();
+  });
+}
 
 // REASONING: Reusable middleware to protect chef-only endpoints
-// - Checks if authenticated user has role='chef'
-// - Returns 403 Forbidden if user is not a chef
-// - Use this on endpoints like POST /chef/reactions
-
 function requireChef(req, res, next) {
-  // Assumes authenticateToken middleware has already run
   if (!req.user) {
     return res.status(401).json({ error: 'not authenticated' });
   }
@@ -18,8 +29,6 @@ function requireChef(req, res, next) {
 }
 
 // REASONING: Check if user is accessing their own resources
-// - Prevents users from modifying other users' posts/profiles
-// - userId parameter can be from req.params.userId or req.body.userId
 function requireOwnership(resourceUserIdKey = 'userId') {
   return async (req, res, next) => {
     const resourceUserId = req.params[resourceUserIdKey] || req.body[resourceUserIdKey];
@@ -37,6 +46,8 @@ function requireOwnership(resourceUserIdKey = 'userId') {
 }
 
 module.exports = {
+  authenticateToken,
   requireChef,
-  requireOwnership
+  requireOwnership,
+  JWT_SECRET
 };

@@ -38,9 +38,13 @@ CREATE TABLE IF NOT EXISTS posts (
   utensils JSONB DEFAULT '[]',
   cook_time TEXT,
   difficulty TEXT CHECK (difficulty IN ('Easy', 'Medium', 'Hard')),
+  is_global BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Add is_global column if upgrading existing database
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_global BOOLEAN DEFAULT false;
 
 -- Index for faster queries on user's posts
 CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id);
@@ -161,6 +165,49 @@ CREATE TABLE IF NOT EXISTS favorite_recipes (
 -- Index for user's favorite recipes
 CREATE INDEX IF NOT EXISTS idx_favorite_recipes_user_id ON favorite_recipes(user_id);
 
+
+-- Review requests from users to chefs
+-- - requester_id: The user asking for feedback
+-- - post_id: The dish/recipe being reviewed
+-- - context: Extra details from user (ingredients, steps)
+-- - chef_filter: 'Following' or 'All Chefs' (logical filter for dispatch)
+-- - status: 'pending', 'claimed', 'completed'
+-- - claimed_by: ID of the chef who picked up the request
+CREATE TABLE IF NOT EXISTS chef_review_requests (
+  id SERIAL PRIMARY KEY,
+  requester_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  context TEXT,
+  chef_filter TEXT DEFAULT 'All Chefs',
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'claimed', 'completed')),
+  claimed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_chef_review_requests_status ON chef_review_requests(status);
+CREATE INDEX IF NOT EXISTS idx_chef_review_requests_requester ON chef_review_requests(requester_id);
+
+
+-- Notifications for users and chefs
+-- - user_id: Recipient
+-- - type: 'new_follower', 'post_likes', 'chef_review_received', 'chef_review_request'
+-- - title/subtitle: Display text
+-- - data: JSON payload for navigation (postId, requestId, etc.)
+-- - is_read: Read status
+CREATE TABLE IF NOT EXISTS notifications (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  subtitle TEXT,
+  data JSONB DEFAULT '{}',
+  is_read BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(user_id, is_read);
 
 
 -- FUTURE   Update updated_at on posts

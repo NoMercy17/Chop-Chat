@@ -10,7 +10,6 @@ import { wp, hp, fp } from "../utils/responsive";
 import CameraScreen from "../components/media/CameraScreen";
 import { CloudinaryService } from "../services/CloudinaryService";
 import { api } from "../services/api";
-import { mockFollowersList, mockFollowingList, mockMyRecipes } from "../data/mockData";
 
 // Refactored Components
 import SettingsModal from "../components/profile/SettingsModal";
@@ -21,16 +20,17 @@ import ProfileStats from "../components/profile/ProfileStats";
 export default function ProfileScreen({ navigation }) {
   const { user, token, signOut } = useContext(AuthContext);
   const { isDarkMode, toggleTheme, theme } = useTheme();
-  const { myFollowingCount } = useFollow();
+  const { myFollowingCount, getFollowersCount, refreshMyFollows } = useFollow();
   const insets = useSafeAreaInsets();
-  
+
   // State
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [userListVisible, setUserListVisible] = useState(false);
   const [userListType, setUserListType] = useState('followers');
   const [imageSourceModalVisible, setImageSourceModalVisible] = useState(false);
   const [cameraModalVisible, setCameraModalVisible] = useState(false);
-  
+  const [followersCount, setFollowersCount] = useState(0);
+
   const [profileData, setProfileData] = useState({
     name: user?.name || "User",
     profile_photo: user?.profile_photo || null,
@@ -58,8 +58,16 @@ export default function ProfileScreen({ navigation }) {
     }
   }, [token, signOut]);
 
-  useEffect(() => { loadUserProfile(); }, [loadUserProfile]);
-  useFocusEffect(useCallback(() => { loadUserProfile(); }, [loadUserProfile]));
+  // Pull the real follower count for the signed-in user; new accounts come back as 0.
+  const loadFollowerStats = useCallback(async () => {
+    if (!user?.id) return;
+    const count = await getFollowersCount(user.id);
+    setFollowersCount(count);
+    refreshMyFollows();
+  }, [user?.id, getFollowersCount, refreshMyFollows]);
+
+  useEffect(() => { loadUserProfile(); loadFollowerStats(); }, [loadUserProfile, loadFollowerStats]);
+  useFocusEffect(useCallback(() => { loadUserProfile(); loadFollowerStats(); }, [loadUserProfile, loadFollowerStats]));
 
   // Photo Handlers
   const handleAccessGallery = async () => {
@@ -109,9 +117,9 @@ export default function ProfileScreen({ navigation }) {
         onEditImage={() => setImageSourceModalVisible(true)}
       />
 
-      <ProfileStats 
-        recipeCount={mockMyRecipes.length}
-        followersCount={mockFollowersList.length}
+      <ProfileStats
+        recipeCount={0}
+        followersCount={followersCount}
         followingCount={myFollowingCount}
         theme={theme}
         onRecipesPress={() => navigation.navigate("MyRecipes")}
@@ -139,23 +147,20 @@ export default function ProfileScreen({ navigation }) {
         ))}
       </View>
 
-      <SettingsModal 
-        visible={settingsVisible} 
+      <SettingsModal
+        visible={settingsVisible}
         onClose={() => setSettingsVisible(false)}
-        user={profileData}
-        token={token}
         theme={theme}
         isDarkMode={isDarkMode}
         toggleTheme={toggleTheme}
         onSignOut={signOut}
-        onBioUpdate={(newBio) => setProfileData(prev => ({ ...prev, bio: newBio }))}
       />
 
       <UserListModal 
         visible={userListVisible}
         onClose={() => setUserListVisible(false)}
         type={userListType}
-        data={userListType === 'followers' ? mockFollowersList : mockFollowingList}
+        data={[]}
         navigation={navigation}
         theme={theme}
       />

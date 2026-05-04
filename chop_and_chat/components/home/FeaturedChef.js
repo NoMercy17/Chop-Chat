@@ -1,11 +1,10 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { Text, View, StyleSheet, ScrollView, Pressable, Modal, TouchableWithoutFeedback, KeyboardAvoidingView, Platform, TextInput } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { useChefFeed } from '../../context/ChefFeedContext';
-import { chefReactionComments } from '../../data/chefFeedData';
 import ChefPostDetailModal from '../posts/ChefPostDetailModal';
 import DishDetailModal from '../posts/DishDetailModal';
 
@@ -29,41 +28,13 @@ export default function FeaturedChef() {
         return feedItems.find(item => item.id === selectedItemId) || null;
     }, [selectedItemId, feedItems]);
 
-    // --- RANDOM SELECTION LOGIC ---
-    const [randomIndices, setRandomIndices] = useState([]);
-
-    useEffect(() => {
-        if (feedItems.length > 0 && randomIndices.length === 0) {
-            const indices = Array.from({ length: feedItems.length }, (_, i) => i)
-                .sort(() => Math.random() - 0.5)
-                .slice(0, 2); // Show only 2 items in quick menu
-            setRandomIndices(indices);
-        }
-    }, [feedItems, randomIndices.length]);
-
-    const quickItems = useMemo(() => {
-        const allItems = randomIndices.map(i => feedItems[i]).filter(Boolean);
-        
-        // Filter out self-reviews
-        return allItems.filter(item => {
-            if (item.contentType === 'reaction') {
-                // Exclude if chef is reacting to their own post
-                return item.reaction?.targetAuthor?.id !== item.chef.id;
-            }
-            return true;
-        });
-    }, [randomIndices, feedItems]);
+    // Show only the 2 most recent chef reactions
+    const quickItems = useMemo(() => feedItems.slice(0, 2), [feedItems]);
 
     // --- HANDLERS ---
 
     const handleOpenComments = (item) => {
-        console.log('Opening comments for:', item?.id);
-        
-        // Keep the selectedItemId set - don't clear it
-        // Close the detail modal FIRST, then open comments
         setChefPostDetailVisible(false);
-        
-        // Small delay to ensure modal transition completes
         setTimeout(() => {
             setCommentsModalVisible(true);
         }, 200);
@@ -71,12 +42,8 @@ export default function FeaturedChef() {
 
     const submitComment = () => {
         if (newComment.trim() && selectedItemId) {
-            console.log("Comment submitted:", newComment);
-            
-            // Update comment count in context
+            // TODO: wire to backend POST /comments
             updateCommentCount(selectedItemId);
-            
-            // Clear input but DON'T close modal
             setNewComment('');
         }
     };
@@ -84,16 +51,12 @@ export default function FeaturedChef() {
     const handleCloseComments = () => {
         setCommentsModalVisible(false);
         setNewComment('');
-        // Don't clear selectedItemId here - it can be reused
     };
 
-    // Render card based on content type
     const renderQuickCard = (item) => {
         if (!item) return null;
         
         const isReaction = item.contentType === 'reaction';
-        const isOwnReaction = isReaction && item.reaction?.targetAuthor?.id === item.chef.id;
-        
         const displayTitle = isReaction ? item.reaction.targetPost?.title : item.post?.title;
         const displayText = isReaction ? item.reaction.text : item.post?.caption;
 
@@ -116,14 +79,9 @@ export default function FeaturedChef() {
                     </View>
                     <View style={styles.headerInfo}>
                         <Text style={[styles.reviewTitle, { color: theme.textPrimary }]} numberOfLines={1}>{displayTitle}</Text>
-                        {isReaction && !isOwnReaction && (
+                        {isReaction && (
                             <Text style={[styles.reactionTarget, { color: theme.textSecondary }]} numberOfLines={1}>
-                                on @{item.reaction.targetAuthor.name}'s post
-                            </Text>
-                        )}
-                        {isOwnReaction && (
-                            <Text style={[styles.reactionTarget, { color: theme.textSecondary }]} numberOfLines={1}>
-                                replied to own post
+                                on @{item.reaction.targetAuthor?.name || 'User'}'s post
                             </Text>
                         )}
                     </View>
@@ -139,9 +97,7 @@ export default function FeaturedChef() {
                                 e.stopPropagation();
                                 navigation.navigate('OtherUserProfile', {
                                     userId: item.chef.id,
-                                    userName: item.chef.name,
-                                    userAvatar: item.chef.avatar || null,
-                                    username: `@${item.chef.name.replace(/\s+/g, '').toLowerCase()}`
+                                    userName: item.chef.name
                                 });
                             }}
                             style={({pressed}) => pressed && {opacity: 0.7}}
@@ -179,7 +135,11 @@ export default function FeaturedChef() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContainer}
             >
-                {quickItems.map((item) => renderQuickCard(item))}
+                {quickItems.length > 0 ? (
+                    quickItems.map((item) => renderQuickCard(item))
+                ) : (
+                    <Text style={{ color: theme.textTertiary, marginLeft: wp(20) }}>No recent chef reviews</Text>
+                )}
                 
                 <Pressable 
                     style={({ pressed }) => [
@@ -196,7 +156,6 @@ export default function FeaturedChef() {
                 </Pressable>
             </ScrollView>
 
-            {/* --- INTERMEDIARY MODAL --- */}
             <ChefPostDetailModal
                 visible={chefPostDetailVisible}
                 onClose={() => {
@@ -204,31 +163,12 @@ export default function FeaturedChef() {
                     setSelectedItemId(null);
                 }}
                 item={selectedItem}
-                
-                onLike={(id) => {
-                    try {
-                        handleLike(id);
-                    } catch (error) {
-                        console.error('Error liking post:', error);
-                    }
-                }}
-                onSave={(id) => {
-                    try {
-                        handleSave(id);
-                    } catch (error) {
-                        console.error('Error saving post:', error);
-                    }
-                }}
-                onComment={(item) => {
-                    if (item) {
-                        handleOpenComments(item);
-                    }
-                }}
-
+                onLike={handleLike}
+                onSave={handleSave}
+                onComment={handleOpenComments}
                 onTitlePress={(item) => {
                     setChefPostDetailVisible(false);
                     setTimeout(() => {
-                        // Transform chef feed item to proper dish format
                         const isReaction = item.contentType === 'reaction';
                         const dishData = {
                             title: isReaction ? item.reaction?.targetPost?.title : item.post?.title,
@@ -246,7 +186,6 @@ export default function FeaturedChef() {
                 }}
             />
 
-            {/* --- DISH DETAIL MODAL --- */}
             <DishDetailModal
                 visible={dishDetailModalVisible}
                 onClose={() => {
@@ -256,7 +195,6 @@ export default function FeaturedChef() {
                 dish={selectedDish}
             />
 
-            {/* --- COMMENTS MODAL --- */}
             <Modal 
                 visible={commentsModalVisible} 
                 transparent={true} 
@@ -278,36 +216,14 @@ export default function FeaturedChef() {
                                         </Pressable>
                                     </View>
                                     
-                                    {/* SCROLLABLE COMMENTS SECTION */}
                                     <ScrollView 
                                         style={styles.commentsScrollView}
-                                        contentContainerStyle={styles.commentsContent}
                                         showsVerticalScrollIndicator={true}
-                                        bounces={true}
                                     >
-                                        {/* Comments from mockData */}
-                                        {selectedItem && chefReactionComments[selectedItem.id] && 
-                                            chefReactionComments[selectedItem.id].map((comment, index) => (
-                                                <View key={comment.id || index} style={styles.commentItem}>
-                                                    <View style={[styles.commentAvatar, { backgroundColor: '#E0F2FE' }]}>
-                                                        <Text style={styles.commentAvatarText}>{comment.initials}</Text>
-                                                    </View>
-                                                    <View style={styles.commentContent}>
-                                                        <Text style={[styles.commentAuthor, { color: theme.textPrimary }]}>{comment.author}</Text>
-                                                        <Text style={[styles.commentText, { color: theme.textSecondary }]}>{comment.text}</Text>
-                                                    </View>
-                                                </View>
-                                            ))
-                                        }
-
-                                        {/* Empty state when no comments */}
-                                        {selectedItem && (!chefReactionComments[selectedItem.id] || chefReactionComments[selectedItem.id].length === 0) && (
-                                            <View style={styles.emptyCommentsState}>
-                                                <Ionicons name="chatbubble-outline" size={fp(38)} color={theme.textTertiary} />
-                                                <Text style={[styles.emptyCommentsText, { color: theme.textSecondary }]}>No comments yet</Text>
-                                                <Text style={[styles.emptyCommentsSubtext, { color: theme.textTertiary }]}>Be the first to comment!</Text>
-                                            </View>
-                                        )}
+                                        <View style={styles.emptyCommentsState}>
+                                            <Ionicons name="chatbubble-outline" size={fp(38)} color={theme.textTertiary} />
+                                            <Text style={[styles.emptyCommentsText, { color: theme.textSecondary }]}>Comments coming soon</Text>
+                                        </View>
                                     </ScrollView>
 
                                     <View style={[styles.addCommentContainer, { backgroundColor: theme.cardBackground, borderTopColor: theme.border }]}>
@@ -380,6 +296,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.08,
         shadowRadius: wp(12),
         elevation: 3,
+        marginRight: wp(12),
     },
     reviewCardPressed: {
         opacity: 0.9,
@@ -457,9 +374,9 @@ const styles = StyleSheet.create({
         transform: [{ scale: 0.96 }],
     },
     glassBackground: {
-        backgroundColor: 'rgba(255, 255, 255, 0.18)',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.35)',
+        borderColor: 'rgba(59, 130, 246, 0.3)',
         borderRadius: wp(25),
     },
     moreCardContent: {
@@ -472,7 +389,7 @@ const styles = StyleSheet.create({
     moreCardText: {
         fontSize: fp(14),
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: '#3B82F6',
         letterSpacing: 0.3,
     },
     modalOverlay: {
@@ -503,38 +420,6 @@ const styles = StyleSheet.create({
         maxHeight: hp(350),
         paddingHorizontal: wp(20),
     },
-    commentsContent: {
-        paddingVertical: hp(12),
-    },
-    commentItem: {
-        flexDirection: 'row',
-        gap: wp(10),
-        marginBottom: hp(16),
-    },
-    commentAvatar: {
-        width: wp(32),
-        height: wp(32),
-        borderRadius: wp(16),
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    commentAvatarText: {
-        color: '#0284C7',
-        fontSize: fp(10),
-        fontWeight: '700',
-    },
-    commentContent: {
-        flex: 1,
-    },
-    commentAuthor: {
-        fontWeight: '600',
-        fontSize: fp(13),
-        marginBottom: hp(2),
-    },
-    commentText: {
-        fontSize: fp(13),
-        lineHeight: hp(18),
-    },
     emptyCommentsState: {
         alignItems: 'center',
         paddingVertical: hp(40),
@@ -542,10 +427,6 @@ const styles = StyleSheet.create({
     emptyCommentsText: {
         fontSize: fp(16),
         marginTop: hp(12),
-    },
-    emptyCommentsSubtext: {
-        fontSize: fp(13),
-        marginTop: hp(4),
     },
     addCommentContainer: {
         flexDirection: 'row',

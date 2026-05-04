@@ -6,7 +6,6 @@ import { wp, hp, fp, SPACING } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
 import DishDetailModal from '../components/posts/DishDetailModal';
 import RecipeCard from '../components/posts/RecipeCard';
-import { mockFavoriteRecipes } from '../data/mockData';
 
 const DIFFICULTIES = ['All', 'Easy', 'Medium', 'Hard'];
 
@@ -15,7 +14,7 @@ export default function FavoriteRecipes({ navigation }) {
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState('All');
-  const [favorites, setFavorites] = useState(mockFavoriteRecipes);
+  const [favorites, setFavorites] = useState([]);
   const [selectedDish, setSelectedDish] = useState(null);
   const [dishDetailModalVisible, setDishDetailModalVisible] = useState(false);
 

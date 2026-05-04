@@ -50,6 +50,15 @@ export const api = {
         return handleResponse(response);
     },
 
+    patch: async (endpoint, data, token = null) => {
+        const response = await fetch(getUrl(endpoint), {
+            method: 'PATCH',
+            headers: getHeaders(token),
+            body: JSON.stringify(data),
+        });
+        return handleResponse(response);
+    },
+
     delete: async (endpoint, token = null) => {
         const response = await fetch(getUrl(endpoint), {
             method: 'DELETE',

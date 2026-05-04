@@ -7,7 +7,6 @@ import { useTheme } from '../context/ThemeContext';
 import DishDetailModal from '../components/posts/DishDetailModal';
 import CommentsModal from '../components/posts/CommentsModal';
 import RecipeCard from '../components/posts/RecipeCard';
-import { mockMyRecipes, mockMyRecipesComments } from '../data/mockData';
 
 export default function MyPostsScreen({ navigation }) {
   const { theme } = useTheme();
@@ -17,7 +16,7 @@ export default function MyPostsScreen({ navigation }) {
   const [commentsModalVisible, setCommentsModalVisible] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
   const [newComment, setNewComment] = useState('');
-  const [myPosts, setMyPosts] = useState(mockMyRecipes);
+  const [myPosts, setMyPosts] = useState([]);
 
   const handleLike = (postId) => {
     setMyPosts(currentPosts => currentPosts.map(post => 
@@ -76,7 +75,7 @@ export default function MyPostsScreen({ navigation }) {
       <CommentsModal 
         visible={commentsModalVisible}
         onClose={() => setCommentsModalVisible(false)}
-        comments={selectedPost ? mockMyRecipesComments[selectedPost.id] : []}
+        comments={[]}
         newComment={newComment}
         onCommentChange={setNewComment}
         onAddComment={handleAddComment}

@@ -1,5 +1,7 @@
 import React, { createContext, useState, useContext, useCallback, useMemo, useEffect } from 'react';
 import { AuthContext } from './AuthContext';
+import { api } from '../services/api';
+import { ChefService } from '../services/ChefService';
 
 const NotificationsContext = createContext();
 
@@ -11,121 +13,156 @@ export const NOTIFICATION_TYPES = {
   CHEF_REVIEW_REQUEST: 'chef_review_request', // Claimable - for chefs only
 };
 
-// Sample notifications data
-const INITIAL_NOTIFICATIONS = [
-  {
-    id: 'notif_1',
-    type: NOTIFICATION_TYPES.NEW_FOLLOWER,
-    title: 'New Follower',
-    subtitle: 'Chef Maria started following you',
-    data: {
-      followerId: 'chef_maria',
-      followerName: 'Chef Maria',
-      followerAvatar: 'CM',
-    },
-    time: '2m ago',
-    unread: true,
-    read: false,
-    timestamp: Date.now() - 2 * 60 * 1000,
-  },
-  {
-    id: 'notif_2',
-    type: NOTIFICATION_TYPES.POST_LIKES,
-    title: 'Your post is getting attention!',
-    subtitle: 'Your Pasta Carbonara reached 10 likes',
-    data: {
-      postId: 'post_1',
-      postTitle: 'Pasta Carbonara',
-      likesCount: 10,
-    },
-    time: '1h ago',
-    unread: true,
-    read: false,
-    timestamp: Date.now() - 60 * 60 * 1000,
-  }
-];
-
-// Sample claimable review requests (for chefs only)
-const INITIAL_CHEF_NOTIFICATIONS = [
-  {
-    id: 'chef_notif_1',
-    type: NOTIFICATION_TYPES.CHEF_REVIEW_REQUEST,
-    title: 'Review Request',
-    subtitle: 'Maria wants your feedback on their dish',
-    data: {
-      requestId: 'req_1',
-      requesterName: 'Maria',
-      postTitle: 'Homemade Ramen Bowl',
-    },
-    time: '10m ago',
-    unread: true,
-    read: false,
-    timestamp: Date.now() - 10 * 60 * 1000,
-    claimedBy: null,
-  }
-];
-
 export function NotificationsProvider({ children }) {
-  const { user } = useContext(AuthContext);
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
-  const [chefNotifications, setChefNotifications] = useState(INITIAL_CHEF_NOTIFICATIONS);
+  const { user, token } = useContext(AuthContext);
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   // Derive if current user is chef from AuthContext
   const isChef = user?.isChef || false;
 
-  // Get all notifications based on user type
-  const allNotifications = useMemo(() => {
-    let combined = [...notifications];
-    if (isChef) {
-      combined = [...combined, ...chefNotifications];
+  const formatTime = (timestamp) => {
+    const now = new Date();
+    const then = new Date(timestamp);
+    const diffInSeconds = Math.floor((now - then) / 1000);
+
+    if (diffInSeconds < 60) return 'Just now';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    return `${Math.floor(diffInSeconds / 86400)}d ago`;
+  };
+
+  const refreshNotifications = useCallback(async () => {
+    if (!token) return;
+    try {
+      const data = await api.get('/notifications', token);
+      const backendNotifs = (data.notifications || []).map(n => ({
+        id: n.id,
+        type: n.type,
+        title: n.title,
+        subtitle: n.subtitle,
+        data: n.data,
+        unread: !n.is_read,
+        read: n.is_read,
+        timestamp: new Date(n.created_at).getTime(),
+        time: formatTime(n.created_at),
+        claimedBy: n.data?.claimedBy || null,
+      }));
+      setNotifications(backendNotifs);
+    } catch (error) {
+      console.error('[NotificationsContext:refreshNotifications] Failed:', error.message);
     }
-    return combined.sort((a, b) => b.timestamp - a.timestamp);
-  }, [isChef, notifications, chefNotifications]);
+  }, [token]);
+
+  // Initial load and polling
+  useEffect(() => {
+    refreshNotifications();
+    const interval = setInterval(refreshNotifications, 30000); // Poll every 30s
+    return () => clearInterval(interval);
+  }, [refreshNotifications]);
 
   // Get unread count
   const unreadCount = useMemo(() => {
-    return allNotifications.filter(n => n.unread && !n.claimedBy).length;
-  }, [allNotifications]);
+    return notifications.filter(n => n.unread).length;
+  }, [notifications]);
 
   // Mark notification as read
-  const markAsRead = useCallback((notificationId) => {
+  const markAsRead = useCallback(async (notificationId) => {
+    if (!token) return;
     try {
+      // Optimistic update
       setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, unread: false, read: true } : n));
-      setChefNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, unread: false, read: true } : n));
+      await api.patch(`/notifications/${notificationId}/read`, {}, token);
     } catch (error) {
-      console.error(`[NotificationsContext:markAsRead] Failed to mark read:`, error.message);
+      console.error(`[NotificationsContext:markAsRead] Failed:`, error.message);
+      refreshNotifications();
     }
-  }, []);
+  }, [token, refreshNotifications]);
 
   // Delete notification
-  const deleteNotification = useCallback((notificationId) => {
+  const deleteNotification = useCallback(async (notificationId) => {
+    if (!token) return;
     try {
       setNotifications(prev => prev.filter(n => n.id !== notificationId));
-      setChefNotifications(prev => prev.filter(n => n.id !== notificationId));
+      // Optionally add DELETE /notifications/:id to backend
     } catch (error) {
-      console.error(`[NotificationsContext:deleteNotification] Failed to delete:`, error.message);
+      console.error(`[NotificationsContext:deleteNotification] Failed:`, error.message);
     }
-  }, []);
+  }, [token]);
 
   // Claim a review request (for chefs)
-  const claimReviewRequest = useCallback((notificationId, chefId) => {
+  const claimReviewRequest = useCallback(async (notificationId, requestId) => {
+    if (!token || !isChef) return;
     try {
-      setChefNotifications(prev =>
-        prev.map(n => n.id === notificationId ? { ...n, claimedBy: chefId } : n)
+      // 1. Claim in backend
+      await ChefService.claimRequest(requestId, token);
+      
+      // 2. Mark notification as read and claimed locally
+      setNotifications(prev =>
+        prev.map(n => n.id === notificationId ? { ...n, unread: false, read: true, claimedBy: user.id } : n)
       );
+      
+      // 3. Mark read in backend
+      await api.patch(`/notifications/${notificationId}/read`, {}, token);
     } catch (error) {
-      console.error(`[NotificationsContext:claimReviewRequest] Failed to claim:`, error.message);
+      console.error(`[NotificationsContext:claimReviewRequest] Failed:`, error.message);
+      refreshNotifications();
+      throw error;
     }
-  }, []);
+  }, [token, isChef, user?.id, refreshNotifications]);
+
+  // Submit a chef review
+  const submitChefReview = useCallback(async (notificationId, requestId, postId, reviewText) => {
+    if (!token || !isChef) return;
+    try {
+      // 1. Post the review to backend
+      await ChefService.postReview({
+        post_id: postId,
+        reaction_text: reviewText,
+        request_id: requestId
+      }, token);
+
+      // 2. Mark notification as read (if not already)
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      
+      // 3. Optional: Mark read in backend if it wasn't
+      await api.patch(`/notifications/${notificationId}/read`, {}, token);
+    } catch (error) {
+      console.error(`[NotificationsContext:submitChefReview] Failed:`, error.message);
+      refreshNotifications();
+      throw error;
+    }
+  }, [token, isChef, refreshNotifications]);
+
+  // Cancel a claim (for Chefs who claimed but haven't reviewed yet)
+  const cancelReviewClaim = useCallback(async (notificationId) => {
+    // For now, this just refreshes notifications to sync with backend
+    // A more advanced version would call an unclaim endpoint
+    refreshNotifications();
+  }, [refreshNotifications]);
 
   const value = useMemo(() => ({
-    notifications: allNotifications,
+    notifications,
     unreadCount,
+    currentUser: user,
     markAsRead,
     deleteNotification,
     claimReviewRequest,
+    submitChefReview,
+    cancelReviewClaim,
+    refreshNotifications,
     NOTIFICATION_TYPES,
-  }), [allNotifications, unreadCount, markAsRead, deleteNotification, claimReviewRequest]);
+  }), [
+    notifications, 
+    unreadCount, 
+    user,
+    markAsRead, 
+    deleteNotification, 
+    claimReviewRequest, 
+    submitChefReview,
+    cancelReviewClaim,
+    refreshNotifications
+  ]);
 
   return (
     <NotificationsContext.Provider value={value}>

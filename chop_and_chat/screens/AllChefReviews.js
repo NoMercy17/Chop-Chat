@@ -4,7 +4,6 @@ import { wp, hp, fp } from '../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
-import { FOLLOWED_CHEF_IDS, chefReactionComments } from '../data/chefFeedData';
 import { useChefFeed } from '../context/ChefFeedContext'; 
 import DishDetailModal from '../components/posts/DishDetailModal'; 
 import CommentsModal from '../components/posts/CommentsModal';
@@ -28,7 +27,7 @@ export default function AllChefReviews({ navigation }) {
     const filteredItems = useMemo(() => {
         let items = selectedCategory === 'All' 
             ? feedItems 
-            : feedItems.filter(item => FOLLOWED_CHEF_IDS.includes(item.chef.id));
+            : feedItems.filter(item => false); // TODO: Implement real following filter
         
         return items.filter(item => {
             if (item.contentType === 'reaction') {
@@ -161,7 +160,7 @@ export default function AllChefReviews({ navigation }) {
             <CommentsModal 
                 visible={commentsModalVisible}
                 onClose={() => setCommentsModalVisible(false)}
-                comments={selectedPostForComments ? chefReactionComments[selectedPostForComments.id] : []}
+                comments={[]}
                 newComment={newComment}
                 onCommentChange={setNewComment}
                 onAddComment={submitComment}

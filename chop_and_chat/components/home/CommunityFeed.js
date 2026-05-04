@@ -1,31 +1,19 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Text, View, StyleSheet, ScrollView, Pressable, Modal, TextInput, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Image, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { usePosts } from '../../context/PostsContext';
-import { commentsData } from '../../data/postsData';
 import DishDetailModal from '../posts/DishDetailModal';
-
-// Helper function to randomly select n post IDs
-const getRandomPostIds = (posts, count) => {
-    if (!posts || posts.length === 0) return [];
-    const shuffled = [...posts].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, count).map(post => post.id);
-};
 
 export default function CommunityFeed() {
     const navigation = useNavigation();
     const { theme } = useTheme();
     const { posts: allPosts, handleLike, handleSave, updateCommentCount } = usePosts();
     
-    // Generate 2 random post IDs for quick menu display
-    // Added dependency on allPosts.length so it re-generates when posts are loaded
-    const randomPostIds = useMemo(() => getRandomPostIds(allPosts, 2), [allPosts.length]);
-    
-    // Get the actual posts from context based on random IDs
-    const posts = useMemo(() => allPosts.filter(post => randomPostIds.includes(post.id)), [allPosts, randomPostIds]);
+    // Show only the 2 most recent posts in the home screen feed
+    const posts = useMemo(() => allPosts.slice(0, 2), [allPosts]);
     
     const [commentsModalVisible, setCommentsModalVisible] = useState(false);
     const [selectedPost, setSelectedPost] = useState(null);
@@ -40,13 +28,10 @@ export default function CommunityFeed() {
 
     const handleAddComment = () => {
         if (newComment.trim() && selectedPost) {
+            // TODO: Wire to backend POST /comments
             updateCommentCount(selectedPost.id);
             setNewComment('');
         }
-    };
-
-    const getCommentsForPost = (postId) => {
-        return commentsData[postId] || [];
     };
 
     return (
@@ -103,9 +88,7 @@ export default function CommunityFeed() {
                                         e.stopPropagation();
                                         navigation.navigate('OtherUserProfile', {
                                             userId: post.authorId || post.id,
-                                            userName: post.author,
-                                            userAvatar: post.authorAvatar || null,
-                                            username: `@${post.author.replace(/\s+/g, '').toLowerCase()}`
+                                            userName: post.author
                                         });
                                     }}
                                     style={({pressed}) => pressed && {opacity: 0.7}}
@@ -160,7 +143,7 @@ export default function CommunityFeed() {
                     </Pressable>
                 )) : (
                     <View style={{alignItems: 'center', paddingVertical: hp(20)}}>
-                        <ActivityIndicator color={theme.primary} />
+                        <Text style={{ color: theme.textTertiary }}>No recent posts</Text>
                     </View>
                 )}
                 
@@ -215,27 +198,11 @@ export default function CommunityFeed() {
                                         style={{maxHeight: hp(300), padding: wp(20)}}
                                         showsVerticalScrollIndicator={false}
                                     >
-                                        {selectedPost && getCommentsForPost(selectedPost.id).map((comment) => (
-                                            <View key={comment.id} style={{marginBottom: hp(15), flexDirection:'row', gap: wp(10)}}>
-                                                <View style={{width: wp(30), height: wp(30), borderRadius: wp(15), backgroundColor: theme.primary, alignItems:'center', justifyContent:'center'}}>
-                                                    <Text style={{color: '#FFFFFF', fontSize: fp(10), fontWeight:'700'}}>{comment.initials}</Text>
-                                                </View>
-                                                <View style={{flex: 1}}>
-                                                    <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
-                                                        <Text style={{color: theme.textPrimary, fontWeight:'600', fontSize: fp(13)}}>{comment.author}</Text>
-                                                        <Text style={{color: theme.textTertiary, fontSize: fp(11)}}>{comment.timestamp}</Text>
-                                                    </View>
-                                                    <Text style={{color: theme.textSecondary, fontSize: fp(13), marginTop: hp(2)}}>{comment.text}</Text>
-                                                </View>
-                                            </View>
-                                        ))}
-                                        {selectedPost && getCommentsForPost(selectedPost.id).length === 0 && (
-                                            <View style={{alignItems: 'center', paddingVertical: hp(40)}}>
-                                                <Ionicons name="chatbubble-outline" size={fp(38)} color={theme.textTertiary} />
-                                                <Text style={{color: theme.textSecondary, fontSize: fp(16), marginTop: hp(12)}}>No comments yet</Text>
-                                                <Text style={{color: theme.textTertiary, fontSize: fp(13), marginTop: hp(4)}}>Be the first to comment!</Text>
-                                            </View>
-                                        )}
+                                        <View style={{alignItems: 'center', paddingVertical: hp(40)}}>
+                                            <Ionicons name="chatbubble-outline" size={fp(38)} color={theme.textTertiary} />
+                                            <Text style={{color: theme.textSecondary, fontSize: fp(16), marginTop: hp(12)}}>Comments coming soon</Text>
+                                            <Text style={{color: theme.textTertiary, fontSize: fp(13), marginTop: hp(4)}}>We're wiring up the live discussion!</Text>
+                                        </View>
                                     </ScrollView>
 
                                     <View style={[styles.addCommentContainer, { backgroundColor: theme.cardBackground, borderTopColor: theme.border }]}>

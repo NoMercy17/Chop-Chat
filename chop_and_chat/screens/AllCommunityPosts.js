@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
 import { wp, hp, fp } from '../utils/responsive';
-import { commentsData } from '../data/postsData';
-import { mockFollowedAuthors } from '../data/mockData';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
@@ -28,7 +26,7 @@ export default function AllCommunityPosts({ navigation }) {
     
     const filteredPosts = selectedCategory === 'All' 
         ? posts 
-        : posts.filter(post => mockFollowedAuthors.includes(post.author));
+        : posts.filter(post => false); // TODO: Implement real following filter
     
     const handleComment = (post) => {
         setSelectedPost(post);
@@ -121,7 +119,7 @@ export default function AllCommunityPosts({ navigation }) {
             <CommentsModal 
                 visible={commentsModalVisible}
                 onClose={() => setCommentsModalVisible(false)}
-                comments={selectedPost ? commentsData[selectedPost.id] : []}
+                comments={[]}
                 newComment={newComment}
                 onCommentChange={setNewComment}
                 onAddComment={handleAddComment}

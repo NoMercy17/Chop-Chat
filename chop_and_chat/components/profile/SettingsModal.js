@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, TextInput, Switch, Alert, TouchableWithoutFeedback, Modal } from 'react-native';
+import React, { useContext, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, TextInput, Switch, Alert, TouchableWithoutFeedback, Modal, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { wp, hp, fp } from '../../utils/responsive';
+import { AuthContext } from '../../context/AuthContext';
 import { api } from '../../services/api';
 
-export default function SettingsModal({ visible, onClose, user, token, theme, isDarkMode, toggleTheme, onSignOut, onBioUpdate }) {
+export default function SettingsModal({ visible, onClose, theme, isDarkMode, toggleTheme, onSignOut }) {
+  const { token } = useContext(AuthContext);
   const [activeSettingTab, setActiveSettingTab] = useState(null);
-  const [tempBio, setTempBio] = useState(user?.bio || "");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [notifications, setNotifications] = useState({
     recipeMatches: true,
     chefReviews: true,
@@ -17,18 +19,13 @@ export default function SettingsModal({ visible, onClose, user, token, theme, is
     newFollowers: false,
   });
 
-  const handleSaveBio = async () => {
-    try {
-      const data = await api.patch('/users/bio', { bio: tempBio }, token);
-      if (onBioUpdate) onBioUpdate(data.user.bio);
-      setActiveSettingTab(null);
-      Alert.alert("Success", "Bio updated successfully");
-    } catch (error) {
-      Alert.alert("Error", error.message || "Failed to update bio");
-    }
+  const resetPasswordFields = () => {
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
   };
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
       Alert.alert("Error", "Please fill in all fields");
       return;
@@ -37,12 +34,24 @@ export default function SettingsModal({ visible, onClose, user, token, theme, is
       Alert.alert("Error", "New passwords don't match");
       return;
     }
-    if (newPassword.length < 6) {
-      Alert.alert("Error", "Password must be at least 6 characters");
+    if (newPassword === currentPassword) {
+      Alert.alert("Error", "New password must be different from current");
       return;
     }
-    Alert.alert("Success", "Password changed successfully");
-    setActiveSettingTab(null);
+    try {
+      setIsChangingPassword(true);
+      await api.patch('/users/password', { currentPassword, newPassword }, token);
+      resetPasswordFields();
+      setActiveSettingTab(null);
+      Alert.alert("Success", "Password changed successfully");
+    } catch (error) {
+      const message = error.status === 401
+        ? "Current password is incorrect"
+        : (error.data?.error || "Failed to change password");
+      Alert.alert("Error", message);
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   const handleDeleteAccount = () => {
@@ -61,42 +70,12 @@ export default function SettingsModal({ visible, onClose, user, token, theme, is
   };
 
   const renderContent = () => {
-    if (activeSettingTab === 'bio') {
-      return (
-        <View style={styles.settingTabContent}>
-          <Text style={[styles.settingTabTitle, { color: theme.textPrimary }]}>Update Bio</Text>
-          <Text style={[styles.settingTabSubtitle, { color: theme.textSecondary }]}>Tell the community about yourself</Text>
-          
-          <TextInput
-            style={[styles.bioInput, { color: theme.textPrimary, backgroundColor: theme.inputBackground, borderColor: theme.border }]}
-            multiline
-            numberOfLines={4}
-            value={tempBio}
-            onChangeText={setTempBio}
-            maxLength={150}
-            placeholder="Write something about your culinary journey..."
-            placeholderTextColor={theme.textTertiary}
-          />
-          <Text style={[styles.charCount, { color: theme.textTertiary }]}>{tempBio.length}/150</Text>
-          
-          <View style={styles.settingTabButtons}>
-            <Pressable style={[styles.cancelBtn, { backgroundColor: theme.borderLight }]} onPress={() => setActiveSettingTab(null)}>
-              <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
-            </Pressable>
-            <Pressable style={[styles.saveBtn, { backgroundColor: theme.primary }]} onPress={handleSaveBio}>
-              <Text style={[styles.saveBtnText, { color: '#FFFFFF' }]}>Save</Text>
-            </Pressable>
-          </View>
-        </View>
-      );
-    }
-
     if (activeSettingTab === 'password') {
       return (
         <View style={styles.settingTabContent}>
           <Text style={[styles.settingTabTitle, { color: theme.textPrimary }]}>Change Password</Text>
           <Text style={[styles.settingTabSubtitle, { color: theme.textSecondary }]}>Keep your account secure</Text>
-          
+
           <TextInput
             style={[styles.passwordInput, { color: theme.textPrimary, backgroundColor: theme.inputBackground, borderColor: theme.border }]}
             secureTextEntry
@@ -115,19 +94,29 @@ export default function SettingsModal({ visible, onClose, user, token, theme, is
           />
           <TextInput
             style={[styles.passwordInput, { color: theme.textPrimary, backgroundColor: theme.inputBackground, borderColor: theme.border }]}
-            secureTypeEntry
+            secureTextEntry
             placeholder="Confirm New Password"
             placeholderTextColor={theme.textTertiary}
             value={confirmPassword}
             onChangeText={setConfirmPassword}
           />
-          
+
           <View style={styles.settingTabButtons}>
-            <Pressable style={[styles.cancelBtn, { backgroundColor: theme.borderLight }]} onPress={() => setActiveSettingTab(null)}>
+            <Pressable
+              style={[styles.cancelBtn, { backgroundColor: theme.borderLight }]}
+              onPress={() => { resetPasswordFields(); setActiveSettingTab(null); }}
+              disabled={isChangingPassword}
+            >
               <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
             </Pressable>
-            <Pressable style={[styles.saveBtn, { backgroundColor: theme.primary }]} onPress={handleChangePassword}>
-              <Text style={[styles.saveBtnText, { color: '#FFFFFF' }]}>Update</Text>
+            <Pressable
+              style={[styles.saveBtn, { backgroundColor: theme.primary, opacity: isChangingPassword ? 0.7 : 1 }]}
+              onPress={handleChangePassword}
+              disabled={isChangingPassword}
+            >
+              {isChangingPassword
+                ? <ActivityIndicator color="#FFFFFF" />
+                : <Text style={[styles.saveBtnText, { color: '#FFFFFF' }]}>Update</Text>}
             </Pressable>
           </View>
         </View>
@@ -139,15 +128,15 @@ export default function SettingsModal({ visible, onClose, user, token, theme, is
         <View style={styles.settingTabContent}>
           <Text style={[styles.settingTabTitle, { color: theme.textPrimary }]}>Notifications</Text>
           <Text style={[styles.settingTabSubtitle, { color: theme.textSecondary }]}>Choose what you want to be alerted about</Text>
-          
+
           <View style={styles.notificationsList}>
             {['recipeMatches', 'chefReviews', 'likesComments'].map((key) => (
               <View key={key} style={[styles.notificationItem, { backgroundColor: theme.inputBackground }]}>
                 <View style={styles.notificationInfo}>
-                  <Ionicons 
-                    name={key === 'recipeMatches' ? "restaurant-outline" : key === 'chefReviews' ? "star-outline" : "heart-outline"} 
-                    size={fp(20)} 
-                    color={theme.primary} 
+                  <Ionicons
+                    name={key === 'recipeMatches' ? "restaurant-outline" : key === 'chefReviews' ? "star-outline" : "heart-outline"}
+                    size={fp(20)}
+                    color={theme.primary}
                   />
                   <Text style={[styles.notificationLabel, { color: theme.textPrimary }]}>
                     {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
@@ -162,8 +151,8 @@ export default function SettingsModal({ visible, onClose, user, token, theme, is
               </View>
             ))}
           </View>
-          
-          <Pressable 
+
+          <Pressable
             style={styles.backToSettingsBtn}
             onPress={() => setActiveSettingTab(null)}
           >
@@ -182,16 +171,6 @@ export default function SettingsModal({ visible, onClose, user, token, theme, is
         </View>
 
         <View style={styles.settingsOptions}>
-          <Pressable style={styles.settingsOption} onPress={() => { setTempBio(user?.bio || ""); setActiveSettingTab('bio'); }}>
-            <View style={styles.settingsOptionLeft}>
-              <View style={[styles.settingsIconContainer, { backgroundColor: isDarkMode ? theme.primaryLighter : theme.primaryLightest }]}>
-                <Ionicons name="pencil-outline" size={fp(20)} color={theme.primary} />
-              </View>
-              <Text style={[styles.settingsOptionTitle, { color: theme.textPrimary }]}>Update Bio</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={fp(20)} color={theme.textTertiary} />
-          </Pressable>
-
           <Pressable style={styles.settingsOption} onPress={() => setActiveSettingTab('password')}>
             <View style={styles.settingsOptionLeft}>
               <View style={[styles.settingsIconContainer, { backgroundColor: isDarkMode ? theme.warningLight : '#FEF3C7' }]}>
@@ -209,8 +188,8 @@ export default function SettingsModal({ visible, onClose, user, token, theme, is
               </View>
               <Text style={[styles.settingsOptionTitle, { color: theme.textPrimary }]}>Dark Mode</Text>
             </View>
-            <Switch 
-                value={isDarkMode} 
+            <Switch
+                value={isDarkMode}
                 onValueChange={toggleTheme}
                 trackColor={{ false: theme.switchTrackOff, true: theme.switchTrackOn }}
                 thumbColor={isDarkMode ? theme.switchThumbOn : theme.switchThumbOff}
@@ -266,8 +245,6 @@ const styles = StyleSheet.create({
   settingTabContent: { padding: wp(24) },
   settingTabTitle: { fontSize: fp(20), fontWeight: '700' },
   settingTabSubtitle: { fontSize: fp(14), marginBottom: hp(16) },
-  bioInput: { borderRadius: wp(8), padding: wp(12), minHeight: hp(100), textAlignVertical: 'top', borderWidth: 1 },
-  charCount: { textAlign: 'right', fontSize: fp(12), marginTop: hp(4) },
   passwordInput: { borderRadius: wp(8), padding: wp(12), borderWidth: 1, marginBottom: hp(12) },
   settingTabButtons: { flexDirection: 'row', gap: wp(12), marginTop: hp(16) },
   cancelBtn: { flex: 1, padding: hp(12), alignItems: 'center', borderRadius: wp(8) },

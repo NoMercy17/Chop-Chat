@@ -5,7 +5,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from "../context/ThemeContext";
 import { useFollow } from "../context/FollowContext";
 import { wp, hp, fp } from "../utils/responsive";
-import { getPostsByAuthor, getFollowersForUser, getFollowingForUser, getUserById } from "../data/mockData";
 import DishDetailModal from "../components/posts/DishDetailModal";
 import RecipeCard from "../components/posts/RecipeCard";
 
@@ -15,10 +14,10 @@ export default function OtherUserProfileScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   
   const { userId, userName, userAvatar } = route.params || {};
-  const fullUserData = useMemo(() => getUserById(userId), [userId]);
-  const userRecipes = useMemo(() => getPostsByAuthor(userName), [userName]);
-  const userFollowers = useMemo(() => getFollowersForUser(userId), [userId]);
-  const userFollowing = useMemo(() => getFollowingForUser(userId), [userId]);
+  const fullUserData = useMemo(() => ({ bio: 'Food Enthusiast', isChef: false }), []);
+  const userRecipes = useMemo(() => [], []);
+  const userFollowers = useMemo(() => [], []);
+  const userFollowing = useMemo(() => [], []);
 
   const [followerAdjustment, setFollowerAdjustment] = useState(0);
   const [dishDetailModalVisible, setDishDetailModalVisible] = useState(false);
