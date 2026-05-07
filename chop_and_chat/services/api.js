@@ -92,13 +92,10 @@ async function handleResponse(response) {
     }
 
     if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-            const errStr = data?.error || '';
-            if (errStr.includes('invalid token') || errStr.includes('missing token') || errStr.includes('malformed token')) {
-                console.warn('[api.js] Invalid token detected. Clearing session.');
-                await AsyncStorage.removeItem('session_user');
-                DeviceEventEmitter.emit('auth_error_logout');
-            }
+        if (response.status === 401) {
+            console.warn('[api.js] 401 received. Clearing session.');
+            await AsyncStorage.removeItem('session_user');
+            DeviceEventEmitter.emit('auth_error_logout');
         }
 
         const error = new Error(data.message || data.error || 'API request failed');

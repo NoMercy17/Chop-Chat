@@ -3,6 +3,22 @@ const router = express.Router();
 const pool = require('../db');
 const { authenticateToken, requireChef } = require('../middleware');
 
+function relativeTime(date) {
+  const s = Math.floor((Date.now() - new Date(date)) / 1000);
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+function initials(name) {
+  const parts = (name || '').trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return (name || '').substring(0, 2).toUpperCase();
+}
+
 // User requests a review for a post
 router.post('/review-request', authenticateToken, async (req, res) => {
   try {
@@ -119,9 +135,10 @@ router.post('/reviews', authenticateToken, requireChef, async (req, res) => {
     }
 
     if (request_id) {
+      // Also pin to post_id so a chef can't accidentally mark an unrelated claimed request completed.
       await pool.query(
-        "UPDATE chef_review_requests SET status = 'completed', updated_at = now() WHERE id = $1 AND claimed_by = $2",
-        [request_id, chef_id]
+        "UPDATE chef_review_requests SET status = 'completed', updated_at = now() WHERE id = $1 AND claimed_by = $2 AND post_id = $3",
+        [request_id, chef_id, post_id]
       );
     }
 
@@ -208,6 +225,79 @@ router.get('/feed', authenticateToken, async (req, res) => {
     }));
 
     res.json({ feedItems });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// GET comments for a chef reaction
+router.get('/:id/comments', authenticateToken, async (req, res) => {
+  try {
+    const reactionId = parseInt(req.params.id, 10);
+    if (Number.isNaN(reactionId)) return res.status(400).json({ error: 'invalid reaction id' });
+
+    const { rows } = await pool.query(
+      `SELECT c.id, u.id as author_id, u.name as author, c.comment_text as text, c.created_at
+       FROM comments c JOIN users u ON c.user_id = u.id
+       WHERE c.chef_reaction_id = $1 ORDER BY c.created_at ASC`,
+      [reactionId]
+    );
+
+    res.json({
+      comments: rows.map(r => ({
+        id: r.id,
+        authorId: r.author_id,
+        author: r.author,
+        initials: initials(r.author),
+        text: r.text,
+        timestamp: relativeTime(r.created_at),
+      }))
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// POST a comment on a chef reaction
+router.post('/:id/comments', authenticateToken, async (req, res) => {
+  try {
+    const reactionId = parseInt(req.params.id, 10);
+    if (Number.isNaN(reactionId)) return res.status(400).json({ error: 'invalid reaction id' });
+    const text = req.body.text?.trim();
+    if (!text) return res.status(400).json({ error: 'text is required' });
+
+    const rxCheck = await pool.query('SELECT chef_id FROM chef_reactions WHERE id = $1', [reactionId]);
+    if (!rxCheck.rows.length) return res.status(404).json({ error: 'reaction not found' });
+
+    const { rows } = await pool.query(
+      'INSERT INTO comments (chef_reaction_id, user_id, comment_text) VALUES ($1, $2, $3) RETURNING id, created_at',
+      [reactionId, req.user.id, text]
+    );
+    const row = rows[0];
+    const commenterName = req.user.name || 'Someone';
+
+    const chefId = rxCheck.rows[0].chef_id;
+    if (chefId !== req.user.id) {
+      await pool.query(
+        'INSERT INTO notifications (user_id, type, title, subtitle, data) VALUES ($1, $2, $3, $4, $5)',
+        [chefId, 'comment_on_post', 'New Comment',
+         `${commenterName} commented on your review`,
+         JSON.stringify({ chefReactionId: reactionId, commentId: row.id, commenterId: req.user.id, commenterName, commentText: text })]
+      );
+    }
+
+    res.status(201).json({
+      comment: {
+        id: row.id,
+        authorId: req.user.id,
+        author: commenterName,
+        initials: initials(commenterName),
+        text,
+        timestamp: 'just now',
+      }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'server error' });

@@ -1,18 +1,33 @@
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = process.env.JWT_SECRET || 'change_me';
+const pool = require('./db');
+const JWT_SECRET = process.env.JWT_SECRET;
 
-// REASONING: Reusable middleware to protect routes with JWT
-function authenticateToken(req, res, next) {
+// Verifies the JWT signature AND confirms the user still exists in the DB.
+// Returning 'invalid token' on a missing user reuses the string api.js already
+// checks for, which fires the auth_error_logout event and clears the local session.
+async function authenticateToken(req, res, next) {
   const auth = req.headers['authorization'];
   if (!auth) return res.status(401).json({ error: 'missing token' });
   const token = auth.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'malformed token' });
-  
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ error: 'invalid token' });
-    req.user = user;
-    next();
-  });
+
+  let payload;
+  try {
+    payload = jwt.verify(token, JWT_SECRET);
+  } catch {
+    return res.status(403).json({ error: 'invalid token' });
+  }
+
+  try {
+    const { rows } = await pool.query('SELECT id FROM users WHERE id = $1', [payload.id]);
+    if (!rows.length) return res.status(401).json({ error: 'invalid token' });
+  } catch (err) {
+    console.error('[authenticateToken] DB check failed:', err.message);
+    return res.status(500).json({ error: 'server error' });
+  }
+
+  req.user = payload;
+  next();
 }
 
 // REASONING: Reusable middleware to protect chef-only endpoints

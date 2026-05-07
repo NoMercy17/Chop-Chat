@@ -27,6 +27,7 @@ export default function ProfileScreen({ navigation }) {
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [userListVisible, setUserListVisible] = useState(false);
   const [userListType, setUserListType] = useState('followers');
+  const [userListData, setUserListData] = useState([]);
   const [imageSourceModalVisible, setImageSourceModalVisible] = useState(false);
   const [cameraModalVisible, setCameraModalVisible] = useState(false);
   const [followersCount, setFollowersCount] = useState(0);
@@ -57,6 +58,22 @@ export default function ProfileScreen({ navigation }) {
       }
     }
   }, [token, signOut]);
+
+  const openUserList = useCallback(async (type) => {
+    setUserListType(type);
+    setUserListData([]);
+    setUserListVisible(true);
+    try {
+      const endpoint = type === 'followers'
+        ? `/users/${user.id}/followers`
+        : `/users/${user.id}/following`;
+      const data = await api.get(endpoint, token);
+      const list = type === 'followers' ? (data.followers || []) : (data.following || []);
+      setUserListData(list);
+    } catch (error) {
+      console.error('[ProfileScreen] fetchUserList:', error.message);
+    }
+  }, [user?.id, token]);
 
   // Pull the real follower count for the signed-in user; new accounts come back as 0.
   const loadFollowerStats = useCallback(async () => {
@@ -123,8 +140,8 @@ export default function ProfileScreen({ navigation }) {
         followingCount={myFollowingCount}
         theme={theme}
         onRecipesPress={() => navigation.navigate("MyRecipes")}
-        onFollowersPress={() => { setUserListType('followers'); setUserListVisible(true); }}
-        onFollowingPress={() => { setUserListType('following'); setUserListVisible(true); }}
+        onFollowersPress={() => openUserList('followers')}
+        onFollowingPress={() => openUserList('following')}
       />
 
       <View style={[styles.menuContainer, { backgroundColor: theme.cardBackground }]}>
@@ -156,13 +173,34 @@ export default function ProfileScreen({ navigation }) {
         onSignOut={signOut}
       />
 
-      <UserListModal 
+      <UserListModal
         visible={userListVisible}
         onClose={() => setUserListVisible(false)}
         type={userListType}
-        data={[]}
+        data={userListData}
         navigation={navigation}
         theme={theme}
+        onRemoveFollower={async (userId) => {
+          setUserListData(prev => prev.filter(u => u.id !== userId));
+          setFollowersCount(prev => Math.max(0, prev - 1));
+          try {
+            await api.delete(`/users/${userId}/follower`, token);
+          } catch (error) {
+            console.error('[ProfileScreen] removeFollower:', error.message);
+            openUserList('followers');
+            setFollowersCount(prev => prev + 1);
+          }
+        }}
+        onUnfollow={async (userId) => {
+          setUserListData(prev => prev.filter(u => u.id !== userId));
+          try {
+            await api.delete(`/users/${userId}/follow`, token);
+            refreshMyFollows();
+          } catch (error) {
+            console.error('[ProfileScreen] unfollow:', error.message);
+            openUserList('following');
+          }
+        }}
       />
 
       <Modal visible={imageSourceModalVisible} transparent animationType="slide" onRequestClose={() => setImageSourceModalVisible(false)}>

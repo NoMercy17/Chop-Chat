@@ -1,25 +1,31 @@
-import { useMemo, useState } from 'react';
-import { Text, View, StyleSheet, ScrollView, Pressable, Modal, TouchableWithoutFeedback, KeyboardAvoidingView, Platform, TextInput } from 'react-native';
+import { useMemo, useState, useContext, useCallback } from 'react';
+import { Text, View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { useChefFeed } from '../../context/ChefFeedContext';
+import { AuthContext } from '../../context/AuthContext';
+import { api } from '../../services/api';
 import ChefPostDetailModal from '../posts/ChefPostDetailModal';
 import DishDetailModal from '../posts/DishDetailModal';
+import CommentsModal from '../posts/CommentsModal';
 
 export default function FeaturedChef() {
     const navigation = useNavigation();
     const { theme } = useTheme();
     
-    const { feedItems, handleLike, handleSave, updateCommentCount } = useChefFeed();
-    
+    const { token } = useContext(AuthContext);
+    const { feedItems, handleLike, handleSave, addComment } = useChefFeed();
+
     const [chefPostDetailVisible, setChefPostDetailVisible] = useState(false);
     const [dishDetailModalVisible, setDishDetailModalVisible] = useState(false);
     const [commentsModalVisible, setCommentsModalVisible] = useState(false);
-    
+
     const [selectedItemId, setSelectedItemId] = useState(null);
     const [selectedDish, setSelectedDish] = useState(null);
+    const [comments, setComments] = useState([]);
+    const [commentsLoading, setCommentsLoading] = useState(false);
     const [newComment, setNewComment] = useState('');
 
     // Derive the selected item from context based on ID
@@ -33,23 +39,32 @@ export default function FeaturedChef() {
 
     // --- HANDLERS ---
 
-    const handleOpenComments = (item) => {
+    const handleOpenComments = useCallback(async (item) => {
         setChefPostDetailVisible(false);
-        setTimeout(() => {
-            setCommentsModalVisible(true);
-        }, 200);
-    };
-
-    const submitComment = () => {
-        if (newComment.trim() && selectedItemId) {
-            // TODO: wire to backend POST /comments
-            updateCommentCount(selectedItemId);
-            setNewComment('');
+        setComments([]);
+        setCommentsLoading(true);
+        setTimeout(() => setCommentsModalVisible(true), 200);
+        try {
+            const data = await api.get(`/chef/${item.id}/comments`, token);
+            setComments(data?.comments || []);
+        } catch (error) {
+            console.error('[FeaturedChef] fetchComments:', error.message);
+        } finally {
+            setCommentsLoading(false);
         }
-    };
+    }, [token]);
+
+    const submitComment = useCallback(async () => {
+        const text = newComment.trim();
+        if (!text || !selectedItemId) return;
+        setNewComment('');
+        const comment = await addComment(selectedItemId, text);
+        if (comment) setComments(curr => [...curr, comment]);
+    }, [newComment, selectedItemId, addComment]);
 
     const handleCloseComments = () => {
         setCommentsModalVisible(false);
+        setComments([]);
         setNewComment('');
     };
 
@@ -195,58 +210,20 @@ export default function FeaturedChef() {
                 dish={selectedDish}
             />
 
-            <Modal 
-                visible={commentsModalVisible} 
-                transparent={true} 
-                animationType="slide"
-                onRequestClose={handleCloseComments}
-            >
-                <TouchableWithoutFeedback onPress={handleCloseComments}>
-                    <View style={styles.modalOverlay}>
-                        <KeyboardAvoidingView 
-                            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                            style={{ width: '100%' }}
-                        >
-                            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-                                <View style={[styles.modalContainer, { backgroundColor: theme.modalBackground }]}>
-                                    <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
-                                        <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Comments</Text>
-                                        <Pressable onPress={handleCloseComments}>
-                                            <Text style={{color: theme.primary, fontWeight:'600'}}>Close</Text>
-                                        </Pressable>
-                                    </View>
-                                    
-                                    <ScrollView 
-                                        style={styles.commentsScrollView}
-                                        showsVerticalScrollIndicator={true}
-                                    >
-                                        <View style={styles.emptyCommentsState}>
-                                            <Ionicons name="chatbubble-outline" size={fp(38)} color={theme.textTertiary} />
-                                            <Text style={[styles.emptyCommentsText, { color: theme.textSecondary }]}>Comments coming soon</Text>
-                                        </View>
-                                    </ScrollView>
-
-                                    <View style={[styles.addCommentContainer, { backgroundColor: theme.cardBackground, borderTopColor: theme.border }]}>
-                                        <TextInput
-                                            style={[styles.commentInput, { backgroundColor: theme.inputBackground, color: theme.textPrimary }]}
-                                            placeholder="Write a comment..."
-                                            placeholderTextColor={theme.textTertiary}
-                                            value={newComment}
-                                            onChangeText={setNewComment}
-                                        />
-                                        <Pressable 
-                                            onPress={submitComment}
-                                            style={{padding: 8, backgroundColor: theme.primary, borderRadius: 20}}
-                                        >
-                                            <Ionicons name="send" size={16} color="white" />
-                                        </Pressable>
-                                    </View>
-                                </View>
-                            </TouchableWithoutFeedback>
-                        </KeyboardAvoidingView>
-                    </View>
-                </TouchableWithoutFeedback>
-            </Modal>
+            <CommentsModal
+                visible={commentsModalVisible}
+                onClose={handleCloseComments}
+                comments={comments}
+                loading={commentsLoading}
+                newComment={newComment}
+                onCommentChange={setNewComment}
+                onAddComment={submitComment}
+                onAuthorPress={(comment) => {
+                    handleCloseComments();
+                    navigation.navigate('OtherUserProfile', { userId: comment.authorId, userName: comment.author });
+                }}
+                theme={theme}
+            />
         </View>
     );
 }
@@ -391,56 +368,5 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#3B82F6',
         letterSpacing: 0.3,
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'flex-end',
-    },
-    modalContainer: {
-        backgroundColor: '#F8FAFB',
-        borderTopLeftRadius: wp(24),
-        borderTopRightRadius: wp(24),
-        paddingTop: hp(20),
-        paddingBottom: hp(30),
-        maxHeight: '80%',
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingHorizontal: wp(20),
-        paddingBottom: hp(16),
-        borderBottomWidth: 1,
-    },
-    modalTitle: {
-        fontSize: fp(18),
-        fontWeight: '700',
-    },
-    commentsScrollView: {
-        maxHeight: hp(350),
-        paddingHorizontal: wp(20),
-    },
-    emptyCommentsState: {
-        alignItems: 'center',
-        paddingVertical: hp(40),
-    },
-    emptyCommentsText: {
-        fontSize: fp(16),
-        marginTop: hp(12),
-    },
-    addCommentContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: wp(20),
-        paddingTop: hp(16),
-        borderTopWidth: 1,
-        gap: wp(12),
-    },
-    commentInput: {
-        flex: 1,
-        borderRadius: wp(20),
-        paddingHorizontal: wp(16),
-        paddingVertical: hp(10),
-        fontSize: fp(14),
     },
 });

@@ -89,6 +89,14 @@ router.post('/:id/follow', authenticateToken, async (req, res) => {
       'INSERT INTO follows (follower_id, following_id) VALUES ($1, $2) RETURNING id, follower_id, following_id, created_at',
       [req.user.id, targetId]
     );
+    // Notify the followed user
+    const followerName = req.user.name || 'Someone';
+    await pool.query(
+      'INSERT INTO notifications (user_id, type, title, subtitle, data) VALUES ($1, $2, $3, $4, $5)',
+      [targetId, 'new_follower', 'New Follower',
+       `${followerName} started following you`,
+       JSON.stringify({ followerId: req.user.id, followerName })]
+    );
     res.status(201).json({ follow: rows[0] });
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'already following' });
@@ -110,6 +118,24 @@ router.delete('/:id/follow', authenticateToken, async (req, res) => {
       [req.user.id, targetId]
     );
     if (!rowCount) return res.status(404).json({ error: 'not following' });
+    res.status(204).send();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// Remove a follower (the authenticated user removes :id from their followers)
+router.delete('/:id/follower', authenticateToken, async (req, res) => {
+  try {
+    const followerId = parseInt(req.params.id, 10);
+    if (Number.isNaN(followerId)) return res.status(400).json({ error: 'invalid user id' });
+
+    const { rowCount } = await pool.query(
+      'DELETE FROM follows WHERE follower_id = $1 AND following_id = $2',
+      [followerId, req.user.id]
+    );
+    if (!rowCount) return res.status(404).json({ error: 'not a follower' });
     res.status(204).send();
   } catch (err) {
     console.error(err);

@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo, useContext, useCallback, useRef } from "react";
 import { View, Text, ScrollView, Pressable, Image, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from "../context/ThemeContext";
 import { useFollow } from "../context/FollowContext";
 import { wp, hp, fp } from "../utils/responsive";
@@ -10,26 +11,42 @@ import RecipeCard from "../components/posts/RecipeCard";
 
 export default function OtherUserProfileScreen({ navigation, route }) {
   const { theme, isDarkMode } = useTheme();
-  const { isFollowingUser, toggleFollow } = useFollow();
+  const { isFollowingUser, toggleFollow, getFollowersCount, getFollowingCount } = useFollow();
   const insets = useSafeAreaInsets();
-  
-  const { userId, userName, userAvatar } = route.params || {};
-  const fullUserData = useMemo(() => ({ bio: 'Food Enthusiast', isChef: false }), []);
-  const userRecipes = useMemo(() => [], []);
-  const userFollowers = useMemo(() => [], []);
-  const userFollowing = useMemo(() => [], []);
 
-  const [followerAdjustment, setFollowerAdjustment] = useState(0);
+  const { userId, userName, userAvatar } = route.params || {};
+  const userRecipes = useMemo(() => [], []);
+
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
   const [dishDetailModalVisible, setDishDetailModalVisible] = useState(false);
   const [selectedDish, setSelectedDish] = useState(null);
 
   const isFollowing = isFollowingUser(userId);
-  const userBio = fullUserData?.bio || (fullUserData?.isChef ? 'Professional Chef' : 'Food Enthusiast');
+  const followInFlight = useRef(false);
+
+  const loadCounts = useCallback(async () => {
+    if (!userId) return;
+    const [followers, following] = await Promise.all([
+      getFollowersCount(userId),
+      getFollowingCount(userId),
+    ]);
+    setFollowerCount(followers);
+    setFollowingCount(following);
+  }, [userId, getFollowersCount, getFollowingCount]);
+
+  useFocusEffect(useCallback(() => { loadCounts(); }, [loadCounts]));
 
   const handleFollow = () => {
+    if (followInFlight.current) return;
+    followInFlight.current = true;
     const nowFollowing = toggleFollow(userId);
-    setFollowerAdjustment(prev => nowFollowing ? prev + 1 : prev - 1);
+    setFollowerCount(prev => nowFollowing ? prev + 1 : Math.max(0, prev - 1));
+    // Release after FollowContext's async mutation settles
+    setTimeout(() => { followInFlight.current = false; }, 800);
   };
+
+  const userBio = 'Food Enthusiast';
 
   const getInitials = (name) => {
     if (!name) return 'U';
@@ -69,12 +86,12 @@ export default function OtherUserProfileScreen({ navigation, route }) {
         </View>
         <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
         <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: theme.textPrimary }]}>{userFollowers.length + followerAdjustment}</Text>
+          <Text style={[styles.statValue, { color: theme.textPrimary }]}>{followerCount}</Text>
           <Text style={[styles.statText, { color: theme.textSecondary }]}>Followers</Text>
         </View>
         <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
         <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: theme.textPrimary }]}>{userFollowing.length}</Text>
+          <Text style={[styles.statValue, { color: theme.textPrimary }]}>{followingCount}</Text>
           <Text style={[styles.statText, { color: theme.textSecondary }]}>Following</Text>
         </View>
       </View>

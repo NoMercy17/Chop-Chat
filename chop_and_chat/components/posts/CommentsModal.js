@@ -1,19 +1,21 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Modal, TextInput, KeyboardAvoidingView, Platform, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Modal, TextInput, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { wp, hp, fp } from '../../utils/responsive';
 
 /**
  * A reusable comments modal for both Chef Reviews and Community Posts.
  */
-export default function CommentsModal({ 
-  visible, 
-  onClose, 
-  comments, 
-  newComment, 
-  onCommentChange, 
-  onAddComment, 
-  theme 
+export default function CommentsModal({
+  visible,
+  onClose,
+  comments,
+  loading,
+  newComment,
+  onCommentChange,
+  onAddComment,
+  onAuthorPress,
+  theme
 }) {
   return (
     <Modal 
@@ -40,29 +42,38 @@ export default function CommentsModal({
                   </Pressable>
                 </View>
                 
-                <ScrollView 
+                <ScrollView
                   style={styles.commentsScrollView}
                   contentContainerStyle={styles.commentsContent}
                   showsVerticalScrollIndicator={true}
                 >
-                  {comments && comments.map((comment, index) => (
-                    <View key={comment.id || index} style={styles.commentItem}>
-                      <View style={[styles.commentAvatar, { backgroundColor: theme.primary }]}>
-                        <Text style={styles.commentAvatarText}>{comment.initials}</Text>
-                      </View>
-                      <View style={styles.commentInfo}>
-                        <View style={styles.commentHeader}>
-                          <Text style={[styles.commentAuthor, { color: theme.textPrimary }]}>{comment.author}</Text>
-                          {comment.timestamp && (
-                            <Text style={[styles.commentTimestamp, { color: theme.textTertiary }]}>{comment.timestamp}</Text>
-                          )}
-                        </View>
-                        <Text style={[styles.commentText, { color: theme.textSecondary }]}>{comment.text}</Text>
-                      </View>
+                  {loading ? (
+                    <View style={styles.emptyContainer}>
+                      <ActivityIndicator size="small" color={theme.primary} />
                     </View>
-                  ))}
-                  
-                  {(!comments || comments.length === 0) && (
+                  ) : comments && comments.length > 0 ? (
+                    comments.map((comment, index) => (
+                      <View key={comment.id || index} style={styles.commentItem}>
+                        <Pressable
+                          style={({ pressed }) => [styles.commentAvatar, { backgroundColor: theme.primary }, pressed && !!comment.authorId && { opacity: 0.7 }]}
+                          onPress={() => comment.authorId && onAuthorPress?.(comment)}
+                        >
+                          <Text style={styles.commentAvatarText}>{comment.initials}</Text>
+                        </Pressable>
+                        <View style={styles.commentInfo}>
+                          <View style={styles.commentHeader}>
+                            <Pressable onPress={() => comment.authorId && onAuthorPress?.(comment)}>
+                              <Text style={[styles.commentAuthor, { color: theme.textPrimary }]}>{comment.author}</Text>
+                            </Pressable>
+                            {comment.timestamp && (
+                              <Text style={[styles.commentTimestamp, { color: theme.textTertiary }]}>{comment.timestamp}</Text>
+                            )}
+                          </View>
+                          <Text style={[styles.commentText, { color: theme.textSecondary }]}>{comment.text}</Text>
+                        </View>
+                      </View>
+                    ))
+                  ) : (
                     <View style={styles.emptyContainer}>
                       <Ionicons name="chatbubble-outline" size={fp(38)} color={theme.textTertiary} />
                       <Text style={[styles.emptyTitle, { color: theme.textSecondary }]}>No comments yet</Text>

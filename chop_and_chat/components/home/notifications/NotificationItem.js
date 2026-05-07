@@ -22,6 +22,8 @@ export default function NotificationItem({
                 return 'star';
             case NOTIFICATION_TYPES.CHEF_REVIEW_REQUEST:
                 return 'restaurant';
+            case NOTIFICATION_TYPES.COMMENT_ON_POST:
+                return 'chatbubble';
             default:
                 return 'notifications';
         }
@@ -38,6 +40,8 @@ export default function NotificationItem({
                 return '#F59E0B';
             case NOTIFICATION_TYPES.CHEF_REVIEW_REQUEST:
                 return '#10B981';
+            case NOTIFICATION_TYPES.COMMENT_ON_POST:
+                return '#8B5CF6';
             default:
                 return theme.primary;
         }

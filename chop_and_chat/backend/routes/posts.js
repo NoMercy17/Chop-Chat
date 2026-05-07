@@ -3,6 +3,22 @@ const router = express.Router();
 const pool = require('../db');
 const { authenticateToken } = require('../middleware');
 
+function relativeTime(date) {
+  const s = Math.floor((Date.now() - new Date(date)) / 1000);
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+function initials(name) {
+  const parts = (name || '').trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return (name || '').substring(0, 2).toUpperCase();
+}
+
 // GET all posts for the community feed (EXCLUDES global reference recipes)
 router.get('/', authenticateToken, async (req, res) => {
   try {
@@ -110,6 +126,50 @@ router.get('/search', authenticateToken, async (req, res) => {
   }
 });
 
+// GET posts saved by the current user (Favorites)
+router.get('/saved', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { rows } = await pool.query(`
+      SELECT
+        p.id, p.title, p.description, p.image_url, p.ingredients, p.instructions,
+        p.utensils, p.cook_time, p.difficulty, p.is_global, p.created_at,
+        u.name  AS author,
+        u.id    AS author_id,
+        (SELECT COUNT(*) FROM post_likes  WHERE post_id = p.id)                  AS likes,
+        (SELECT COUNT(*) FROM comments    WHERE post_id = p.id)                  AS comments,
+        EXISTS (SELECT 1 FROM post_likes  WHERE post_id = p.id AND user_id = $1) AS liked,
+        sp.created_at AS saved_at
+      FROM saved_posts sp
+      JOIN posts p ON p.id = sp.post_id
+      JOIN users u ON u.id = p.user_id
+      WHERE sp.user_id = $1
+      ORDER BY sp.created_at DESC
+    `, [userId]);
+
+    res.json(rows.map(r => ({
+      id: r.id,
+      author: r.author,
+      authorId: r.author_id,
+      title: r.title,
+      description: r.description,
+      image: r.image_url,
+      ingredients: r.ingredients,
+      instructions: r.instructions,
+      utensils: r.utensils,
+      cookTime: r.cook_time,
+      difficulty: r.difficulty,
+      likes: parseInt(r.likes),
+      comments: parseInt(r.comments),
+      liked: r.liked,
+      saved: true,
+    })));
+  } catch (err) {
+    console.error('[GET /saved]', err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
 // GET single post detail
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
@@ -177,9 +237,33 @@ router.post('/like', authenticateToken, async (req, res) => {
         'INSERT INTO post_likes (user_id, post_id, chef_reaction_id) VALUES ($1, $2, $3)',
         [user_id, post_id || null, chef_reaction_id || null]
       );
+      // Notify content owner (skip if liking own content)
+      const likerName = req.user.name || 'Someone';
+      if (post_id) {
+        const postData = await pool.query('SELECT user_id, title FROM posts WHERE id = $1', [post_id]);
+        if (postData.rows.length && postData.rows[0].user_id !== user_id) {
+          await pool.query(
+            'INSERT INTO notifications (user_id, type, title, subtitle, data) VALUES ($1, $2, $3, $4, $5)',
+            [postData.rows[0].user_id, 'post_likes', 'Post Liked',
+             `${likerName} liked your ${postData.rows[0].title}`,
+             JSON.stringify({ postId: post_id, likerId: user_id, likerName })]
+          );
+        }
+      } else if (chef_reaction_id) {
+        const rxData = await pool.query('SELECT chef_id FROM chef_reactions WHERE id = $1', [chef_reaction_id]);
+        if (rxData.rows.length && rxData.rows[0].chef_id !== user_id) {
+          await pool.query(
+            'INSERT INTO notifications (user_id, type, title, subtitle, data) VALUES ($1, $2, $3, $4, $5)',
+            [rxData.rows[0].chef_id, 'post_likes', 'Post Liked',
+             `${likerName} liked your review`,
+             JSON.stringify({ chefReactionId: chef_reaction_id, likerId: user_id, likerName })]
+          );
+        }
+      }
       return res.status(201).json({ liked: true });
     }
   } catch (err) {
+    if (err.code === '23503') return res.status(401).json({ error: 'invalid token' });
     console.error(err);
     res.status(500).json({ error: 'server error' });
   }
@@ -208,6 +292,79 @@ router.post('/save', authenticateToken, async (req, res) => {
       );
       return res.status(201).json({ saved: true });
     }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// GET comments for a post
+router.get('/:id/comments', authenticateToken, async (req, res) => {
+  try {
+    const postId = parseInt(req.params.id, 10);
+    if (Number.isNaN(postId)) return res.status(400).json({ error: 'invalid post id' });
+
+    const { rows } = await pool.query(
+      `SELECT c.id, u.id as author_id, u.name as author, c.comment_text as text, c.created_at
+       FROM comments c JOIN users u ON c.user_id = u.id
+       WHERE c.post_id = $1 ORDER BY c.created_at ASC`,
+      [postId]
+    );
+
+    res.json({
+      comments: rows.map(r => ({
+        id: r.id,
+        authorId: r.author_id,
+        author: r.author,
+        initials: initials(r.author),
+        text: r.text,
+        timestamp: relativeTime(r.created_at),
+      }))
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// POST a comment on a post
+router.post('/:id/comments', authenticateToken, async (req, res) => {
+  try {
+    const postId = parseInt(req.params.id, 10);
+    if (Number.isNaN(postId)) return res.status(400).json({ error: 'invalid post id' });
+    const text = req.body.text?.trim();
+    if (!text) return res.status(400).json({ error: 'text is required' });
+
+    const postCheck = await pool.query('SELECT user_id, title FROM posts WHERE id = $1', [postId]);
+    if (!postCheck.rows.length) return res.status(404).json({ error: 'post not found' });
+
+    const { rows } = await pool.query(
+      'INSERT INTO comments (post_id, user_id, comment_text) VALUES ($1, $2, $3) RETURNING id, created_at',
+      [postId, req.user.id, text]
+    );
+    const row = rows[0];
+    const commenterName = req.user.name || 'Someone';
+
+    const { user_id: authorId, title: postTitle } = postCheck.rows[0];
+    if (authorId !== req.user.id) {
+      await pool.query(
+        'INSERT INTO notifications (user_id, type, title, subtitle, data) VALUES ($1, $2, $3, $4, $5)',
+        [authorId, 'comment_on_post', 'New Comment',
+         `${commenterName} commented on your ${postTitle}`,
+         JSON.stringify({ postId, commentId: row.id, commenterId: req.user.id, commenterName, commentText: text })]
+      );
+    }
+
+    res.status(201).json({
+      comment: {
+        id: row.id,
+        authorId: req.user.id,
+        author: commenterName,
+        initials: initials(commenterName),
+        text,
+        timestamp: 'just now',
+      }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'server error' });
