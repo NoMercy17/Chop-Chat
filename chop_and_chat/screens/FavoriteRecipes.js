@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useContext, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { wp, hp, fp, SPACING } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
+import { AuthContext } from '../context/AuthContext';
+import { api } from '../services/api';
 import DishDetailModal from '../components/posts/DishDetailModal';
 import RecipeCard from '../components/posts/RecipeCard';
 
@@ -12,11 +15,25 @@ const DIFFICULTIES = ['All', 'Easy', 'Medium', 'Hard'];
 export default function FavoriteRecipes({ navigation }) {
   const { theme, isDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
+  const { token } = useContext(AuthContext);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState('All');
   const [favorites, setFavorites] = useState([]);
   const [selectedDish, setSelectedDish] = useState(null);
   const [dishDetailModalVisible, setDishDetailModalVisible] = useState(false);
+
+  const loadFavorites = useCallback(async () => {
+    if (!token) return;
+    try {
+      const data = await api.get('/posts/saved', token);
+      setFavorites(data || []);
+    } catch (error) {
+      console.error('[FavoriteRecipes] loadFavorites:', error.message);
+    }
+  }, [token]);
+
+  useEffect(() => { loadFavorites(); }, [loadFavorites]);
+  useFocusEffect(useCallback(() => { loadFavorites(); }, [loadFavorites]));
 
   const filteredFavorites = favorites.filter(recipe => {
     const query = searchQuery.toLowerCase();
@@ -29,8 +46,14 @@ export default function FavoriteRecipes({ navigation }) {
     return matchesSearch && matchesDifficulty;
   });
 
-  const removeFavorite = (id) => {
+  const removeFavorite = async (id) => {
     setFavorites(prev => prev.filter(r => r.id !== id));
+    try {
+      await api.post('/posts/save', { post_id: id }, token);
+    } catch (error) {
+      console.error('[FavoriteRecipes] removeFavorite:', error.message);
+      loadFavorites();
+    }
   };
 
   return (

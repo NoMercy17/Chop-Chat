@@ -21,6 +21,7 @@ export const FollowProvider = ({ children }) => {
 
     const [followedUsers, setFollowedUsers] = useState(new Set());
     const [myFollowingCount, setMyFollowingCount] = useState(0);
+    const [pendingUsers, setPendingUsers] = useState(new Set());
 
     const refreshMyFollows = useCallback(async () => {
         if (!user?.id || !token) {
@@ -41,51 +42,41 @@ export const FollowProvider = ({ children }) => {
     useEffect(() => { refreshMyFollows(); }, [refreshMyFollows]);
 
     const isFollowingUser = useCallback((userId) => followedUsers.has(userId), [followedUsers]);
+    const isFollowPending = useCallback((userId) => pendingUsers.has(userId), [pendingUsers]);
 
-    // Optimistic follow: update local state immediately, sync to backend, revert on error.
     const followUser = useCallback((userId) => {
-        if (!token || followedUsers.has(userId)) return;
-        setFollowedUsers(prev => {
-            const next = new Set(prev);
-            next.add(userId);
-            return next;
-        });
+        if (!token || followedUsers.has(userId) || pendingUsers.has(userId)) return;
+        setPendingUsers(prev => { const n = new Set(prev); n.add(userId); return n; });
+        setFollowedUsers(prev => { const n = new Set(prev); n.add(userId); return n; });
         setMyFollowingCount(prev => prev + 1);
 
-        api.post(`/users/${userId}/follow`, {}, token).catch(error => {
-            // 409 means we were already following on the server — keep local state.
-            if (error.status === 409) return;
-            console.error(`[FollowContext:followUser] ${userId}:`, error.message);
-            setFollowedUsers(prev => {
-                const next = new Set(prev);
-                next.delete(userId);
-                return next;
-            });
-            setMyFollowingCount(prev => Math.max(0, prev - 1));
-        });
-    }, [token, followedUsers]);
+        api.post(`/users/${userId}/follow`, {}, token)
+            .then(() => refreshMyFollows())
+            .catch(error => {
+                if (error.status === 409) { refreshMyFollows(); return; }
+                console.error(`[FollowContext:followUser] ${userId}:`, error.message);
+                setFollowedUsers(prev => { const n = new Set(prev); n.delete(userId); return n; });
+                setMyFollowingCount(prev => Math.max(0, prev - 1));
+            })
+            .finally(() => setPendingUsers(prev => { const n = new Set(prev); n.delete(userId); return n; }));
+    }, [token, followedUsers, pendingUsers, refreshMyFollows]);
 
     const unfollowUser = useCallback((userId) => {
-        if (!token || !followedUsers.has(userId)) return;
-        setFollowedUsers(prev => {
-            const next = new Set(prev);
-            next.delete(userId);
-            return next;
-        });
+        if (!token || !followedUsers.has(userId) || pendingUsers.has(userId)) return;
+        setPendingUsers(prev => { const n = new Set(prev); n.add(userId); return n; });
+        setFollowedUsers(prev => { const n = new Set(prev); n.delete(userId); return n; });
         setMyFollowingCount(prev => Math.max(0, prev - 1));
 
-        api.delete(`/users/${userId}/follow`, token).catch(error => {
-            // 404 means the relationship was already gone server-side.
-            if (error.status === 404) return;
-            console.error(`[FollowContext:unfollowUser] ${userId}:`, error.message);
-            setFollowedUsers(prev => {
-                const next = new Set(prev);
-                next.add(userId);
-                return next;
-            });
-            setMyFollowingCount(prev => prev + 1);
-        });
-    }, [token, followedUsers]);
+        api.delete(`/users/${userId}/follow`, token)
+            .then(() => refreshMyFollows())
+            .catch(error => {
+                if (error.status === 404) { refreshMyFollows(); return; }
+                console.error(`[FollowContext:unfollowUser] ${userId}:`, error.message);
+                setFollowedUsers(prev => { const n = new Set(prev); n.add(userId); return n; });
+                setMyFollowingCount(prev => prev + 1);
+            })
+            .finally(() => setPendingUsers(prev => { const n = new Set(prev); n.delete(userId); return n; }));
+    }, [token, followedUsers, pendingUsers, refreshMyFollows]);
 
     // Returns the new follow state synchronously so callers can update derived counts
     // without awaiting the backend round-trip.
@@ -126,6 +117,7 @@ export const FollowProvider = ({ children }) => {
         followUser,
         unfollowUser,
         isFollowingUser,
+        isFollowPending,
         toggleFollow,
         refreshMyFollows,
         getFollowersCount,
@@ -136,6 +128,7 @@ export const FollowProvider = ({ children }) => {
         followUser,
         unfollowUser,
         isFollowingUser,
+        isFollowPending,
         toggleFollow,
         refreshMyFollows,
         getFollowersCount,

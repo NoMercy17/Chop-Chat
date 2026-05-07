@@ -1,11 +1,14 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useContext } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { wp, hp, fp } from '../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
-import { useChefFeed } from '../context/ChefFeedContext'; 
-import DishDetailModal from '../components/posts/DishDetailModal'; 
+import { useChefFeed } from '../context/ChefFeedContext';
+import { useFollow } from '../context/FollowContext';
+import { AuthContext } from '../context/AuthContext';
+import { api } from '../services/api';
+import DishDetailModal from '../components/posts/DishDetailModal';
 import CommentsModal from '../components/posts/CommentsModal';
 import CategoryHeader from '../components/home/CategoryHeader';
 
@@ -14,28 +17,31 @@ const CATEGORIES = ['Following', 'All'];
 export default function AllChefReviews({ navigation }) {
     const { theme } = useTheme();
     const insets = useSafeAreaInsets();
-    const { feedItems, handleLike, handleSave, updateCommentCount } = useChefFeed();
-    
-    // State
+    const { token } = useContext(AuthContext);
+    const { feedItems, handleLike, handleSave, addComment } = useChefFeed();
+    const { followedUsers } = useFollow();
+
     const [selectedCategory, setSelectedCategory] = useState('All');
     const [dishDetailModalVisible, setDishDetailModalVisible] = useState(false);
     const [selectedDish, setSelectedDish] = useState(null);
     const [commentsModalVisible, setCommentsModalVisible] = useState(false);
-    const [selectedPostForComments, setSelectedPostForComments] = useState(null);
+    const [selectedItem, setSelectedItem] = useState(null);
+    const [comments, setComments] = useState([]);
+    const [commentsLoading, setCommentsLoading] = useState(false);
     const [newComment, setNewComment] = useState('');
 
     const filteredItems = useMemo(() => {
-        let items = selectedCategory === 'All' 
-            ? feedItems 
-            : feedItems.filter(item => false); // TODO: Implement real following filter
-        
+        let items = selectedCategory === 'All'
+            ? feedItems
+            : feedItems.filter(item => followedUsers.has(item.chef.id));
+
         return items.filter(item => {
             if (item.contentType === 'reaction') {
                 return item.reaction?.targetAuthor?.id !== item.chef.id;
             }
             return true;
         });
-    }, [selectedCategory, feedItems]);
+    }, [selectedCategory, feedItems, followedUsers]);
 
     // Handlers
     const handleOpenDish = (item) => {
@@ -54,16 +60,27 @@ export default function AllChefReviews({ navigation }) {
         setDishDetailModalVisible(true);
     };
 
-    const handleOpenComments = (item) => {
-        setSelectedPostForComments(item);
+    const handleOpenComments = async (item) => {
+        setSelectedItem(item);
+        setComments([]);
+        setCommentsLoading(true);
         setCommentsModalVisible(true);
+        try {
+            const data = await api.get(`/chef/${item.id}/comments`, token);
+            setComments(data?.comments || []);
+        } catch (error) {
+            console.error('[AllChefReviews] fetchComments:', error.message);
+        } finally {
+            setCommentsLoading(false);
+        }
     };
 
-    const submitComment = () => {
-        if (newComment.trim() && selectedPostForComments) {
-            updateCommentCount(selectedPostForComments.id);
-            setNewComment('');
-        }
+    const submitComment = async () => {
+        const text = newComment.trim();
+        if (!text || !selectedItem) return;
+        setNewComment('');
+        const comment = await addComment(selectedItem.id, text);
+        if (comment) setComments(curr => [...curr, comment]);
     };
 
     const renderFeedCard = (item) => {
@@ -157,13 +174,18 @@ export default function AllChefReviews({ navigation }) {
                 dish={selectedDish}
             />
 
-            <CommentsModal 
+            <CommentsModal
                 visible={commentsModalVisible}
-                onClose={() => setCommentsModalVisible(false)}
-                comments={[]}
+                onClose={() => { setCommentsModalVisible(false); setComments([]); }}
+                comments={comments}
+                loading={commentsLoading}
                 newComment={newComment}
                 onCommentChange={setNewComment}
                 onAddComment={submitComment}
+                onAuthorPress={(comment) => {
+                    setCommentsModalVisible(false);
+                    navigation.navigate('OtherUserProfile', { userId: comment.authorId, userName: comment.author });
+                }}
                 theme={theme}
             />
         </View>

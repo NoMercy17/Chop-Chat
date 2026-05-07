@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
 import { wp, hp, fp } from '../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { usePosts } from '../context/PostsContext';
+import { useFollow } from '../context/FollowContext';
+import { AuthContext } from '../context/AuthContext';
+import { api } from '../services/api';
 import DishDetailModal from '../components/posts/DishDetailModal';
 import CategoryHeader from '../components/home/CategoryHeader';
 import CommentsModal from '../components/posts/CommentsModal';
@@ -14,30 +17,44 @@ const CATEGORIES = ['Following', 'All'];
 export default function AllCommunityPosts({ navigation }) {
     const { theme } = useTheme();
     const insets = useSafeAreaInsets();
-    const { posts, handleLike, handleSave, updateCommentCount } = usePosts();
-    
-    // State
+    const { token } = useContext(AuthContext);
+    const { posts, handleLike, handleSave, addComment } = usePosts();
+    const { followedUsers } = useFollow();
+
     const [selectedCategory, setSelectedCategory] = useState('All');
     const [commentsModalVisible, setCommentsModalVisible] = useState(false);
     const [selectedPost, setSelectedPost] = useState(null);
+    const [comments, setComments] = useState([]);
+    const [commentsLoading, setCommentsLoading] = useState(false);
     const [dishDetailModalVisible, setDishDetailModalVisible] = useState(false);
     const [selectedDish, setSelectedDish] = useState(null);
     const [newComment, setNewComment] = useState('');
     
-    const filteredPosts = selectedCategory === 'All' 
-        ? posts 
-        : posts.filter(post => false); // TODO: Implement real following filter
+    const filteredPosts = selectedCategory === 'All'
+        ? posts
+        : posts.filter(post => followedUsers.has(post.authorId));
     
-    const handleComment = (post) => {
+    const handleComment = async (post) => {
         setSelectedPost(post);
+        setComments([]);
+        setCommentsLoading(true);
         setCommentsModalVisible(true);
+        try {
+            const data = await api.get(`/posts/${post.id}/comments`, token);
+            setComments(data?.comments || []);
+        } catch (error) {
+            console.error('[AllCommunityPosts] fetchComments:', error.message);
+        } finally {
+            setCommentsLoading(false);
+        }
     };
 
-    const handleAddComment = () => {
-        if (newComment.trim() && selectedPost) {
-            updateCommentCount(selectedPost.id);
-            setNewComment('');
-        }
+    const handleAddComment = async () => {
+        const text = newComment.trim();
+        if (!text || !selectedPost) return;
+        setNewComment('');
+        const comment = await addComment(selectedPost.id, text);
+        if (comment) setComments(curr => [...curr, comment]);
     };
 
     return (
@@ -116,13 +133,18 @@ export default function AllCommunityPosts({ navigation }) {
             )}
             </ScrollView>
 
-            <CommentsModal 
+            <CommentsModal
                 visible={commentsModalVisible}
-                onClose={() => setCommentsModalVisible(false)}
-                comments={[]}
+                onClose={() => { setCommentsModalVisible(false); setComments([]); }}
+                comments={comments}
+                loading={commentsLoading}
                 newComment={newComment}
                 onCommentChange={setNewComment}
                 onAddComment={handleAddComment}
+                onAuthorPress={(comment) => {
+                    setCommentsModalVisible(false);
+                    navigation.navigate('OtherUserProfile', { userId: comment.authorId, userName: comment.author });
+                }}
                 theme={theme}
             />
 

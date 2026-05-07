@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { Alert } from 'react-native';
 import { AuthContext } from './AuthContext';
 import { ChefService } from '../services/ChefService';
 import { api } from '../services/api';
+import { mockChefFeedItems } from '../data/mockData';
 
 const ChefFeedContext = createContext();
 
@@ -30,24 +32,25 @@ export function ChefFeedProvider({ children }) {
         return () => { mountedRef.current = false; };
     }, []);
 
+    // Always reflects the latest feedItems without creating a stale closure in handleSave
+    const feedItemsRef = useRef(feedItems);
+    useEffect(() => { feedItemsRef.current = feedItems; }, [feedItems]);
+
     const refreshFeed = useCallback(async () => {
         if (!token) {
-            if (mountedRef.current) setFeedItems([]);
+            if (mountedRef.current) setFeedItems(mockChefFeedItems);
             return;
         }
         setLoading(true);
         try {
             const items = await ChefService.getChefFeed(token);
-            // Hardcode random likes for demo purposes if they are 0
-            const enhancedItems = (items || []).map((item, index) => ({
-                ...item,
-                likes: item.likes > 0 ? item.likes : (300 + index * 27),
-                comments: item.comments > 0 ? item.comments : (index % 2 !== 0 ? 1 : 0)
-            }));
-            if (mountedRef.current) setFeedItems(enhancedItems);
+            // Fall back to mock data when the API returns nothing yet (demo mode)
+            const source = items && items.length ? items : mockChefFeedItems;
+            if (mountedRef.current) setFeedItems(source);
         } catch (error) {
             console.error('[ChefFeedContext:refreshFeed] Error:', error.message);
-            if (mountedRef.current) setFeedItems([]);
+            Alert.alert('Feed unavailable', 'Could not load chef feed. Please try again.');
+            if (mountedRef.current) setFeedItems(mockChefFeedItems);
         } finally {
             if (mountedRef.current) setLoading(false);
         }
@@ -61,11 +64,18 @@ export function ChefFeedProvider({ children }) {
         setFeedItems(curr => toggleLike(curr, feedItemId));
         if (!token) return;
 
+        // Like/save hit the posts router, not chef — bypassing ChefService is intentional here
         try {
-            await api.post('/posts/like', { chef_reaction_id: feedItemId }, token);
+            const result = await api.post('/posts/like', { chef_reaction_id: feedItemId }, token);
+            if (result && typeof result.liked === 'boolean') {
+                if (mountedRef.current) setFeedItems(curr => curr.map(item => {
+                    if (item.id !== feedItemId || item.liked === result.liked) return item;
+                    return { ...item, liked: result.liked, likes: item.likes + (result.liked ? 1 : -1) };
+                }));
+            }
         } catch (error) {
             console.error(`[ChefFeedContext:handleLike] Error liking item ${feedItemId}:`, error.message);
-            // Revert by re-applying the same toggle
+            Alert.alert('Could not like post', 'Please try again.');
             if (mountedRef.current) setFeedItems(curr => toggleLike(curr, feedItemId));
         }
     }, [token]);
@@ -74,7 +84,7 @@ export function ChefFeedProvider({ children }) {
         setFeedItems(curr => toggleSave(curr, feedItemId));
         if (!token) return;
 
-        const item = feedItems.find(i => i.id === feedItemId);
+        const item = feedItemsRef.current.find(i => i.id === feedItemId);
         const targetPostId = item?.reaction?.targetPostId;
         if (!targetPostId) return;
 
@@ -82,13 +92,27 @@ export function ChefFeedProvider({ children }) {
             await api.post('/posts/save', { post_id: targetPostId }, token);
         } catch (error) {
             console.error(`[ChefFeedContext:handleSave] Error saving item ${feedItemId}:`, error.message);
+            Alert.alert('Could not save post', 'Please try again.');
             if (mountedRef.current) setFeedItems(curr => toggleSave(curr, feedItemId));
         }
-    }, [token, feedItems]);
+    }, [token]);
 
     const updateCommentCount = useCallback((feedItemId) => {
         setFeedItems(curr => incrementComments(curr, feedItemId));
     }, []);
+
+    const addComment = useCallback(async (reactionId, text) => {
+        if (!token || !text?.trim()) return null;
+        try {
+            const result = await api.post(`/chef/${reactionId}/comments`, { text }, token);
+            if (result?.comment) updateCommentCount(reactionId);
+            return result?.comment ?? null;
+        } catch (error) {
+            console.error(`[ChefFeedContext:addComment] ${reactionId}:`, error.message);
+            Alert.alert('Could not post comment', 'Please try again.');
+            return null;
+        }
+    }, [token, updateCommentCount]);
 
     const value = useMemo(() => ({
         feedItems,
@@ -97,7 +121,8 @@ export function ChefFeedProvider({ children }) {
         handleLike,
         handleSave,
         updateCommentCount,
-    }), [feedItems, loading, refreshFeed, handleLike, handleSave, updateCommentCount]);
+        addComment,
+    }), [feedItems, loading, refreshFeed, handleLike, handleSave, updateCommentCount, addComment]);
 
     return (
         <ChefFeedContext.Provider value={value}>

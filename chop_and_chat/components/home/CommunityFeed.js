@@ -1,37 +1,53 @@
-import { useState, useMemo } from 'react';
-import { Text, View, StyleSheet, ScrollView, Pressable, Modal, TextInput, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Image, ActivityIndicator } from 'react-native';
+import { useState, useMemo, useContext } from 'react';
+import { Text, View, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { usePosts } from '../../context/PostsContext';
+import { AuthContext } from '../../context/AuthContext';
+import { api } from '../../services/api';
 import DishDetailModal from '../posts/DishDetailModal';
+import CommentsModal from '../posts/CommentsModal';
 
 export default function CommunityFeed() {
     const navigation = useNavigation();
     const { theme } = useTheme();
-    const { posts: allPosts, handleLike, handleSave, updateCommentCount } = usePosts();
-    
+    const { token } = useContext(AuthContext);
+    const { posts: allPosts, handleLike, handleSave, addComment } = usePosts();
+
     // Show only the 2 most recent posts in the home screen feed
     const posts = useMemo(() => allPosts.slice(0, 2), [allPosts]);
-    
+
     const [commentsModalVisible, setCommentsModalVisible] = useState(false);
     const [selectedPost, setSelectedPost] = useState(null);
+    const [comments, setComments] = useState([]);
+    const [commentsLoading, setCommentsLoading] = useState(false);
     const [dishDetailModalVisible, setDishDetailModalVisible] = useState(false);
     const [selectedDish, setSelectedDish] = useState(null);
     const [newComment, setNewComment] = useState('');
 
-    const handleComment = (post) => {
+    const handleComment = async (post) => {
         setSelectedPost(post);
+        setComments([]);
+        setCommentsLoading(true);
         setCommentsModalVisible(true);
+        try {
+            const data = await api.get(`/posts/${post.id}/comments`, token);
+            setComments(data?.comments || []);
+        } catch (error) {
+            console.error('[CommunityFeed] fetchComments:', error.message);
+        } finally {
+            setCommentsLoading(false);
+        }
     };
 
-    const handleAddComment = () => {
-        if (newComment.trim() && selectedPost) {
-            // TODO: Wire to backend POST /comments
-            updateCommentCount(selectedPost.id);
-            setNewComment('');
-        }
+    const handleAddComment = async () => {
+        const text = newComment.trim();
+        if (!text || !selectedPost) return;
+        setNewComment('');
+        const comment = await addComment(selectedPost.id, text);
+        if (comment) setComments(curr => [...curr, comment]);
     };
 
     return (
@@ -164,68 +180,20 @@ export default function CommunityFeed() {
 
             </ScrollView>
 
-            {/* Comments Modal */}
-            <Modal 
-                visible={commentsModalVisible} 
-                transparent={true} 
-                animationType="slide"
-                onRequestClose={() => setCommentsModalVisible(false)}
-            >
-                <TouchableWithoutFeedback onPress={() => {
+            <CommentsModal
+                visible={commentsModalVisible}
+                onClose={() => { setCommentsModalVisible(false); setSelectedPost(null); setComments([]); setNewComment(''); }}
+                comments={comments}
+                loading={commentsLoading}
+                newComment={newComment}
+                onCommentChange={setNewComment}
+                onAddComment={handleAddComment}
+                onAuthorPress={(comment) => {
                     setCommentsModalVisible(false);
-                    setSelectedPost(null);
-                    setNewComment('');
-                }}>
-                    <View style={styles.modalOverlay}>
-                        <KeyboardAvoidingView 
-                            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                            style={{ width: '100%' }}
-                        >
-                            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-                                <View style={[styles.modalContainer, { backgroundColor: theme.modalBackground }]}>
-                                    <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
-                                        <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Comments</Text>
-                                        <Pressable onPress={() => {
-                                            setCommentsModalVisible(false);
-                                            setSelectedPost(null);
-                                            setNewComment('');
-                                        }}>
-                                            <Text style={{color: theme.primary, fontWeight:'600'}}>Close</Text>
-                                        </Pressable>
-                                    </View>
-                                    
-                                    <ScrollView 
-                                        style={{maxHeight: hp(300), padding: wp(20)}}
-                                        showsVerticalScrollIndicator={false}
-                                    >
-                                        <View style={{alignItems: 'center', paddingVertical: hp(40)}}>
-                                            <Ionicons name="chatbubble-outline" size={fp(38)} color={theme.textTertiary} />
-                                            <Text style={{color: theme.textSecondary, fontSize: fp(16), marginTop: hp(12)}}>Comments coming soon</Text>
-                                            <Text style={{color: theme.textTertiary, fontSize: fp(13), marginTop: hp(4)}}>We're wiring up the live discussion!</Text>
-                                        </View>
-                                    </ScrollView>
-
-                                    <View style={[styles.addCommentContainer, { backgroundColor: theme.cardBackground, borderTopColor: theme.border }]}>
-                                        <TextInput
-                                            style={[styles.commentInput, { backgroundColor: theme.inputBackground, color: theme.textPrimary }]}
-                                            placeholder="Write a comment..."
-                                            placeholderTextColor={theme.textTertiary}
-                                            value={newComment}
-                                            onChangeText={setNewComment}
-                                        />
-                                        <Pressable 
-                                            onPress={handleAddComment}
-                                            style={{padding: wp(8), backgroundColor: theme.primary, borderRadius: wp(20)}}
-                                        >
-                                            <Ionicons name="send" size={fp(16)} color="white" />
-                                        </Pressable>
-                                    </View>
-                                </View>
-                            </TouchableWithoutFeedback>
-                        </KeyboardAvoidingView>
-                    </View>
-                </TouchableWithoutFeedback>
-            </Modal>
+                    navigation.navigate('OtherUserProfile', { userId: comment.authorId, userName: comment.author });
+                }}
+                theme={theme}
+            />
 
             <DishDetailModal
                 visible={dishDetailModalVisible}
@@ -384,43 +352,5 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#FFFFFF',
         letterSpacing: 0.3,
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'flex-end',
-    },
-    modalContainer: {
-        borderTopLeftRadius: wp(24),
-        borderTopRightRadius: wp(24),
-        paddingTop: hp(20),
-        paddingBottom: hp(30),
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingHorizontal: wp(20),
-        paddingBottom: hp(16),
-        borderBottomWidth: 1,
-    },
-    modalTitle: {
-        fontSize: fp(18),
-        fontWeight: '700',
-    },
-    addCommentContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: wp(20),
-        paddingTop: hp(16),
-        borderTopWidth: 1,
-        gap: wp(12),
-    },
-    commentInput: {
-        flex: 1,
-        borderRadius: wp(20),
-        paddingHorizontal: wp(16),
-        paddingVertical: hp(10),
-        fontSize: fp(14),
-        maxHeight: hp(80),
     },
 });

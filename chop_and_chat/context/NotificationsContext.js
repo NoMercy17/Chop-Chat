@@ -11,6 +11,7 @@ export const NOTIFICATION_TYPES = {
   POST_LIKES: 'post_likes',
   CHEF_REVIEW_RECEIVED: 'chef_review_received',
   CHEF_REVIEW_REQUEST: 'chef_review_request', // Claimable - for chefs only
+  COMMENT_ON_POST: 'comment_on_post',
 };
 
 export function NotificationsProvider({ children }) {
