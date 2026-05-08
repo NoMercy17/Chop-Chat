@@ -4,8 +4,10 @@ const router = express.Router();
 const pool = require('../db');
 const { authenticateToken } = require('../middleware');
 
+const postsReadLimiter     = rateLimit({ windowMs: 15 * 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false });
+const likesWriteLimiter    = rateLimit({ windowMs: 15 * 60 * 1000, max: 40,  standardHeaders: true, legacyHeaders: false });
 const commentsReadLimiter  = rateLimit({ windowMs: 15 * 60 * 1000, max: 180, standardHeaders: true, legacyHeaders: false });
-const commentsWriteLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 40, standardHeaders: true, legacyHeaders: false });
+const commentsWriteLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 40,  standardHeaders: true, legacyHeaders: false });
 
 function relativeTime(date) {
   const s = Math.floor((Date.now() - new Date(date)) / 1000);
@@ -24,7 +26,7 @@ function initials(name) {
 }
 
 // GET all posts for the community feed (EXCLUDES global reference recipes)
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', postsReadLimiter, authenticateToken, async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT 
@@ -69,7 +71,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // SEARCH recipes (INCLUDES global reference recipes + user's own recipes)
-router.get('/search', authenticateToken, async (req, res) => {
+router.get('/search', postsReadLimiter, authenticateToken, async (req, res) => {
   try {
     const { query, utensils } = req.query;
     const user_id = req.user.id;
@@ -131,7 +133,7 @@ router.get('/search', authenticateToken, async (req, res) => {
 });
 
 // GET posts saved by the current user (Favorites)
-router.get('/saved', authenticateToken, async (req, res) => {
+router.get('/saved', postsReadLimiter, authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const { rows } = await pool.query(`
@@ -175,7 +177,7 @@ router.get('/saved', authenticateToken, async (req, res) => {
 });
 
 // GET single post detail
-router.get('/:id', authenticateToken, async (req, res) => {
+router.get('/:id', postsReadLimiter, authenticateToken, async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT 
@@ -219,7 +221,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 });
 
 // Like a post or chef reaction
-router.post('/like', authenticateToken, async (req, res) => {
+router.post('/like', likesWriteLimiter, authenticateToken, async (req, res) => {
   try {
     const { post_id, chef_reaction_id } = req.body;
     const user_id = req.user.id;
@@ -274,7 +276,7 @@ router.post('/like', authenticateToken, async (req, res) => {
 });
 
 // Save a post to favorites
-router.post('/save', authenticateToken, async (req, res) => {
+router.post('/save', likesWriteLimiter, authenticateToken, async (req, res) => {
   try {
     const { post_id } = req.body;
     const user_id = req.user.id;

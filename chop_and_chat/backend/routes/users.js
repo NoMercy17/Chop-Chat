@@ -5,10 +5,13 @@ const bcrypt = require('bcrypt');
 const pool = require('../db');
 const { authenticateToken } = require('../middleware');
 
-const followMutationLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false });
+const profileReadLimiter    = rateLimit({ windowMs: 15 * 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false });
+const profileWriteLimiter   = rateLimit({ windowMs: 15 * 60 * 1000, max: 20,  standardHeaders: true, legacyHeaders: false });
+const followReadLimiter     = rateLimit({ windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false });
+const followMutationLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 60,  standardHeaders: true, legacyHeaders: false });
 
 // Get current user info 
-router.get('/me', authenticateToken, async (req, res) => {
+router.get('/me', profileReadLimiter, authenticateToken, async (req, res) => {
   try {
     const { rows } = await pool.query(
       'SELECT id, email, name, role, profile_photo, bio, created_at FROM users WHERE id = $1',
@@ -24,7 +27,7 @@ router.get('/me', authenticateToken, async (req, res) => {
 });
 
 // Update profile photo
-router.patch('/profile-photo', authenticateToken, async (req, res) => {
+router.patch('/profile-photo', profileWriteLimiter, authenticateToken, async (req, res) => {
   try {
     const { photo_url } = req.body;
     if (!photo_url) return res.status(400).json({ error: 'photo_url is required' });
@@ -43,7 +46,7 @@ router.patch('/profile-photo', authenticateToken, async (req, res) => {
 });
 
 // Change password (verifies current password, then hashes and stores the new one)
-router.patch('/password', authenticateToken, async (req, res) => {
+router.patch('/password', profileWriteLimiter, authenticateToken, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     if (!currentPassword || !newPassword) {
@@ -69,7 +72,7 @@ router.patch('/password', authenticateToken, async (req, res) => {
 });
 
 // List users
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', profileReadLimiter, authenticateToken, async (req, res) => {
   try {
     const { rows } = await pool.query(
       'SELECT id, email, name, role, profile_photo, created_at FROM users ORDER BY id DESC LIMIT 100'
@@ -147,7 +150,7 @@ router.delete('/:id/follower', followMutationLimiter, authenticateToken, async (
 });
 
 // Followers (people who follow :id)
-router.get('/:id/followers', authenticateToken, async (req, res) => {
+router.get('/:id/followers', followReadLimiter, authenticateToken, async (req, res) => {
   try {
     const targetId = parseInt(req.params.id, 10);
     if (Number.isNaN(targetId)) return res.status(400).json({ error: 'invalid user id' });
@@ -168,7 +171,7 @@ router.get('/:id/followers', authenticateToken, async (req, res) => {
 });
 
 // Following (people :id follows)
-router.get('/:id/following', authenticateToken, async (req, res) => {
+router.get('/:id/following', followReadLimiter, authenticateToken, async (req, res) => {
   try {
     const targetId = parseInt(req.params.id, 10);
     if (Number.isNaN(targetId)) return res.status(400).json({ error: 'invalid user id' });
@@ -189,7 +192,7 @@ router.get('/:id/following', authenticateToken, async (req, res) => {
 });
 
 // Does the current user follow :id?
-router.get('/:id/is-following', authenticateToken, async (req, res) => {
+router.get('/:id/is-following', followReadLimiter, authenticateToken, async (req, res) => {
   try {
     const targetId = parseInt(req.params.id, 10);
     if (Number.isNaN(targetId)) return res.status(400).json({ error: 'invalid user id' });
