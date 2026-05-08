@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useContext } from 'react';
+import React, { useState, useEffect, useCallback, useContext, useRef } from 'react';
 import { View, Text, StyleSheet, Modal, Pressable, TextInput, FlatList, ScrollView, ActivityIndicator, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { wp, hp, fp } from '../../../utils/responsive';
@@ -29,31 +29,38 @@ export default function FindRecipeModal({ visible, onClose, theme }) {
     const [selectedDish, setSelectedDish] = useState(null);
     const [dishDetailVisible, setDishDetailVisible] = useState(false);
 
+    const fetchIdRef = useRef(0);
+
     const fetchResults = useCallback(async () => {
-        if (!visible || !token) return;
-        
+        if (!token) return;
+        const fetchId = ++fetchIdRef.current;
         setLoading(true);
         try {
             const params = new URLSearchParams();
-            if (searchQuery) params.append('query', searchQuery);
+            const trimmed = searchQuery.trim();
+            if (trimmed) params.append('query', trimmed);
             if (selectedUtensils.length > 0) params.append('utensils', selectedUtensils.join(','));
-            
             const data = await api.get(`/posts/search?${params.toString()}`, token);
-            setResults(data || []);
+            if (fetchId === fetchIdRef.current) setResults(data || []);
         } catch (error) {
             console.error('[FindRecipeModal:fetchResults] Error:', error.message);
+            if (fetchId === fetchIdRef.current) setResults([]);
         } finally {
-            setLoading(false);
+            if (fetchId === fetchIdRef.current) setLoading(false);
         }
-    }, [searchQuery, selectedUtensils, token, visible]);
+    }, [searchQuery, selectedUtensils, token]);
 
+    // Fetch immediately when modal opens (no debounce delay on open)
     useEffect(() => {
-        const delayDebounceFn = setTimeout(() => {
-            fetchResults();
-        }, 300);
+        if (visible) fetchResults();
+    }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
-        return () => clearTimeout(delayDebounceFn);
-    }, [fetchResults]);
+    // Debounced fetch on query or utensil changes
+    useEffect(() => {
+        if (!visible) return;
+        const timer = setTimeout(fetchResults, 300);
+        return () => clearTimeout(timer);
+    }, [fetchResults, visible]);
 
     const toggleUtensil = (id) => {
         if (selectedUtensils.includes(id)) {
