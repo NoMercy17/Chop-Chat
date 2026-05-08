@@ -1,8 +1,11 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const pool = require('../db');
 const { authenticateToken } = require('../middleware');
+
+const followMutationLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false });
 
 // Get current user info 
 router.get('/me', authenticateToken, async (req, res) => {
@@ -79,7 +82,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // Follow a user
-router.post('/:id/follow', authenticateToken, async (req, res) => {
+router.post('/:id/follow', followMutationLimiter, authenticateToken, async (req, res) => {
   try {
     const targetId = parseInt(req.params.id, 10);
     if (Number.isNaN(targetId)) return res.status(400).json({ error: 'invalid user id' });
@@ -108,7 +111,7 @@ router.post('/:id/follow', authenticateToken, async (req, res) => {
 });
 
 // Unfollow a user
-router.delete('/:id/follow', authenticateToken, async (req, res) => {
+router.delete('/:id/follow', followMutationLimiter, authenticateToken, async (req, res) => {
   try {
     const targetId = parseInt(req.params.id, 10);
     if (Number.isNaN(targetId)) return res.status(400).json({ error: 'invalid user id' });
@@ -126,7 +129,7 @@ router.delete('/:id/follow', authenticateToken, async (req, res) => {
 });
 
 // Remove a follower (the authenticated user removes :id from their followers)
-router.delete('/:id/follower', authenticateToken, async (req, res) => {
+router.delete('/:id/follower', followMutationLimiter, authenticateToken, async (req, res) => {
   try {
     const followerId = parseInt(req.params.id, 10);
     if (Number.isNaN(followerId)) return res.status(400).json({ error: 'invalid user id' });
