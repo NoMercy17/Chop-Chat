@@ -1,7 +1,11 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const pool = require('../db');
 const { authenticateToken } = require('../middleware');
+
+const commentsReadLimiter  = rateLimit({ windowMs: 15 * 60 * 1000, max: 180, standardHeaders: true, legacyHeaders: false });
+const commentsWriteLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 40, standardHeaders: true, legacyHeaders: false });
 
 function relativeTime(date) {
   const s = Math.floor((Date.now() - new Date(date)) / 1000);
@@ -299,7 +303,7 @@ router.post('/save', authenticateToken, async (req, res) => {
 });
 
 // GET comments for a post
-router.get('/:id/comments', authenticateToken, async (req, res) => {
+router.get('/:id/comments', commentsReadLimiter, authenticateToken, async (req, res) => {
   try {
     const postId = parseInt(req.params.id, 10);
     if (Number.isNaN(postId)) return res.status(400).json({ error: 'invalid post id' });
@@ -328,7 +332,7 @@ router.get('/:id/comments', authenticateToken, async (req, res) => {
 });
 
 // POST a comment on a post
-router.post('/:id/comments', authenticateToken, async (req, res) => {
+router.post('/:id/comments', commentsWriteLimiter, authenticateToken, async (req, res) => {
   try {
     const postId = parseInt(req.params.id, 10);
     if (Number.isNaN(postId)) return res.status(400).json({ error: 'invalid post id' });

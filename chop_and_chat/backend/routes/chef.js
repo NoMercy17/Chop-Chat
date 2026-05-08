@@ -1,7 +1,13 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const pool = require('../db');
 const { authenticateToken, requireChef } = require('../middleware');
+
+const reviewRequestLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
+const feedLimiter           = rateLimit({ windowMs: 15 * 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false });
+const commentsReadLimiter   = rateLimit({ windowMs: 15 * 60 * 1000, max: 180, standardHeaders: true, legacyHeaders: false });
+const commentsWriteLimiter  = rateLimit({ windowMs: 15 * 60 * 1000, max: 40, standardHeaders: true, legacyHeaders: false });
 
 function relativeTime(date) {
   const s = Math.floor((Date.now() - new Date(date)) / 1000);
@@ -20,7 +26,7 @@ function initials(name) {
 }
 
 // User requests a review for a post
-router.post('/review-request', authenticateToken, async (req, res) => {
+router.post('/review-request', reviewRequestLimiter, authenticateToken, async (req, res) => {
   try {
     const { post_id, context, chef_filter } = req.body;
     const requester_id = req.user.id;
@@ -167,7 +173,7 @@ router.post('/reviews', authenticateToken, requireChef, async (req, res) => {
 });
 
 // Get Chef Feed (all chef reactions)
-router.get('/feed', authenticateToken, async (req, res) => {
+router.get('/feed', feedLimiter, authenticateToken, async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT 
@@ -232,7 +238,7 @@ router.get('/feed', authenticateToken, async (req, res) => {
 });
 
 // GET comments for a chef reaction
-router.get('/:id/comments', authenticateToken, async (req, res) => {
+router.get('/:id/comments', commentsReadLimiter, authenticateToken, async (req, res) => {
   try {
     const reactionId = parseInt(req.params.id, 10);
     if (Number.isNaN(reactionId)) return res.status(400).json({ error: 'invalid reaction id' });
@@ -261,7 +267,7 @@ router.get('/:id/comments', authenticateToken, async (req, res) => {
 });
 
 // POST a comment on a chef reaction
-router.post('/:id/comments', authenticateToken, async (req, res) => {
+router.post('/:id/comments', commentsWriteLimiter, authenticateToken, async (req, res) => {
   try {
     const reactionId = parseInt(req.params.id, 10);
     if (Number.isNaN(reactionId)) return res.status(400).json({ error: 'invalid reaction id' });
