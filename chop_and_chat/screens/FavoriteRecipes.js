@@ -7,6 +7,8 @@ import { wp, hp, fp, SPACING } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
 import { AuthContext } from '../context/AuthContext';
 import { api } from '../services/api';
+import { usePosts } from '../context/PostsContext';
+import { useChefFeed } from '../context/ChefFeedContext';
 import DishDetailModal from '../components/posts/DishDetailModal';
 import RecipeCard from '../components/posts/RecipeCard';
 
@@ -16,6 +18,8 @@ export default function FavoriteRecipes({ navigation }) {
   const { theme, isDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
   const { token } = useContext(AuthContext);
+  const { markUnsaved } = usePosts();
+  const { unsaveByPostId } = useChefFeed();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState('All');
   const [favorites, setFavorites] = useState([]);
@@ -48,6 +52,8 @@ export default function FavoriteRecipes({ navigation }) {
 
   const removeFavorite = async (id) => {
     setFavorites(prev => prev.filter(r => r.id !== id));
+    markUnsaved(id);
+    unsaveByPostId(id);
     try {
       await api.post('/posts/save', { post_id: id }, token);
     } catch (error) {

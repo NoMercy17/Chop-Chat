@@ -1,42 +1,35 @@
-import { useState } from 'react';
+import { useState, useContext, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { wp, hp, fp, SPACING } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
+import { AuthContext } from '../context/AuthContext';
+import { api } from '../services/api';
 import DishDetailModal from '../components/posts/DishDetailModal';
-import CommentsModal from '../components/posts/CommentsModal';
 import RecipeCard from '../components/posts/RecipeCard';
 
 export default function MyPostsScreen({ navigation }) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
+  const { token } = useContext(AuthContext);
   const [selectedDish, setSelectedDish] = useState(null);
   const [dishDetailModalVisible, setDishDetailModalVisible] = useState(false);
-  const [commentsModalVisible, setCommentsModalVisible] = useState(false);
-  const [selectedPost, setSelectedPost] = useState(null);
-  const [newComment, setNewComment] = useState('');
   const [myPosts, setMyPosts] = useState([]);
 
-  const handleLike = (postId) => {
-    setMyPosts(currentPosts => currentPosts.map(post => 
-      post.id === postId ? { ...post, likes: post.liked ? post.likes - 1 : post.likes + 1, liked: !post.liked } : post
-    ));
-  };
-
-  const handleComment = (post) => {
-    setSelectedPost(post);
-    setCommentsModalVisible(true);
-  };
-
-  const handleAddComment = () => {
-    if (newComment.trim() && selectedPost) {
-      setMyPosts(currentPosts => currentPosts.map(post => 
-        post.id === selectedPost.id ? { ...post, comments: post.comments + 1 } : post
-      ));
-      setNewComment('');
+  const loadMyRecipes = useCallback(async () => {
+    if (!token) return;
+    try {
+      const data = await api.get('/posts/search', token);
+      setMyPosts(data?.posts ?? data ?? []);
+    } catch (error) {
+      console.error('[MyRecipes] loadMyRecipes:', error.message);
     }
-  };
+  }, [token]);
+
+  useEffect(() => { loadMyRecipes(); }, [loadMyRecipes]);
+  useFocusEffect(useCallback(() => { loadMyRecipes(); }, [loadMyRecipes]));
 
   return (
     <View style={[styles.container, { backgroundColor: theme.screenBackground, paddingTop: insets.top }]}>
@@ -71,16 +64,6 @@ export default function MyPostsScreen({ navigation }) {
           </View>
         )}
       </ScrollView>
-
-      <CommentsModal 
-        visible={commentsModalVisible}
-        onClose={() => setCommentsModalVisible(false)}
-        comments={[]}
-        newComment={newComment}
-        onCommentChange={setNewComment}
-        onAddComment={handleAddComment}
-        theme={theme}
-      />
 
       <DishDetailModal
         visible={dishDetailModalVisible}

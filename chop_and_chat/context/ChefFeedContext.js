@@ -97,6 +97,12 @@ export function ChefFeedProvider({ children }) {
         }
     }, [token]);
 
+    const unsaveByPostId = useCallback((postId) => {
+        setFeedItems(curr => curr.map(item =>
+            item.reaction?.targetPostId === postId ? { ...item, saved: false } : item
+        ));
+    }, []);
+
     const updateCommentCount = useCallback((feedItemId) => {
         setFeedItems(curr => incrementComments(curr, feedItemId));
     }, []);
@@ -120,9 +126,10 @@ export function ChefFeedProvider({ children }) {
         refreshFeed,
         handleLike,
         handleSave,
+        unsaveByPostId,
         updateCommentCount,
         addComment,
-    }), [feedItems, loading, refreshFeed, handleLike, handleSave, updateCommentCount, addComment]);
+    }), [feedItems, loading, refreshFeed, handleLike, handleSave, unsaveByPostId, updateCommentCount, addComment]);
 
     return (
         <ChefFeedContext.Provider value={value}>

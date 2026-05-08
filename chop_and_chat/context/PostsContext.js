@@ -79,7 +79,7 @@ export function PostsProvider({ children }) {
     }, []);
 
     const handleSave = useCallback(async (postId) => {
-        setPosts(currentPosts => 
+        setPosts(currentPosts =>
             currentPosts.map(post => {
                 if (post.id === postId) {
                     return { ...post, saved: !post.saved };
@@ -96,6 +96,12 @@ export function PostsProvider({ children }) {
             fetchPosts();
         }
     }, [token, fetchPosts]);
+
+    const markUnsaved = useCallback((postId) => {
+        setPosts(curr => curr.map(post =>
+            post.id === postId ? { ...post, saved: false } : post
+        ));
+    }, []);
 
     const addComment = useCallback(async (postId, text) => {
         if (!token || !text?.trim()) return null;
@@ -115,10 +121,11 @@ export function PostsProvider({ children }) {
         loading,
         handleLike,
         handleSave,
+        markUnsaved,
         updateCommentCount,
         addComment,
         refreshPosts: fetchPosts
-    }), [posts, loading, handleLike, handleSave, updateCommentCount, addComment, fetchPosts]);
+    }), [posts, loading, handleLike, handleSave, markUnsaved, updateCommentCount, addComment, fetchPosts]);
 
     return (
         <PostsContext.Provider value={value}>
