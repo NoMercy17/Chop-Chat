@@ -4,16 +4,16 @@ import { wp, hp, fp } from '../../utils/responsive';
 
 export default function ProfileStats({ recipeCount, followersCount, followingCount, theme, onRecipesPress, onFollowersPress, onFollowingPress }) {
   return (
-    <View style={[styles.statsBar, { backgroundColor: theme.cardBackground }]}>
-      <Pressable style={styles.statItem} onPress={onRecipesPress}>
+    <View style={[styles.statsBar, { backgroundColor: theme.cardBackground, borderWidth: 1, borderColor: theme.border }]}>
+      <Pressable style={({ pressed }) => [styles.statItem, pressed && { opacity: 0.7 }]} onPress={onRecipesPress}>
         <Text style={[styles.statValue, { color: theme.textPrimary }]}>{recipeCount}</Text>
         <Text style={[styles.statText, { color: theme.textSecondary }]}>Recipes</Text>
       </Pressable>
-      <Pressable style={styles.statItem} onPress={onFollowersPress}>
+      <Pressable style={({ pressed }) => [styles.statItem, pressed && { opacity: 0.7 }]} onPress={onFollowersPress}>
         <Text style={[styles.statValue, { color: theme.textPrimary }]}>{followersCount}</Text>
         <Text style={[styles.statText, { color: theme.textSecondary }]}>Followers</Text>
       </Pressable>
-      <Pressable style={styles.statItem} onPress={onFollowingPress}>
+      <Pressable style={({ pressed }) => [styles.statItem, pressed && { opacity: 0.7 }]} onPress={onFollowingPress}>
         <Text style={[styles.statValue, { color: theme.textPrimary }]}>{followingCount}</Text>
         <Text style={[styles.statText, { color: theme.textSecondary }]}>Following</Text>
       </Pressable>

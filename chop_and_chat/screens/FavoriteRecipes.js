@@ -66,7 +66,7 @@ export default function FavoriteRecipes({ navigation }) {
     <View style={[styles.container, { backgroundColor: theme.screenBackground, paddingTop: insets.top }]}>
       {/* Header */}
       <View style={[styles.headerContainer, { backgroundColor: theme.screenBackground }]}>
-        <Pressable 
+        <Pressable
           style={({ pressed }) => [
             styles.backButton,
             !isDarkMode && styles.backButtonLight,
@@ -77,6 +77,7 @@ export default function FavoriteRecipes({ navigation }) {
           <Ionicons name="arrow-back" size={fp(24)} color={theme.headerTitleColor} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: theme.headerTitleColor }]}>Favorites</Text>
+        <View style={{ width: wp(40) }} />
       </View>
 
       {/* Search */}
@@ -107,16 +108,14 @@ export default function FavoriteRecipes({ navigation }) {
               key={difficulty}
               style={({ pressed }) => [
                 styles.filterTab,
-                { backgroundColor: theme.inputBackground },
-                selectedDifficulty === difficulty && styles.filterTabActive,
+                { backgroundColor: selectedDifficulty === difficulty ? theme.primary : theme.inputBackground },
                 pressed && styles.filterTabPressed
               ]}
               onPress={() => setSelectedDifficulty(difficulty)}
             >
               <Text style={[
                 styles.filterText,
-                { color: theme.textSecondary },
-                selectedDifficulty === difficulty && styles.filterTextActive
+                { color: selectedDifficulty === difficulty ? theme.textInverse : theme.textSecondary }
               ]}>
                 {difficulty}
               </Text>
@@ -167,7 +166,7 @@ export default function FavoriteRecipes({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  headerContainer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.screenPadding, paddingVertical: hp(12), gap: wp(16) },
+  headerContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.screenPadding, paddingVertical: hp(12) },
   backButton: { width: wp(40), height: wp(40), borderRadius: wp(20), backgroundColor: 'rgba(255, 255, 255, 0.15)', justifyContent: 'center', alignItems: 'center' },
   backButtonLight: { backgroundColor: 'rgba(0, 0, 0, 0.05)' },
   backButtonPressed: { opacity: 0.7 },
@@ -178,9 +177,7 @@ const styles = StyleSheet.create({
   filterContainer: { marginBottom: hp(20) },
   filterScroll: { paddingHorizontal: SPACING.screenPadding, gap: wp(10) },
   filterTab: { paddingHorizontal: wp(16), paddingVertical: hp(8), borderRadius: wp(20) },
-  filterTabActive: { backgroundColor: '#3B82F6' },
   filterText: { fontSize: fp(14), fontWeight: '600' },
-  filterTextActive: { color: '#FFFFFF' },
   listContainer: { flex: 1 },
   listContent: { paddingHorizontal: SPACING.screenPadding, paddingBottom: hp(30) },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: wp(40) },

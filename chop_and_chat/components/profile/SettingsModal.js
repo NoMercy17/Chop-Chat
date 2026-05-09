@@ -12,13 +12,6 @@ export default function SettingsModal({ visible, onClose, theme, isDarkMode, tog
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const [notifications, setNotifications] = useState({
-    recipeMatches: true,
-    chefReviews: true,
-    likesComments: true,
-    newFollowers: false,
-  });
-
   const resetPasswordFields = () => {
     setCurrentPassword("");
     setNewPassword("");
@@ -63,10 +56,6 @@ export default function SettingsModal({ visible, onClose, theme, isDarkMode, tog
         { text: "Delete", style: "destructive", onPress: () => onSignOut() }
       ]
     );
-  };
-
-  const toggleNotification = (key) => {
-    setNotifications(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   const renderContent = () => {
@@ -116,49 +105,9 @@ export default function SettingsModal({ visible, onClose, theme, isDarkMode, tog
             >
               {isChangingPassword
                 ? <ActivityIndicator color="#FFFFFF" />
-                : <Text style={[styles.saveBtnText, { color: '#FFFFFF' }]}>Update</Text>}
+                : <Text style={[styles.saveBtnText, { color: theme.textInverse }]}>Update</Text>}
             </Pressable>
           </View>
-        </View>
-      );
-    }
-
-    if (activeSettingTab === 'notifications') {
-      return (
-        <View style={styles.settingTabContent}>
-          <Text style={[styles.settingTabTitle, { color: theme.textPrimary }]}>Notifications</Text>
-          <Text style={[styles.settingTabSubtitle, { color: theme.textSecondary }]}>Choose what you want to be alerted about</Text>
-
-          <View style={styles.notificationsList}>
-            {['recipeMatches', 'chefReviews', 'likesComments'].map((key) => (
-              <View key={key} style={[styles.notificationItem, { backgroundColor: theme.inputBackground }]}>
-                <View style={styles.notificationInfo}>
-                  <Ionicons
-                    name={key === 'recipeMatches' ? "restaurant-outline" : key === 'chefReviews' ? "star-outline" : "heart-outline"}
-                    size={fp(20)}
-                    color={theme.primary}
-                  />
-                  <Text style={[styles.notificationLabel, { color: theme.textPrimary }]}>
-                    {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
-                  </Text>
-                </View>
-                <Switch
-                  value={notifications[key]}
-                  onValueChange={() => toggleNotification(key)}
-                  trackColor={{ false: theme.switchTrackOff, true: theme.switchTrackOn }}
-                  thumbColor={notifications[key] ? theme.switchThumbOn : theme.switchThumbOff}
-                />
-              </View>
-            ))}
-          </View>
-
-          <Pressable
-            style={styles.backToSettingsBtn}
-            onPress={() => setActiveSettingTab(null)}
-          >
-            <Ionicons name="arrow-back" size={fp(18)} color={theme.textSecondary} />
-            <Text style={[styles.backToSettingsBtnText, { color: theme.textPrimary }]}>Back to Settings</Text>
-          </Pressable>
         </View>
       );
     }
@@ -173,7 +122,7 @@ export default function SettingsModal({ visible, onClose, theme, isDarkMode, tog
         <View style={styles.settingsOptions}>
           <Pressable style={styles.settingsOption} onPress={() => setActiveSettingTab('password')}>
             <View style={styles.settingsOptionLeft}>
-              <View style={[styles.settingsIconContainer, { backgroundColor: isDarkMode ? theme.warningLight : '#FEF3C7' }]}>
+              <View style={[styles.settingsIconContainer, { backgroundColor: theme.warningLight }]}>
                 <Ionicons name="lock-closed-outline" size={fp(20)} color={theme.warning} />
               </View>
               <Text style={[styles.settingsOptionTitle, { color: theme.textPrimary }]}>Change Password</Text>
@@ -183,8 +132,8 @@ export default function SettingsModal({ visible, onClose, theme, isDarkMode, tog
 
           <View style={styles.darkModeRow}>
             <View style={styles.settingsOptionLeft}>
-              <View style={[styles.settingsIconContainer, { backgroundColor: isDarkMode ? '#312E81' : '#EDE9FE' }]}>
-                <Ionicons name={isDarkMode ? "moon" : "moon-outline"} size={fp(20)} color={isDarkMode ? '#A78BFA' : '#7C3AED'} />
+              <View style={[styles.settingsIconContainer, { backgroundColor: theme.primaryLighter }]}>
+                <Ionicons name={isDarkMode ? "moon" : "moon-outline"} size={fp(20)} color={theme.primary} />
               </View>
               <Text style={[styles.settingsOptionTitle, { color: theme.textPrimary }]}>Dark Mode</Text>
             </View>
@@ -250,11 +199,5 @@ const styles = StyleSheet.create({
   cancelBtn: { flex: 1, padding: hp(12), alignItems: 'center', borderRadius: wp(8) },
   cancelBtnText: { fontWeight: '600' },
   saveBtn: { flex: 1, padding: hp(12), alignItems: 'center', borderRadius: wp(8) },
-  saveBtnText: { color: '#FFFFFF', fontWeight: '600' },
-  notificationsList: { gap: hp(10) },
-  notificationItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: wp(12), borderRadius: wp(8) },
-  notificationInfo: { flexDirection: 'row', alignItems: 'center', gap: wp(12) },
-  notificationLabel: { fontSize: fp(15) },
-  backToSettingsBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: wp(8), marginTop: hp(20), padding: hp(10), borderRadius: wp(8) },
-  backToSettingsBtnText: { fontWeight: '600' },
+  saveBtnText: { fontWeight: '600' },
 });

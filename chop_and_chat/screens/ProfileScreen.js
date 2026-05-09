@@ -124,12 +124,13 @@ export default function ProfileScreen({ navigation }) {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
-      <ProfileHeader 
+      <ProfileHeader
         name={profileData.name}
         profilePhoto={profileData.profile_photo}
         bio={profileData.bio}
         isUploading={isUploading}
         theme={theme}
+        isDarkMode={isDarkMode}
         onBack={() => navigation.goBack()}
         onEditImage={() => setImageSourceModalVisible(true)}
       />
@@ -150,9 +151,9 @@ export default function ProfileScreen({ navigation }) {
           { icon: "heart-outline", label: "Favorite Recipes", target: "FavoriteRecipes" },
           { icon: "settings-outline", label: "Settings", action: () => setSettingsVisible(true) }
         ].map((item, idx) => (
-          <Pressable 
-            key={idx} 
-            style={[styles.menuItem, { borderBottomColor: idx === 2 ? 'transparent' : theme.border }]} 
+          <Pressable
+            key={idx}
+            style={({ pressed }) => [styles.menuItem, { borderBottomColor: idx === 2 ? 'transparent' : theme.border }, pressed && { opacity: 0.7 }]}
             onPress={item.action || (() => navigation.navigate(item.target))}
           >
             <View style={styles.menuItemLeft}>
@@ -240,5 +241,5 @@ const styles = StyleSheet.create({
   compactOption: { flexDirection: 'row', alignItems: 'center', gap: wp(16), paddingVertical: hp(16) },
   compactOptionText: { fontSize: fp(16), fontWeight: '600' },
   logoutButton: { margin: wp(20), padding: wp(16), borderRadius: wp(12), alignItems: 'center', marginBottom: hp(40) },
-  logoutText: { fontWeight: '700' },
+  logoutText: { fontWeight: '700', fontSize: fp(16) },
 });

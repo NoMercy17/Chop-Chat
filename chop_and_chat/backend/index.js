@@ -38,6 +38,7 @@ const authLimiter = rateLimit({
 const PORT = process.env.PORT || 4000;
 
 // Health check
+
 app.get('/health', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT 1 AS ok');
