@@ -29,12 +29,17 @@ export function getCloudinaryUrl(urlOrPublicId, options = {}) {
 
   const transform = parts.join(',');
 
-  if (urlOrPublicId.includes('res.cloudinary.com')) {
-    const uploadIdx = urlOrPublicId.indexOf('/upload/');
-    if (uploadIdx === -1) return urlOrPublicId;
-    const base = urlOrPublicId.slice(0, uploadIdx + 8);
-    const rest = urlOrPublicId.slice(uploadIdx + 8);
-    return `${base}${transform}/${rest}`;
+  try {
+    const parsed = new URL(urlOrPublicId);
+    if (parsed.hostname === 'res.cloudinary.com') {
+      const uploadIdx = parsed.href.indexOf('/upload/');
+      if (uploadIdx === -1) return urlOrPublicId;
+      const base = parsed.href.slice(0, uploadIdx + 8);
+      const rest = parsed.href.slice(uploadIdx + 8);
+      return `${base}${transform}/${rest}`;
+    }
+  } catch {
+    // Not an absolute URL — fall through to treat as public_id
   }
 
   const cloudName = env.CLOUDINARY_CLOUD_NAME;
