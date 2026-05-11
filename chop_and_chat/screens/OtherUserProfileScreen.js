@@ -1,10 +1,12 @@
-import React, { useState, useMemo, useContext, useCallback, useRef } from "react";
-import { View, Text, ScrollView, Pressable, Image, StyleSheet } from "react-native";
+import React, { useState, useContext, useCallback, useRef } from "react";
+import { View, Text, ScrollView, Pressable, Image, StyleSheet, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from "../context/ThemeContext";
 import { useFollow } from "../context/FollowContext";
+import { AuthContext } from "../context/AuthContext";
+import { api } from "../services/api";
 import { wp, hp, fp } from "../utils/responsive";
 import DishDetailModal from "../components/posts/DishDetailModal";
 import RecipeCard from "../components/posts/RecipeCard";
@@ -12,11 +14,13 @@ import RecipeCard from "../components/posts/RecipeCard";
 export default function OtherUserProfileScreen({ navigation, route }) {
   const { theme, isDarkMode } = useTheme();
   const { isFollowingUser, toggleFollow, getFollowersCount, getFollowingCount } = useFollow();
+  const { token } = useContext(AuthContext);
   const insets = useSafeAreaInsets();
 
   const { userId, userName, userAvatar } = route.params || {};
-  const userRecipes = useMemo(() => [], []);
 
+  const [userPosts, setUserPosts] = useState([]);
+  const [postsLoading, setPostsLoading] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [dishDetailModalVisible, setDishDetailModalVisible] = useState(false);
@@ -35,7 +39,20 @@ export default function OtherUserProfileScreen({ navigation, route }) {
     setFollowingCount(following);
   }, [userId, getFollowersCount, getFollowingCount]);
 
-  useFocusEffect(useCallback(() => { loadCounts(); }, [loadCounts]));
+  const loadPosts = useCallback(async () => {
+    if (!userId || !token) return;
+    setPostsLoading(true);
+    try {
+      const data = await api.get(`/users/${userId}/posts`, token);
+      setUserPosts(data.posts || []);
+    } catch (err) {
+      console.error('[OtherUserProfileScreen] loadPosts:', err.message);
+    } finally {
+      setPostsLoading(false);
+    }
+  }, [userId, token]);
+
+  useFocusEffect(useCallback(() => { loadCounts(); loadPosts(); }, [loadCounts, loadPosts]));
 
   const handleFollow = () => {
     if (followInFlight.current) return;
@@ -81,7 +98,7 @@ export default function OtherUserProfileScreen({ navigation, route }) {
 
       <View style={[styles.statsBar, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
         <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: theme.textPrimary }]}>{userRecipes.length}</Text>
+          <Text style={[styles.statValue, { color: theme.textPrimary }]}>{userPosts.length}</Text>
           <Text style={[styles.statText, { color: theme.textSecondary }]}>Recipes</Text>
         </View>
         <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
@@ -98,15 +115,21 @@ export default function OtherUserProfileScreen({ navigation, route }) {
 
       <View style={styles.recipesSection}>
         <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Recipes</Text>
-        {userRecipes.map((recipe) => (
-          <RecipeCard 
-            key={recipe.id}
-            recipe={recipe}
-            variant="compact"
-            theme={theme}
-            onPress={() => { setSelectedDish(recipe); setDishDetailModalVisible(true); }}
-          />
-        ))}
+        {postsLoading ? (
+          <ActivityIndicator color={theme.primary} style={{ marginTop: hp(20) }} />
+        ) : userPosts.length === 0 ? (
+          <Text style={[styles.emptyText, { color: theme.textTertiary }]}>No recipes yet</Text>
+        ) : (
+          userPosts.map((recipe) => (
+            <RecipeCard
+              key={recipe.id}
+              recipe={recipe}
+              variant="compact"
+              theme={theme}
+              onPress={() => { setSelectedDish(recipe); setDishDetailModalVisible(true); }}
+            />
+          ))
+        )}
       </View>
 
       <DishDetailModal
@@ -139,5 +162,6 @@ const styles = StyleSheet.create({
   statText: { fontSize: fp(12), marginTop: hp(2) },
   statDivider: { width: 1, height: hp(30) },
   recipesSection: { paddingHorizontal: wp(20), paddingBottom: hp(40) },
-  sectionTitle: { fontSize: fp(20), fontWeight: "700", marginBottom: hp(16) }
+  sectionTitle: { fontSize: fp(20), fontWeight: "700", marginBottom: hp(16) },
+  emptyText: { fontSize: fp(14), textAlign: 'center', marginTop: hp(12) }
 });

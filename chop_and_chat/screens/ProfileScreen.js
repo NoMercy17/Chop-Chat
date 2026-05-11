@@ -9,6 +9,7 @@ import { useFollow } from "../context/FollowContext";
 import { wp, hp, fp } from "../utils/responsive";
 import CameraScreen from "../components/media/CameraScreen";
 import { CloudinaryService } from "../services/CloudinaryService";
+import { MediaService, compressImage } from "../services/MediaService";
 import { api } from "../services/api";
 
 // Refactored Components
@@ -91,7 +92,13 @@ export default function ProfileScreen({ navigation }) {
     setImageSourceModalVisible(false);
     try {
       setIsUploading(true);
-      const photoUrl = await CloudinaryService.uploadImage(await CloudinaryService.pickImage(), 'profile_photos');
+      const picked = await MediaService.pickFromGallery();
+      if (!picked?.uri) return;
+      // MediaService already compresses; public_id ensures re-upload replaces the previous avatar
+      const photoUrl = await CloudinaryService.uploadImage(picked.uri, 'profile_photos', {
+        public_id: `profile_photos/user_${user.id}`,
+        overwrite: true,
+      });
       if (photoUrl) await updateProfilePhotoOnBackend(photoUrl);
     } catch (error) {
       Alert.alert("Error", "Failed to upload image");
@@ -104,7 +111,11 @@ export default function ProfileScreen({ navigation }) {
     setCameraModalVisible(false);
     try {
       setIsUploading(true);
-      const photoUrl = await CloudinaryService.uploadImage(uri, 'profile_photos');
+      const compressedUri = await compressImage(uri);
+      const photoUrl = await CloudinaryService.uploadImage(compressedUri, 'profile_photos', {
+        public_id: `profile_photos/user_${user.id}`,
+        overwrite: true,
+      });
       if (photoUrl) await updateProfilePhotoOnBackend(photoUrl);
     } catch (error) {
       Alert.alert("Error", "Failed to upload photo");
@@ -181,6 +192,7 @@ export default function ProfileScreen({ navigation }) {
         data={userListData}
         navigation={navigation}
         theme={theme}
+        currentUserId={user?.id}
         onRemoveFollower={async (userId) => {
           setUserListData(prev => prev.filter(u => u.id !== userId));
           setFollowersCount(prev => Math.max(0, prev - 1));

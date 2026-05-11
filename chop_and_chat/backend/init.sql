@@ -39,12 +39,16 @@ CREATE TABLE IF NOT EXISTS posts (
   cook_time TEXT,
   difficulty TEXT CHECK (difficulty IN ('Easy', 'Medium', 'Hard')),
   is_global BOOLEAN DEFAULT false,
+  is_seeded BOOLEAN NOT NULL DEFAULT FALSE,
+  chef_review_requested BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
 -- Add is_global column if upgrading existing database
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_global BOOLEAN DEFAULT false;
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_seeded BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS chef_review_requested BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- Index for faster queries on user's posts
 CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id);

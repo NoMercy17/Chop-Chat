@@ -84,6 +84,53 @@ router.get('/', profileReadLimiter, authenticateToken, async (req, res) => {
   }
 });
 
+// Get posts by a specific user (excluding global/seeded posts)
+router.get('/:id/posts', profileReadLimiter, authenticateToken, async (req, res) => {
+  try {
+    const targetId = parseInt(req.params.id, 10);
+    if (Number.isNaN(targetId)) return res.status(400).json({ error: 'invalid user id' });
+
+    const { rows } = await pool.query(
+      `SELECT p.id, p.title, p.description, p.image_url, p.cook_time, p.difficulty,
+              p.utensils, p.ingredients, p.instructions, p.created_at,
+              u.name as author, u.id as author_id,
+              (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id AND chef_reaction_id IS NULL) as likes,
+              (SELECT COUNT(*) FROM comments WHERE post_id = p.id AND chef_reaction_id IS NULL) as comments,
+              EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = $2 AND chef_reaction_id IS NULL) as liked,
+              EXISTS(SELECT 1 FROM saved_posts WHERE post_id = p.id AND user_id = $2) as saved
+       FROM posts p
+       JOIN users u ON p.user_id = u.id
+       WHERE p.user_id = $1 AND p.is_global = false
+       ORDER BY p.created_at DESC`,
+      [targetId, req.user.id]
+    );
+
+    const posts = rows.map(r => ({
+      id: r.id,
+      title: r.title,
+      description: r.description,
+      image: r.image_url,
+      cookTime: r.cook_time,
+      difficulty: r.difficulty,
+      utensils: r.utensils,
+      ingredients: r.ingredients,
+      instructions: r.instructions,
+      author: r.author,
+      authorId: r.author_id,
+      likes: parseInt(r.likes),
+      comments: parseInt(r.comments),
+      liked: r.liked,
+      saved: r.saved,
+      createdAt: r.created_at,
+    }));
+
+    res.json({ posts });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
 // Follow a user
 router.post('/:id/follow', followMutationLimiter, authenticateToken, async (req, res) => {
   try {

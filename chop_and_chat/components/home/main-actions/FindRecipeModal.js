@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useContext, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useContext, useRef, useMemo } from 'react';
+import { getCloudinaryUrl } from '../../../utils/cloudinaryUrl';
 import { View, Text, StyleSheet, Modal, Pressable, TextInput, FlatList, ScrollView, ActivityIndicator, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { wp, hp, fp } from '../../../utils/responsive';
@@ -24,7 +25,8 @@ export default function FindRecipeModal({ visible, onClose, theme }) {
     const [selectedUtensils, setSelectedUtensils] = useState([]);
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
-    
+    const [failedImages, setFailedImages] = useState(new Set());
+
     // For dish details
     const [selectedDish, setSelectedDish] = useState(null);
     const [dishDetailVisible, setDishDetailVisible] = useState(false);
@@ -41,7 +43,14 @@ export default function FindRecipeModal({ visible, onClose, theme }) {
             if (trimmed) params.append('query', trimmed);
             if (selectedUtensils.length > 0) params.append('utensils', selectedUtensils.join(','));
             const data = await api.get(`/posts/search?${params.toString()}`, token);
-            if (fetchId === fetchIdRef.current) setResults(data || []);
+            if (fetchId === fetchIdRef.current) {
+                    const raw = data || [];
+                    // User's own recipes (isGlobal=false) pinned first, sorted A→Z.
+                    // Global reference recipes follow, also sorted A→Z by title.
+                    const ownRecipes = raw.filter(r => !r.isGlobal).sort((a, b) => a.title.localeCompare(b.title));
+                    const globalRecipes = raw.filter(r => r.isGlobal).sort((a, b) => a.title.localeCompare(b.title));
+                    setResults([...ownRecipes, ...globalRecipes]);
+                }
         } catch (error) {
             console.error('[FindRecipeModal:fetchResults] Error:', error.message);
             if (fetchId === fetchIdRef.current) setResults([]);
@@ -202,9 +211,13 @@ export default function FindRecipeModal({ visible, onClose, theme }) {
                                         }
                                     ]}
                                 >
-                                    {item.image ? (
+                                    {item.image && !failedImages.has(item.id) ? (
                                         <View style={styles.imageContainer}>
-                                            <Image source={{ uri: item.image }} style={styles.recipeImage} />
+                                            <Image
+                                                source={{ uri: getCloudinaryUrl(item.image, { width: 120, height: 120, crop: 'fill' }) }}
+                                                style={styles.recipeImage}
+                                                onError={() => setFailedImages(prev => new Set(prev).add(item.id))}
+                                            />
                                         </View>
                                     ) : (
                                         <View style={[styles.recipeImagePlaceholder, { backgroundColor: theme.cardBackgroundAlt }]}>
@@ -246,7 +259,6 @@ export default function FindRecipeModal({ visible, onClose, theme }) {
                                         </View>
                                     </View>
                                     
-                                    <Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />
                                 </Pressable>
                             )
                         }}

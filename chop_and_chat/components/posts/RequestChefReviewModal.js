@@ -1,104 +1,86 @@
-import React, { useState } from 'react';
-import { 
-    View, 
-    Text, 
-    StyleSheet, 
-    Modal, 
-    Pressable, 
+import { useState, useEffect } from 'react';
+import {
+    View,
+    Text,
+    StyleSheet,
+    Modal,
+    Pressable,
     TextInput,
     Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
-    Image,
-    Animated,
     ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { wp, hp, fp, SPACING } from '../../utils/responsive';
+import { wp, hp, fp } from '../../utils/responsive';
 import { useTheme } from '../../context/ThemeContext';
 
 const CHEF_FILTERS = ['Following', 'All Chefs'];
 
-export default function RequestChefReviewModal({ 
-    visible, 
-    onClose, 
+export default function RequestChefReviewModal({
+    visible,
+    onClose,
     onBack,
-    dish,
-    imageUri,
-    onSubmit 
+    postData,
+    onSubmit,
+    // Initial form values — restored when the user comes back from ConfirmChefReviewPopup.
+    // Both are null/undefined on a fresh start, which resets the form to defaults.
+    initialFeedbackContext,
+    initialChefFilter,
+    loading,
 }) {
     const { theme } = useTheme();
     const [selectedFilter, setSelectedFilter] = useState('Following');
     const [feedbackContext, setFeedbackContext] = useState('');
-    const [imageExpanded, setImageExpanded] = useState(false);
-    const [rotateAnim] = useState(new Animated.Value(0));
-    const [loading, setLoading] = useState(false);
 
-    const toggleImageExpanded = () => {
-        const toValue = imageExpanded ? 0 : 1;
-        
-        Animated.timing(rotateAnim, {
-            toValue,
-            duration: 300,
-            useNativeDriver: true,
-        }).start();
-        
-        setImageExpanded(!imageExpanded);
-    };
+    // Reset form to initial values each time the modal becomes visible.
+    // When going back from ConfirmChefReviewPopup, initialFeedbackContext/Filter still hold
+    // the staged data (MainActions hasn't cleared them), so the user's input is restored.
+    // When starting fresh, both are undefined/null, so the form resets to defaults.
+    useEffect(() => {
+        if (visible) {
+            setFeedbackContext(initialFeedbackContext ?? '');
+            setSelectedFilter(initialChefFilter ?? 'Following');
+        }
+    }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const arrowRotation = rotateAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['0deg', '180deg'],
-    });
-
-    const handleSubmit = async () => {
+    const handleSubmit = () => {
         if (!feedbackContext.trim()) {
             Alert.alert(
                 'Context Required',
-                'Please specify some of the ingredients and/or preparation steps.',
+                'Please add some context for the chef.',
                 [{ text: 'OK' }]
             );
             return;
         }
-
-        setLoading(true);
-        try {
-            await onSubmit?.({
-                dishId: dish?.id,
-                dishTitle: dish?.title,
-                context: feedbackContext.trim(),
-                chefFilter: selectedFilter,
-                timestamp: new Date().toISOString()
-            });
-
-            setFeedbackContext('');
-            setSelectedFilter('Following');
-            setImageExpanded(false);
-            rotateAnim.setValue(0);
-            onClose();
-        } catch (error) {
-            // Error is usually handled by the parent's onSubmit
-            console.error('[RequestChefReviewModal:handleSubmit] Error:', error.message);
-        } finally {
-            setLoading(false);
-        }
+        // Stage the data — the actual upload is triggered from ConfirmChefReviewPopup.
+        onSubmit?.({
+            feedbackContext: feedbackContext.trim(),
+            chefFilter: selectedFilter,
+        });
     };
 
     const handleClose = () => {
+        // Block dismissal while the upload is in progress — dismissing mid-upload would
+        // leave MainActions stuck in isSubmitting=true with no way to recover.
+        if (loading) return;
         setFeedbackContext('');
         setSelectedFilter('Following');
-        setImageExpanded(false);
-        rotateAnim.setValue(0);
         onClose();
     };
 
     const handleBackPress = () => {
+        // Same guard as handleClose — navigating back mid-upload has the same stuck-state risk.
+        if (loading) return;
         setFeedbackContext('');
         setSelectedFilter('Following');
-        setImageExpanded(false);
-        rotateAnim.setValue(0);
         onBack?.();
+        // TODO: implement left/right slide transition between this modal and CreatePostModal.
+        // The current architecture uses independent React Native <Modal> components with a
+        // 200ms NONE gap via switchModal() — horizontal slide would require either combining
+        // both steps into a single Modal container with Animated translate, or migrating to
+        // a React Navigation stack for the create-post flow.
     };
 
     return (
@@ -108,17 +90,16 @@ export default function RequestChefReviewModal({
             animationType="slide"
             onRequestClose={handleClose}
         >
-            <View style={styles.overlay}>
-                <Pressable 
-                    style={styles.overlayPressable} 
+            <View style={[styles.overlay, { backgroundColor: theme.overlayBackground }]}>
+                <Pressable
+                    style={styles.overlayPressable}
                     onPress={handleClose}
                 />
-                <KeyboardAvoidingView 
+                <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                     style={styles.keyboardAvoid}
                 >
                     <View style={[styles.modalContainer, { backgroundColor: theme.modalBackground }]}>
-                        {/* Header */}
                         <View style={[styles.header, { borderBottomColor: theme.border }]}>
                             <Pressable onPress={handleBackPress} style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.6 }]}>
                                 <Ionicons name="arrow-back" size={fp(24)} color={theme.textPrimary} />
@@ -129,64 +110,42 @@ export default function RequestChefReviewModal({
                             <View style={styles.placeholder} />
                         </View>
 
-                        <ScrollView 
+                        <ScrollView
                             style={styles.scrollContent}
                             contentContainerStyle={styles.scrollContentContainer}
                             showsVerticalScrollIndicator={false}
                             keyboardShouldPersistTaps="handled"
                         >
-                            {/* Dish Info - Pressable */}
-                            {dish && (
-                                <>
-                                    <Pressable 
-                                        style={[styles.dishInfo, { backgroundColor: theme.cardBackgroundAlt }]}
-                                        onPress={toggleImageExpanded}
-                                    >
-                                        <Ionicons name="restaurant-outline" size={fp(20)} color={theme.primary} />
-                                        <Text style={[styles.dishTitle, { color: theme.textPrimary }]} numberOfLines={1}>
-                                            {dish.title}
-                                        </Text>
-                                        <Animated.View style={{ transform: [{ rotate: arrowRotation }] }}>
-                                            <Ionicons name="chevron-down" size={fp(20)} color={theme.textSecondary} />
-                                        </Animated.View>
-                                    </Pressable>
-
-                                    {/* Expandable Image */}
-                                    {imageExpanded && imageUri && (
-                                        <View style={styles.imageContainer}>
-                                            <Image 
-                                                source={{ uri: imageUri }} 
-                                                style={styles.dishImage}
-                                                resizeMode="cover"
-                                            />
-                                        </View>
-                                    )}
-                                </>
+                            {postData?.title && (
+                                <View style={[styles.dishInfo, { backgroundColor: theme.cardBackgroundAlt }]}>
+                                    <Ionicons name="restaurant-outline" size={fp(20)} color={theme.primary} />
+                                    <Text style={[styles.dishTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+                                        {postData.title}
+                                    </Text>
+                                </View>
                             )}
 
-                            {/* Info Section */}
                             <View style={[styles.infoBox, { backgroundColor: theme.primaryLightest }]}>
                                 <Ionicons name="information-circle" size={fp(20)} color={theme.primary} />
                                 <Text style={[styles.infoText, { color: theme.textSecondary }]}>
-                                    Professional chefs will review your dish and provide feedback based on 
+                                    Professional chefs will review your dish and provide feedback based on
                                     presentation, technique, and flavor potential. Tell them what they need to know!
                                 </Text>
                             </View>
 
-                            {/* Feedback Context Input */}
                             <Text style={[styles.label, { color: theme.textPrimary }]}>
-                                Specify the ingredients and/or preparation steps. <Text style={styles.required}>*</Text>
+                                Want to add anything else? <Text style={{ color: theme.danger }}>*</Text>
                             </Text>
                             <TextInput
                                 style={[
                                     styles.textInput,
-                                    { 
-                                        backgroundColor: theme.inputBackground, 
+                                    {
+                                        backgroundColor: theme.inputBackground,
                                         color: theme.textPrimary,
                                         borderColor: theme.border
                                     }
                                 ]}
-                                placeholder="e.g., Chicken breast, garlic, olive oil. Seasoned and pan-seared for 5 minutes each side, then baked at 180°C for 15 minutes."
+                                placeholder="Anything else the chef should know about your technique or preparation?"
                                 placeholderTextColor={theme.textTertiary}
                                 value={feedbackContext}
                                 onChangeText={setFeedbackContext}
@@ -195,7 +154,6 @@ export default function RequestChefReviewModal({
                                 textAlignVertical="top"
                             />
 
-                            {/* Chef Selection */}
                             <Text style={[styles.label, { color: theme.textPrimary, marginTop: hp(20) }]}>
                                 Who can review?
                             </Text>
@@ -205,28 +163,28 @@ export default function RequestChefReviewModal({
                                         key={filter}
                                         style={[
                                             styles.filterOption,
-                                            { 
-                                                backgroundColor: selectedFilter === filter 
-                                                    ? theme.primary 
+                                            {
+                                                backgroundColor: selectedFilter === filter
+                                                    ? theme.primary
                                                     : theme.cardBackgroundAlt,
-                                                borderColor: selectedFilter === filter 
-                                                    ? theme.primary 
+                                                borderColor: selectedFilter === filter
+                                                    ? theme.primary
                                                     : theme.border
                                             }
                                         ]}
                                         onPress={() => setSelectedFilter(filter)}
                                     >
-                                        <Ionicons 
-                                            name={filter === 'Following' ? 'people' : 'globe-outline'} 
-                                            size={fp(16)} 
-                                            color={selectedFilter === filter ? '#FFFFFF' : theme.textSecondary} 
+                                        <Ionicons
+                                            name={filter === 'Following' ? 'people' : 'globe-outline'}
+                                            size={fp(16)}
+                                            color={selectedFilter === filter ? theme.textInverse : theme.textSecondary}
                                         />
                                         <Text style={[
                                             styles.filterText,
-                                            { 
-                                                color: selectedFilter === filter 
-                                                    ? '#FFFFFF' 
-                                                    : theme.textPrimary 
+                                            {
+                                                color: selectedFilter === filter
+                                                    ? theme.textInverse
+                                                    : theme.textPrimary
                                             }
                                         ]}>
                                             {filter}
@@ -236,16 +194,15 @@ export default function RequestChefReviewModal({
                             </View>
 
                             <Text style={[styles.filterHint, { color: theme.textTertiary }]}>
-                                {selectedFilter === 'Following' 
+                                {selectedFilter === 'Following'
                                     ? 'Only chefs you follow will see this request'
                                     : 'All verified chefs can see and claim this request'
                                 }
                             </Text>
 
-                            {/* Submit Button inside ScrollView */}
                             <Pressable
                                 style={({ pressed }) => [
-                                    styles.submitButton, 
+                                    styles.submitButton,
                                     { backgroundColor: theme.primary },
                                     (pressed || loading) && { opacity: 0.8 }
                                 ]}
@@ -253,11 +210,11 @@ export default function RequestChefReviewModal({
                                 disabled={loading}
                             >
                                 {loading ? (
-                                    <ActivityIndicator color="#FFF" />
+                                    <ActivityIndicator color={theme.textInverse} />
                                 ) : (
                                     <>
-                                        <Ionicons name="paper-plane" size={fp(18)} color="#FFFFFF" />
-                                        <Text style={styles.submitButtonText}>Send Request</Text>
+                                        <Ionicons name="paper-plane-outline" size={fp(18)} color={theme.textInverse} />
+                                        <Text style={[styles.submitButtonText, { color: theme.textInverse }]}>Post</Text>
                                     </>
                                 )}
                             </Pressable>
@@ -272,7 +229,6 @@ export default function RequestChefReviewModal({
 const styles = StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'flex-end',
     },
     overlayPressable: {
@@ -328,17 +284,6 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         flex: 1,
     },
-    imageContainer: {
-        width: '100%',
-        marginBottom: hp(16),
-        borderRadius: wp(12),
-        overflow: 'hidden',
-    },
-    dishImage: {
-        width: '100%',
-        height: hp(140),
-        backgroundColor: '#F3F4F6',
-    },
     infoBox: {
         flexDirection: 'row',
         alignItems: 'flex-start',
@@ -356,9 +301,6 @@ const styles = StyleSheet.create({
         fontSize: fp(14),
         fontWeight: '600',
         marginBottom: hp(8),
-    },
-    required: {
-        color: '#EF4444',
     },
     textInput: {
         borderWidth: 1,
@@ -400,7 +342,6 @@ const styles = StyleSheet.create({
         borderRadius: wp(12),
     },
     submitButtonText: {
-        color: '#FFFFFF',
         fontSize: fp(16),
         fontWeight: '700',
     },

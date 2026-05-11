@@ -1,6 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet, Modal, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Image, StyleSheet, Modal, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { getCloudinaryUrl } from '../../../utils/cloudinaryUrl';
 import { wp, hp, fp } from '../../../utils/responsive';
 import { NOTIFICATION_TYPES } from '../../../context/NotificationsContext';
 
@@ -13,10 +14,19 @@ export default function NotificationDetailModal({
     onClaim,
     claiming 
 }) {
+    const [dishImageFailed, setDishImageFailed] = useState(false);
+
     if (!notification) return null;
 
     const isChefRequest = notification.type === NOTIFICATION_TYPES.CHEF_REVIEW_REQUEST;
     const isReviewReceived = notification.type === NOTIFICATION_TYPES.CHEF_REVIEW_RECEIVED;
+
+    const requestStatus = notification.data?.requestStatus;
+    const claimedBy = notification.data?.claimedBy;
+    const isClaimedByMe = claimedBy === currentUser?.id;
+    const isClaimedByOther = claimedBy && !isClaimedByMe;
+    const isCompleted = requestStatus === 'completed';
+    const isStillClaimable = isChefRequest && !isClaimedByOther && !isCompleted;
 
     return (
         <Modal visible={visible} transparent={true} animationType='slide' onRequestClose={onClose}>
@@ -42,7 +52,9 @@ export default function NotificationDetailModal({
                             </View>
                             <View style={styles.details}>
                                 <Text style={[styles.name, { color: theme.textPrimary }]}>
-                                    {isChefRequest ? notification.data?.requesterName : notification.data?.chefName}
+                                    {isChefRequest
+                                        ? (notification.data?.requesterName || '—')
+                                        : (notification.data?.chefName || '—')}
                                 </Text>
                                 <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
                                     {isChefRequest ? 'Wants your expert feedback' : 'Professional Chef'}
@@ -54,9 +66,33 @@ export default function NotificationDetailModal({
                         <View style={[styles.postCard, { backgroundColor: theme.cardBackgroundAlt }]}>
                             {isReviewReceived && <Ionicons name="restaurant" size={fp(20)} color={theme.primary} />}
                             <Text style={[styles.postTitle, { color: theme.textPrimary }]}>
-                                {isChefRequest ? `Dish: ${notification.data?.postTitle}` : (notification.data?.postTitle || 'Your Dish')}
+                                {isChefRequest
+                                    ? `Dish: ${notification.data?.postTitle || '—'}`
+                                    : (notification.data?.postTitle || 'Your Dish')}
                             </Text>
                         </View>
+
+                        {/* Dish image — always rendered for chef review requests so the slot is
+                            never invisible; shows a placeholder when the URL is missing or broken */}
+                        {isChefRequest && (
+                            <View style={[styles.dishImageContainer, { backgroundColor: theme.cardBackgroundAlt }]}>
+                                {notification.data?.postImage && !dishImageFailed ? (
+                                    <Image
+                                        source={{ uri: getCloudinaryUrl(notification.data.postImage, { width: 600, quality: 'auto', format: 'auto' }) }}
+                                        style={styles.dishImage}
+                                        resizeMode="cover"
+                                        onError={() => setDishImageFailed(true)}
+                                    />
+                                ) : (
+                                    <View style={styles.dishImagePlaceholder}>
+                                        <Ionicons name="camera-outline" size={fp(36)} color={theme.textTertiary} />
+                                        <Text style={[styles.dishImagePlaceholderText, { color: theme.textTertiary }]}>
+                                            No photo provided
+                                        </Text>
+                                    </View>
+                                )}
+                            </View>
+                        )}
 
                         {/* Content */}
                         {isChefRequest && notification.data?.context && (
@@ -90,32 +126,41 @@ export default function NotificationDetailModal({
 
                     <View style={styles.actionButtonsRow}>
                         {isChefRequest ? (
-                            <>
-                                <Pressable 
-                                    onPress={onClose} 
-                                    style={[styles.cancelButton, { backgroundColor: theme.cardBackgroundAlt }]}
-                                >
-                                    <Text style={[styles.cancelButtonText, { color: theme.textMuted }]}>Later</Text>
-                                </Pressable>
-                                <Pressable 
-                                    onPress={onClaim} 
-                                    style={[styles.actionButton, { backgroundColor: theme.primary }]}
-                                    disabled={claiming}
-                                >
-                                    {claiming ? <ActivityIndicator color="#FFF" /> : (
-                                        <>
-                                            <Ionicons 
-                                                name={notification.data?.claimedBy === currentUser?.id ? "pencil" : "checkbox"} 
-                                                size={fp(18)} 
-                                                color="#FFF" 
-                                            />
-                                            <Text style={styles.actionButtonText}>
-                                                {notification.data?.claimedBy === currentUser?.id ? 'Review Now' : 'Claim & Review'}
-                                            </Text>
-                                        </>
-                                    )}
-                                </Pressable>
-                            </>
+                            isClaimedByOther || isCompleted ? (
+                                <View style={[styles.claimedBanner, { backgroundColor: theme.cardBackgroundAlt }]}>
+                                    <Ionicons name="lock-closed-outline" size={fp(16)} color={theme.textTertiary} />
+                                    <Text style={[styles.claimedBannerText, { color: theme.textTertiary }]}>
+                                        {isCompleted ? 'This request has been completed' : 'Already claimed by another chef'}
+                                    </Text>
+                                </View>
+                            ) : (
+                                <>
+                                    <Pressable
+                                        onPress={onClose}
+                                        style={[styles.cancelButton, { backgroundColor: theme.cardBackgroundAlt }]}
+                                    >
+                                        <Text style={[styles.cancelButtonText, { color: theme.textMuted }]}>Later</Text>
+                                    </Pressable>
+                                    <Pressable
+                                        onPress={onClaim}
+                                        style={[styles.actionButton, { backgroundColor: theme.primary }]}
+                                        disabled={claiming}
+                                    >
+                                        {claiming ? <ActivityIndicator color="#FFF" /> : (
+                                            <>
+                                                <Ionicons
+                                                    name={isClaimedByMe ? "pencil" : "checkbox"}
+                                                    size={fp(18)}
+                                                    color="#FFF"
+                                                />
+                                                <Text style={styles.actionButtonText}>
+                                                    {isClaimedByMe ? 'Review Now' : 'Claim & Review'}
+                                                </Text>
+                                            </>
+                                        )}
+                                    </Pressable>
+                                </>
+                            )
                         ) : (
                             <Pressable onPress={onClose} style={[styles.fullWidthButton, { backgroundColor: theme.primary }]}>
                                 <Text style={styles.fullWidthButtonText}>Close</Text>
@@ -212,6 +257,27 @@ const styles = StyleSheet.create({
         fontSize: fp(14),
         lineHeight: hp(22),
     },
+    dishImageContainer: {
+        borderRadius: wp(12),
+        overflow: 'hidden',
+        marginBottom: hp(16),
+        minHeight: hp(160),
+    },
+    dishImage: {
+        width: '100%',
+        height: hp(200),
+    },
+    dishImagePlaceholder: {
+        width: '100%',
+        height: hp(160),
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: hp(8),
+    },
+    dishImagePlaceholderText: {
+        fontSize: fp(13),
+        fontWeight: '500',
+    },
     contextBox: {
         padding: wp(14),
         borderRadius: wp(12),
@@ -229,6 +295,19 @@ const styles = StyleSheet.create({
         paddingTop: hp(12),
         borderTopWidth: 1,
         borderTopColor: 'rgba(0,0,0,0.08)',
+    },
+    claimedBanner: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: wp(8),
+        paddingVertical: hp(14),
+        borderRadius: wp(12),
+    },
+    claimedBannerText: {
+        fontSize: fp(14),
+        fontWeight: '500',
     },
     cancelButton: {
         flex: 1,

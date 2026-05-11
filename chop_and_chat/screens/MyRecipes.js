@@ -21,7 +21,7 @@ export default function MyPostsScreen({ navigation }) {
   const loadMyRecipes = useCallback(async () => {
     if (!token) return;
     try {
-      const data = await api.get('/posts/search', token);
+      const data = await api.get('/posts/mine', token);
       setMyPosts(data?.posts ?? data ?? []);
     } catch (error) {
       console.error('[MyRecipes] loadMyRecipes:', error.message);

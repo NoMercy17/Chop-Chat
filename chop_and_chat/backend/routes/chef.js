@@ -25,6 +25,111 @@ function initials(name) {
   return (name || '').substring(0, 2).toUpperCase();
 }
 
+// Creates a post + chef review request atomically in a single DB transaction.
+// This replaces the old two-call flow (POST /posts then POST /chef/review-request) where
+// a failure after post creation would leave an orphaned post with no review request row.
+router.post('/submit-with-review', reviewRequestLimiter, authenticateToken, async (req, res) => {
+  const { title, description, image_url, cook_time, difficulty, utensils, ingredients, instructions, context, chef_filter } = req.body;
+
+  if (!title?.trim()) return res.status(400).json({ error: 'title is required' });
+  if (!image_url?.trim()) return res.status(400).json({ error: 'image_url is required' });
+  if (difficulty && !['Easy', 'Medium', 'Hard'].includes(difficulty)) {
+    return res.status(400).json({ error: 'difficulty must be Easy, Medium, or Hard' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Both inserts run inside the transaction — if either fails, ROLLBACK undoes both.
+    const { rows: postRows } = await client.query(`
+      INSERT INTO posts (user_id, title, description, image_url, cook_time, difficulty, utensils, ingredients, instructions, is_global, is_seeded, chef_review_requested)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false, false, true)
+      RETURNING *
+    `, [
+      req.user.id,
+      title.trim(),
+      description?.trim() || null,
+      image_url.trim(),
+      cook_time || null,
+      difficulty || null,
+      JSON.stringify(utensils || []),
+      JSON.stringify(ingredients || []),
+      instructions?.trim() || null,
+    ]);
+
+    const post = postRows[0];
+
+    // RETURNING id is required so we can include requestId in the notification data,
+    // which the frontend needs to claim the request without a separate lookup.
+    const { rows: reviewRows } = await client.query(
+      'INSERT INTO chef_review_requests (requester_id, post_id, context, chef_filter) VALUES ($1, $2, $3, $4) RETURNING id',
+      [req.user.id, post.id, context?.trim() || null, chef_filter || 'All Chefs']
+    );
+    const reviewRequestId = reviewRows[0].id;
+
+    await client.query('COMMIT');
+
+    // Notifications are sent outside the transaction — they're non-critical and
+    // a notification failure should not roll back the post + review request.
+    let chefIds = [];
+    if (chef_filter === 'Following') {
+      const following = await pool.query(
+        'SELECT following_id FROM follows f JOIN users u ON f.following_id = u.id WHERE f.follower_id = $1 AND u.role = $2',
+        [req.user.id, 'chef']
+      );
+      chefIds = following.rows.map(r => r.following_id);
+    } else {
+      const allChefs = await pool.query('SELECT id FROM users WHERE role = $1 AND id != $2', ['chef', req.user.id]);
+      chefIds = allChefs.rows.map(r => r.id);
+    }
+
+    const requesterName = req.user.name || 'A user';
+    for (const chefId of chefIds) {
+      await pool.query(
+        'INSERT INTO notifications (user_id, type, title, subtitle, data) VALUES ($1, $2, $3, $4, $5)',
+        [
+          chefId,
+          'chef_review_request',
+          'Review Request',
+          `${requesterName} wants your feedback on their ${post.title}`,
+          // requestId and postImage are included so the chef's notification UI can show
+          // the dish image and claim the request without extra lookups.
+          JSON.stringify({ requestId: reviewRequestId, postId: post.id, requesterName, postTitle: post.title, postImage: post.image_url })
+        ]
+      );
+    }
+
+    res.status(201).json({
+      post: {
+        id: post.id,
+        author: req.user.name,
+        authorId: req.user.id,
+        title: post.title,
+        description: post.description,
+        image: post.image_url,
+        ingredients: post.ingredients,
+        instructions: post.instructions,
+        utensils: post.utensils,
+        cookTime: post.cook_time,
+        difficulty: post.difficulty,
+        likes: 0,
+        comments: 0,
+        liked: false,
+        saved: false,
+        chefReviewRequested: true,
+        createdAt: post.created_at,
+      }
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[POST /chef/submit-with-review]', err);
+    res.status(500).json({ error: 'server error' });
+  } finally {
+    client.release();
+  }
+});
+
 // User requests a review for a post
 router.post('/review-request', reviewRequestLimiter, authenticateToken, async (req, res) => {
   try {
@@ -53,23 +158,25 @@ router.post('/review-request', reviewRequestLimiter, authenticateToken, async (r
       );
       chefIds = following.rows.map(r => r.following_id);
     } else {
-      const allChefs = await pool.query('SELECT id FROM users WHERE role = $1', ['chef']);
+      const allChefs = await pool.query('SELECT id FROM users WHERE role = $1 AND id != $2', ['chef', requester_id]);
       chefIds = allChefs.rows.map(r => r.id);
     }
 
-    const postData = await pool.query('SELECT title FROM posts WHERE id = $1', [post_id]);
+    // Fetch title and image in one query so the notification includes the dish photo
+    const postData = await pool.query('SELECT title, image_url FROM posts WHERE id = $1', [post_id]);
     const postTitle = postData.rows[0]?.title || 'a dish';
+    const postImage = postData.rows[0]?.image_url || null;
     const requesterName = req.user.name || 'A user';
 
     for (const chefId of chefIds) {
       await pool.query(
         'INSERT INTO notifications (user_id, type, title, subtitle, data) VALUES ($1, $2, $3, $4, $5)',
         [
-          chefId, 
-          'chef_review_request', 
-          'Review Request', 
+          chefId,
+          'chef_review_request',
+          'Review Request',
           `${requesterName} wants your feedback on their ${postTitle}`,
-          JSON.stringify({ requestId: reviewRequest.id, postId: post_id, requesterName, postTitle })
+          JSON.stringify({ requestId: reviewRequest.id, postId: post_id, requesterName, postTitle, postImage })
         ]
       );
     }
@@ -102,13 +209,17 @@ router.get('/review-requests', authenticateToken, requireChef, async (req, res) 
 
 // Claim a review request
 router.patch('/review-requests/:id/claim', authenticateToken, requireChef, async (req, res) => {
+  // Parse and validate before touching the DB — passing the raw param string when it is
+  // 'undefined' causes PostgreSQL to throw "invalid input syntax for type integer".
+  const requestId = parseInt(req.params.id, 10);
+  if (isNaN(requestId)) return res.status(400).json({ error: 'request id must be a valid integer' });
   try {
     const { rows } = await pool.query(
-      `UPDATE chef_review_requests 
-       SET status = 'claimed', claimed_by = $1, updated_at = now() 
-       WHERE id = $2 AND status = 'pending' 
+      `UPDATE chef_review_requests
+       SET status = 'claimed', claimed_by = $1, updated_at = now()
+       WHERE id = $2 AND status = 'pending'
        RETURNING *`,
-      [req.user.id, req.params.id]
+      [req.user.id, requestId]
     );
     
     if (!rows.length) return res.status(404).json({ error: 'request not found or already claimed' });
@@ -135,7 +246,26 @@ router.post('/reviews', authenticateToken, requireChef, async (req, res) => {
       );
       reaction = reactionInsert.rows[0];
     } catch (insertErr) {
-      if (insertErr.code === '23505') return res.status(409).json({ error: 'you already reviewed this post' });
+      if (insertErr.code === '23505') {
+        // Reaction already exists — this happens when the claim succeeded and the reaction
+        // was saved, but the status update to 'completed' failed. Make the endpoint idempotent:
+        // if a request_id is provided, find the existing reaction, mark the request complete,
+        // and return success so the chef isn't stuck in a broken state.
+        if (request_id) {
+          const existing = await pool.query(
+            'SELECT * FROM chef_reactions WHERE chef_id = $1 AND post_id = $2',
+            [chef_id, post_id]
+          );
+          if (existing.rows.length) {
+            await pool.query(
+              "UPDATE chef_review_requests SET status = 'completed', updated_at = now() WHERE id = $1 AND claimed_by = $2 AND post_id = $3",
+              [request_id, chef_id, post_id]
+            );
+            return res.status(201).json({ reaction: existing.rows[0] });
+          }
+        }
+        return res.status(409).json({ error: 'you already reviewed this post' });
+      }
       if (insertErr.code === '23503') return res.status(404).json({ error: 'post not found' });
       throw insertErr;
     }

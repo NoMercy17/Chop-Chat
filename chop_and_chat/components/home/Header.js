@@ -1,5 +1,4 @@
-import { Text, View, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Text, View, StyleSheet, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { useState, useCallback } from 'react';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,7 +15,6 @@ export default function Header({ navigation }) {
     const [chefReviewModalVisible, setChefReviewModalVisible] = useState(false);
     const [claiming, setClaiming] = useState(false);
     
-    const insets = useSafeAreaInsets();
     const { theme } = useTheme();
     const { 
         notifications, 
@@ -32,16 +30,22 @@ export default function Header({ navigation }) {
     const handleNotificationPress = useCallback((notification) => {
         markAsRead(notification.id);
         setSelectedNotification(notification);
-        
+
         if (notification.type === NOTIFICATION_TYPES.CHEF_REVIEW_REQUEST) {
             setModalVisible(false);
             requestAnimationFrame(() => {
-                setDetailModalVisible(true);
+                // Already claimed by this chef — skip the info/claim screen and go straight
+                // to the review editor. The detail modal is only for unclaimed requests.
+                if (notification.data?.claimedBy && notification.data.claimedBy === currentUser?.id) {
+                    setChefReviewModalVisible(true);
+                } else {
+                    setDetailModalVisible(true);
+                }
             });
         } else if (notification.type === NOTIFICATION_TYPES.CHEF_REVIEW_RECEIVED) {
             setDetailModalVisible(true);
         }
-    }, [markAsRead]);
+    }, [markAsRead, currentUser]);
 
     const handleDeleteNotification = useCallback((notificationId) => {
         deleteNotification(notificationId);
@@ -49,18 +53,34 @@ export default function Header({ navigation }) {
 
     const handleClaimReview = useCallback(async () => {
         if (!selectedNotification || !currentUser) return;
-        
+
+        const requestId = selectedNotification.data?.requestId;
+        if (!requestId) {
+            // Stale notification with no requestId — auto-dismiss it so it doesn't reappear
+            deleteNotification(selectedNotification.id);
+            setDetailModalVisible(false);
+            setSelectedNotification(null);
+            Alert.alert('Not Available', 'This request is no longer available.');
+            return;
+        }
+
         setClaiming(true);
         try {
-            const requestId = selectedNotification.data?.requestId;
             if (selectedNotification.data?.claimedBy !== currentUser.id) {
                 await claimReviewRequest(selectedNotification.id, requestId);
             }
-            
             setDetailModalVisible(false);
             setChefReviewModalVisible(true);
         } catch (error) {
             console.error('[Header:handleClaimReview] Failed to claim:', error.message);
+            // Another chef claimed it first — remove from this chef's list and explain why
+            deleteNotification(selectedNotification.id);
+            setDetailModalVisible(false);
+            setSelectedNotification(null);
+            Alert.alert(
+                'Already Claimed',
+                'Another chef has already claimed this review request. It has been removed from your notifications.'
+            );
         } finally {
             setClaiming(false);
         }
@@ -98,7 +118,7 @@ export default function Header({ navigation }) {
 
     return (
         <View style={[styles.container, { backgroundColor: theme.primary }]}>
-            <Text style={[styles.appName, { color: theme.textInverse }]}>Cook&Chat</Text>
+            <Text style={[styles.appName, { color: theme.textInverse }]}>Chop & Chat</Text>
 
             <View style={styles.rightButtons}>
                 <Pressable 
@@ -110,8 +130,8 @@ export default function Header({ navigation }) {
                 >
                     <Ionicons name="notifications" size={fp(22)} color={theme.textInverse} />
                     {unreadCount > 0 && (
-                        <View style={styles.badge}>
-                            <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                        <View style={[styles.badge, { backgroundColor: theme.danger }]}>
+                            <Text style={[styles.badgeText, { color: theme.textInverse }]}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
                         </View>
                     )}
                 </Pressable>
@@ -171,16 +191,15 @@ const styles = StyleSheet.create({
     appName: {
         fontSize: fp(24),
         fontWeight: '700',
-        color: '#111827',
         letterSpacing: -0.5,
     },
     rightButtons: {
         flexDirection: 'row',
-        gap: wp(8),
+        gap: wp(4),
     },
     button: {
-        width: wp(36),
-        height: wp(36),
+        width: wp(44),
+        height: wp(44),
         borderRadius: wp(10),
         backgroundColor: 'transparent',
         justifyContent: 'center',
@@ -194,7 +213,6 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: -hp(2),
         right: -wp(2),
-        backgroundColor: '#EF4444',
         borderRadius: wp(10),
         minWidth: wp(18),
         height: wp(18),
@@ -203,7 +221,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: wp(4),
     },
     badgeText: {
-        color: '#FFFFFF',
         fontSize: fp(10),
         fontWeight: '700',
     },

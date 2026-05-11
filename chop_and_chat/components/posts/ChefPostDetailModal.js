@@ -1,9 +1,23 @@
-import React from 'react';
-import { View, Text, StyleSheet, Modal, Pressable, ScrollView } from 'react-native';
+import React, { useContext } from 'react';
+
+function relativeTime(date) {
+    if (!date) return '';
+    const s = Math.floor((Date.now() - new Date(date)) / 1000);
+    if (s < 60) return 'just now';
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+}
+import { View, Text, StyleSheet, Modal, Pressable, ScrollView, Image } from 'react-native';
+import { getCloudinaryUrl } from '../../utils/cloudinaryUrl';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { useTheme } from '../../context/ThemeContext';
+import { AuthContext } from '../../context/AuthContext';
+import { navigateToProfile } from '../../utils/navigation';
 
 export default function ChefPostDetailModal({ 
     visible, 
@@ -16,6 +30,7 @@ export default function ChefPostDetailModal({
 }) {
     const { theme } = useTheme();
     const navigation = useNavigation();
+    const { user: currentUser } = useContext(AuthContext);
 
     if (!item) return null;
 
@@ -25,15 +40,10 @@ export default function ChefPostDetailModal({
     const displayTitle = isReaction ? item.reaction.targetPost?.title : item.post?.title;
     const displayText = isReaction ? item.reaction.text : item.post?.caption;
 
-    const handleUserPress = (user) => {
-        onClose(); // Close the modal first
+    const handleUserPress = (profileUser) => {
+        onClose();
         setTimeout(() => {
-            navigation.navigate('OtherUserProfile', {
-                userId: user.id,
-                userName: user.name,
-                userAvatar: user.avatar || null,
-                username: `@${user.name.replace(/\s+/g, '').toLowerCase()}`
-            });
+            navigateToProfile(navigation, profileUser.id, profileUser.name, currentUser?.id);
         }, 200);
     };
 
@@ -57,11 +67,18 @@ export default function ChefPostDetailModal({
                                 onPress={() => handleUserPress(item.chef)}
                             >
                                 <View style={[styles.avatar, { backgroundColor: theme.primary }]}>
-                                    <Text style={styles.avatarText}>{item.chef.avatar}</Text>
+                                    {item.chef.photo ? (
+                                        <Image
+                                            source={{ uri: getCloudinaryUrl(item.chef.photo, { width: 80, height: 80, crop: 'fill', gravity: 'face' }) }}
+                                            style={styles.avatarImg}
+                                        />
+                                    ) : (
+                                        <Text style={styles.avatarText}>{item.chef.avatar}</Text>
+                                    )}
                                 </View>
                                 <View>
                                     <Text style={[styles.chefName, { color: theme.textPrimary }]}>{item.chef.name}</Text>
-                                    <Text style={[styles.timestamp, { color: theme.textSecondary }]}>2 hours ago</Text>
+                                    <Text style={[styles.timestamp, { color: theme.textSecondary }]}>{relativeTime(item.createdAt)}</Text>
                                 </View>
                             </Pressable>
                             <Pressable onPress={onClose} style={styles.closeButton}>
@@ -194,6 +211,11 @@ const styles = StyleSheet.create({
         borderRadius: wp(20),
         justifyContent: 'center',
         alignItems: 'center',
+        overflow: 'hidden',
+    },
+    avatarImg: {
+        width: '100%',
+        height: '100%',
     },
     avatarText: {
         color: '#FFF',

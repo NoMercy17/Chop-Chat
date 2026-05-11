@@ -94,9 +94,16 @@ export function NotificationsProvider({ children }) {
   // Claim a review request (for chefs)
   const claimReviewRequest = useCallback(async (notificationId, requestId) => {
     if (!token || !isChef) return;
+    // Validate requestId before hitting the backend — passing 'undefined' as a URL segment
+    // causes PostgreSQL's integer cast to throw "invalid input syntax for type integer".
+    const id = parseInt(requestId, 10);
+    if (isNaN(id)) {
+      console.error('[NotificationsContext:claimReviewRequest] Invalid requestId:', requestId);
+      throw new Error('Invalid review request ID — cannot claim');
+    }
     try {
       // 1. Claim in backend
-      await ChefService.claimRequest(requestId, token);
+      await ChefService.claimRequest(id, token);
       
       // 2. Mark notification as read and claimed locally
       setNotifications(prev =>

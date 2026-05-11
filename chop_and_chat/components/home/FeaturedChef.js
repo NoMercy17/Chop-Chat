@@ -1,5 +1,6 @@
 import { useMemo, useState, useContext, useCallback } from 'react';
-import { Text, View, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { Text, View, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
+import { getCloudinaryUrl } from '../../utils/cloudinaryUrl';
 import { useNavigation } from '@react-navigation/native';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +8,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useChefFeed } from '../../context/ChefFeedContext';
 import { AuthContext } from '../../context/AuthContext';
 import { api } from '../../services/api';
+import { navigateToProfile } from '../../utils/navigation';
 import ChefPostDetailModal from '../posts/ChefPostDetailModal';
 import DishDetailModal from '../posts/DishDetailModal';
 import CommentsModal from '../posts/CommentsModal';
@@ -15,7 +17,7 @@ export default function FeaturedChef() {
     const navigation = useNavigation();
     const { theme } = useTheme();
     
-    const { token } = useContext(AuthContext);
+    const { token, user } = useContext(AuthContext);
     const { feedItems, handleLike, handleSave, addComment } = useChefFeed();
 
     const [chefPostDetailVisible, setChefPostDetailVisible] = useState(false);
@@ -90,7 +92,14 @@ export default function FeaturedChef() {
             >
                 <View style={[styles.cardHeader, { backgroundColor: theme.chefCardHeaderBg }]}>
                     <View style={[styles.chefAvatar, { backgroundColor: theme.primary }]}>
-                        <Text style={[styles.chefInitial, { color: theme.textInverse }]}>{item.chef.avatar}</Text>
+                        {item.chef.photo ? (
+                            <Image
+                                source={{ uri: getCloudinaryUrl(item.chef.photo, { width: 96, height: 96, crop: 'fill', gravity: 'face' }) }}
+                                style={styles.chefAvatarImg}
+                            />
+                        ) : (
+                            <Text style={[styles.chefInitial, { color: theme.textInverse }]}>{item.chef.avatar}</Text>
+                        )}
                     </View>
                     <View style={styles.headerInfo}>
                         <Text style={[styles.reviewTitle, { color: theme.textPrimary }]} numberOfLines={1}>{displayTitle}</Text>
@@ -110,10 +119,7 @@ export default function FeaturedChef() {
                         <Pressable
                             onPress={(e) => {
                                 e.stopPropagation();
-                                navigation.navigate('OtherUserProfile', {
-                                    userId: item.chef.id,
-                                    userName: item.chef.name
-                                });
+                                navigateToProfile(navigation, item.chef.id, item.chef.name, user?.id);
                             }}
                             style={({pressed}) => pressed && {opacity: 0.7}}
                         >
@@ -220,7 +226,7 @@ export default function FeaturedChef() {
                 onAddComment={submitComment}
                 onAuthorPress={(comment) => {
                     handleCloseComments();
-                    navigation.navigate('OtherUserProfile', { userId: comment.authorId, userName: comment.author });
+                    navigateToProfile(navigation, comment.authorId, comment.author, user?.id);
                 }}
                 theme={theme}
             />
@@ -293,6 +299,11 @@ const styles = StyleSheet.create({
         borderRadius: wp(24),
         justifyContent: 'center',
         alignItems: 'center',
+        overflow: 'hidden',
+    },
+    chefAvatarImg: {
+        width: '100%',
+        height: '100%',
     },
     chefInitial: {
         fontSize: fp(18),

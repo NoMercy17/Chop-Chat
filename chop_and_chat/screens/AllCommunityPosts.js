@@ -8,6 +8,7 @@ import { usePosts } from '../context/PostsContext';
 import { useFollow } from '../context/FollowContext';
 import { AuthContext } from '../context/AuthContext';
 import { api } from '../services/api';
+import { navigateToProfile } from '../utils/navigation';
 import DishDetailModal from '../components/posts/DishDetailModal';
 import CategoryHeader from '../components/home/CategoryHeader';
 import CommentsModal from '../components/posts/CommentsModal';
@@ -17,7 +18,7 @@ const CATEGORIES = ['Following', 'All'];
 export default function AllCommunityPosts({ navigation }) {
     const { theme } = useTheme();
     const insets = useSafeAreaInsets();
-    const { token } = useContext(AuthContext);
+    const { token, user } = useContext(AuthContext);
     const { posts, handleLike, handleSave, addComment } = usePosts();
     const { followedUsers } = useFollow();
 
@@ -97,10 +98,7 @@ export default function AllCommunityPosts({ navigation }) {
                             <Pressable
                                 onPress={(e) => {
                                     e.stopPropagation();
-                                    navigation.navigate('OtherUserProfile', {
-                                        userId: post.authorId || post.id,
-                                        userName: post.author
-                                    });
+                                    navigateToProfile(navigation, post.authorId || post.id, post.author, user?.id);
                                 }}
                                 style={({pressed}) => pressed && {opacity: 0.7}}
                             >
@@ -143,7 +141,7 @@ export default function AllCommunityPosts({ navigation }) {
                 onAddComment={handleAddComment}
                 onAuthorPress={(comment) => {
                     setCommentsModalVisible(false);
-                    navigation.navigate('OtherUserProfile', { userId: comment.authorId, userName: comment.author });
+                    navigateToProfile(navigation, comment.authorId, comment.author, user?.id);
                 }}
                 theme={theme}
             />

@@ -5,6 +5,7 @@ const pool = require('../db');
 const { authenticateToken } = require('../middleware');
 
 const postsReadLimiter     = rateLimit({ windowMs: 15 * 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false });
+const postsWriteLimiter    = rateLimit({ windowMs: 15 * 60 * 1000, max: 40,  standardHeaders: true, legacyHeaders: false });
 const likesWriteLimiter    = rateLimit({ windowMs: 15 * 60 * 1000, max: 40,  standardHeaders: true, legacyHeaders: false });
 const commentsReadLimiter  = rateLimit({ windowMs: 15 * 60 * 1000, max: 180, standardHeaders: true, legacyHeaders: false });
 const commentsWriteLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 40,  standardHeaders: true, legacyHeaders: false });
@@ -24,6 +25,105 @@ function initials(name) {
   if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   return (name || '').substring(0, 2).toUpperCase();
 }
+
+// Create a new post
+router.post('/', postsWriteLimiter, authenticateToken, async (req, res) => {
+  try {
+    const { title, description, image_url, cook_time, difficulty, utensils, ingredients, instructions, chef_review_requested } = req.body;
+
+    if (!title?.trim()) return res.status(400).json({ error: 'title is required' });
+    if (!image_url?.trim()) return res.status(400).json({ error: 'image_url is required' });
+    if (difficulty && !['Easy', 'Medium', 'Hard'].includes(difficulty)) {
+      return res.status(400).json({ error: 'difficulty must be Easy, Medium, or Hard' });
+    }
+
+    const { rows } = await pool.query(`
+      INSERT INTO posts (user_id, title, description, image_url, cook_time, difficulty, utensils, ingredients, instructions, is_global, is_seeded, chef_review_requested)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false, false, $10)
+      RETURNING *
+    `, [
+      req.user.id,
+      title.trim(),
+      description?.trim() || null,
+      image_url.trim(),
+      cook_time || null,
+      difficulty || null,
+      JSON.stringify(utensils || []),
+      JSON.stringify(ingredients || []),
+      instructions?.trim() || null,
+      !!chef_review_requested,
+    ]);
+
+    const p = rows[0];
+    res.status(201).json({
+      post: {
+        id: p.id,
+        author: req.user.name,
+        authorId: req.user.id,
+        title: p.title,
+        description: p.description,
+        image: p.image_url,
+        ingredients: p.ingredients,
+        instructions: p.instructions,
+        utensils: p.utensils,
+        cookTime: p.cook_time,
+        difficulty: p.difficulty,
+        likes: 0,
+        comments: 0,
+        liked: false,
+        saved: false,
+        chefReviewRequested: p.chef_review_requested,
+        createdAt: p.created_at,
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// GET only the current user's own posts (My Recipes — excludes global/seeded recipes)
+router.get('/mine', postsReadLimiter, authenticateToken, async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT
+        p.id, p.title, p.description, p.image_url, p.ingredients, p.instructions,
+        p.utensils, p.cook_time, p.difficulty, p.is_global, p.created_at,
+        u.name  AS author,
+        u.id    AS author_id,
+        (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) AS likes,
+        (SELECT COUNT(*) FROM comments   WHERE post_id = p.id) AS comments,
+        EXISTS (SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = $1) AS liked,
+        EXISTS (SELECT 1 FROM saved_posts WHERE post_id = p.id AND user_id = $1) AS saved
+      FROM posts p
+      JOIN users u ON u.id = p.user_id
+      WHERE p.user_id = $1 AND p.is_global = false
+      ORDER BY p.created_at DESC
+    `, [req.user.id]);
+
+    res.json(rows.map(r => ({
+      id: r.id,
+      author: r.author,
+      authorId: r.author_id,
+      title: r.title,
+      description: r.description,
+      image: r.image_url,
+      ingredients: r.ingredients,
+      instructions: r.instructions,
+      utensils: r.utensils,
+      cookTime: r.cook_time,
+      difficulty: r.difficulty,
+      likes: parseInt(r.likes),
+      comments: parseInt(r.comments),
+      liked: r.liked,
+      saved: r.saved,
+      createdAt: r.created_at,
+    })));
+  } catch (err) {
+    console.error('[GET /mine]', err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
 
 // GET all posts for the community feed (EXCLUDES global reference recipes)
 router.get('/', postsReadLimiter, authenticateToken, async (req, res) => {
@@ -373,6 +473,54 @@ router.post('/:id/comments', commentsWriteLimiter, authenticateToken, async (req
     });
   } catch (err) {
     console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// Get a single post by ID — used by ChefReviewModal to display the full recipe to the chef
+router.get('/:id', postsReadLimiter, authenticateToken, async (req, res) => {
+  const postId = parseInt(req.params.id, 10);
+  if (isNaN(postId)) return res.status(400).json({ error: 'invalid post id' });
+  try {
+    const { rows } = await pool.query(`
+      SELECT
+        p.id, p.title, p.description, p.image_url, p.ingredients, p.instructions,
+        p.utensils, p.cook_time, p.difficulty, p.is_global, p.created_at,
+        u.name  AS author,
+        u.id    AS author_id,
+        (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) AS likes,
+        (SELECT COUNT(*) FROM comments   WHERE post_id = p.id) AS comments,
+        EXISTS (SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = $2) AS liked,
+        EXISTS (SELECT 1 FROM saved_posts WHERE post_id = p.id AND user_id = $2) AS saved
+      FROM posts p
+      JOIN users u ON u.id = p.user_id
+      WHERE p.id = $1
+    `, [postId, req.user.id]);
+
+    if (!rows.length) return res.status(404).json({ error: 'post not found' });
+    const r = rows[0];
+    res.json({
+      post: {
+        id: r.id,
+        author: r.author,
+        authorId: r.author_id,
+        title: r.title,
+        description: r.description,
+        image: r.image_url,
+        ingredients: r.ingredients,
+        instructions: r.instructions,
+        utensils: r.utensils,
+        cookTime: r.cook_time,
+        difficulty: r.difficulty,
+        likes: parseInt(r.likes),
+        comments: parseInt(r.comments),
+        liked: r.liked,
+        saved: r.saved,
+        createdAt: r.created_at,
+      }
+    });
+  } catch (err) {
+    console.error('[GET /posts/:id]', err);
     res.status(500).json({ error: 'server error' });
   }
 });

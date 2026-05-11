@@ -9,14 +9,16 @@ router.get('/', authenticateToken, async (req, res) => {
     const query = `
       SELECT 
         n.*,
-        CASE 
-          WHEN n.type = 'chef_review_request' THEN (
+        CASE
+          -- Guard against non-numeric requestId values (e.g. null or 'undefined') before
+          -- casting to int; a bare ::int cast throws "invalid input syntax for type integer".
+          WHEN n.type = 'chef_review_request' AND (n.data->>'requestId') ~ '^[0-9]+$' THEN (
             SELECT claimed_by FROM chef_review_requests WHERE id = (n.data->>'requestId')::int
           )
           ELSE NULL
         END as claimed_by_id,
         CASE
-          WHEN n.type = 'chef_review_request' THEN (
+          WHEN n.type = 'chef_review_request' AND (n.data->>'requestId') ~ '^[0-9]+$' THEN (
             SELECT status FROM chef_review_requests WHERE id = (n.data->>'requestId')::int
           )
           ELSE NULL

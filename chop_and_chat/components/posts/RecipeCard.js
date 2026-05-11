@@ -54,7 +54,6 @@ export default function RecipeCard({
       <View style={[styles.info, !isDetailed && styles.compactInfo]}>
         <View style={styles.titleRow}>
           <Text style={[styles.title, { color: theme.textPrimary }]} numberOfLines={1}>{recipe.title}</Text>
-          {!isDetailed && <Ionicons name="chevron-forward" size={fp(18)} color={theme.textTertiary} />}
         </View>
         
         {isDetailed && <Text style={[styles.author, { color: theme.textSecondary }]}>by {recipe.author}</Text>}

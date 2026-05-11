@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { wp, fp } from '../../../utils/responsive';
+import { wp, hp, fp } from '../../../utils/responsive';
 
 const UTENSIL_OPTIONS = [
     { id: 'oven', label: 'Oven', icon: 'tablet-landscape-outline' },
@@ -54,19 +54,19 @@ const styles = StyleSheet.create({
     utensilsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 8,
+        gap: wp(8),
     },
     utensilChip: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-        borderRadius: 20,
+        gap: wp(6),
+        paddingVertical: hp(8),
+        paddingHorizontal: wp(12),
+        borderRadius: wp(20),
         borderWidth: 1,
     },
     utensilChipText: {
-        fontSize: 13,
+        fontSize: fp(13),
         fontWeight: '500',
     },
 });

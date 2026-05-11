@@ -1,8 +1,9 @@
 import { useState, useCallback } from 'react';
-import { 
-    View, Text, StyleSheet, Modal, ScrollView, Pressable, 
-    TextInput, Image, KeyboardAvoidingView, Platform, Alert 
+import {
+    View, Text, StyleSheet, Modal, ScrollView, Pressable,
+    TextInput, Image, KeyboardAvoidingView, Platform, Alert
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { wp, hp, fp } from '../../utils/responsive';
 import { useTheme } from '../../context/ThemeContext';
@@ -10,10 +11,10 @@ import DifficultySelector from './create-post/DifficultySelector';
 import UtensilSelector from './create-post/UtensilSelector';
 import IngredientList from './create-post/IngredientList';
 
-export default function CreatePostModal({ visible, onClose, onBack, imageUri, onSubmit }) {
+export default function CreatePostModal({ visible, onClose, onBack, imageUri, onSubmit, destination }) {
     const { theme } = useTheme();
-    
-    // Form State
+    const insets = useSafeAreaInsets();
+
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [cookTime, setCookTime] = useState('');
@@ -21,13 +22,16 @@ export default function CreatePostModal({ visible, onClose, onBack, imageUri, on
     const [selectedUtensils, setSelectedUtensils] = useState([]);
     const [ingredients, setIngredients] = useState(['']);
     const [instructions, setInstructions] = useState('');
-    
-    // Validation
+
     const hasValidIngredients = ingredients.some(i => i.trim().length > 0);
-    const isValid = title.trim() && description.trim() && cookTime.trim() && hasValidIngredients;
+    // imageUri is always provided via the normal flow but guarded here as a safety net —
+    // without it the backend rejects the post with a 400 on image_url.
+    const isValid = !!imageUri && title.trim() && description.trim() && cookTime.trim() && hasValidIngredients;
+
+    const submitLabel = destination === 'feed' ? 'Post' : 'Next';
 
     const toggleUtensil = useCallback((id) => {
-        setSelectedUtensils(prev => 
+        setSelectedUtensils(prev =>
             prev.includes(id) ? prev.filter(u => u !== id) : [...prev, id]
         );
     }, []);
@@ -59,7 +63,6 @@ export default function CreatePostModal({ visible, onClose, onBack, imageUri, on
             Alert.alert('Missing Fields', 'Please fill in all required fields marked with *');
             return;
         }
-        
         onSubmit({
             title: title.trim(),
             description: description.trim(),
@@ -70,131 +73,209 @@ export default function CreatePostModal({ visible, onClose, onBack, imageUri, on
             instructions: instructions.trim(),
             imageUri,
         });
-        resetForm();
+        // resetForm is intentionally NOT called here — MainActions resets state after confirmed success
     };
 
     const handleClose = () => { resetForm(); onClose(); };
     const handleBackPress = () => { resetForm(); onBack?.(); };
 
     return (
-        <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
-            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <View style={[styles.container, { backgroundColor: theme.screenBackground }]}>
-                    {/* Header */}
-                    <View style={[styles.header, { borderBottomColor: theme.border }]}>
-                        <Pressable onPress={onBack ? handleBackPress : handleClose} style={styles.headerButton}>
-                            <Ionicons name={onBack ? "arrow-back" : "close"} size={fp(24)} color={theme.textPrimary} />
-                        </Pressable>
-                        <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Create Post</Text>
-                        <Pressable onPress={handleSubmit} style={[styles.postButton, !isValid && styles.postButtonDisabled]}>
-                            <Text style={[styles.postButtonText, !isValid && { color: theme.textTertiary }]}>Post</Text>
-                        </Pressable>
-                    </View>
+        <Modal visible={visible} transparent={true} animationType="slide" onRequestClose={handleClose}>
+            <View style={styles.overlay}>
+                <Pressable style={styles.overlayPressable} onPress={handleClose} />
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.keyboardAvoid}
+                >
+                    <View style={[styles.modalContainer, { backgroundColor: theme.modalBackground }]}>
+                        <View style={[styles.header, { borderBottomColor: theme.border, paddingTop: hp(16) + (Platform.OS === 'ios' ? 0 : 0) }]}>
+                            <Pressable
+                                onPress={onBack ? handleBackPress : handleClose}
+                                style={({ pressed }) => [styles.headerButton, pressed && { opacity: 0.6 }]}
+                            >
+                                <Ionicons name={onBack ? 'arrow-back' : 'close'} size={fp(24)} color={theme.textPrimary} />
+                            </Pressable>
+                            <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Create Post</Text>
+                            <Pressable
+                                onPress={handleSubmit}
+                                style={({ pressed }) => [
+                                    styles.submitButton,
+                                    { backgroundColor: isValid ? theme.primary : theme.border },
+                                    pressed && { opacity: 0.7 },
+                                ]}
+                                disabled={!isValid}
+                            >
+                                <Text style={[styles.submitButtonText, { color: isValid ? theme.textInverse : theme.textTertiary }]}>
+                                    {submitLabel}
+                                </Text>
+                            </Pressable>
+                        </View>
 
-                    <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                        {imageUri && (
-                            <View style={styles.imagePreviewContainer}>
-                                <Image source={{ uri: imageUri }} style={styles.imagePreview} />
+                        <ScrollView
+                            style={styles.scrollContainer}
+                            contentContainerStyle={styles.scrollContent}
+                            showsVerticalScrollIndicator={false}
+                            keyboardShouldPersistTaps="handled"
+                        >
+                            {imageUri && (
+                                <View style={styles.imagePreviewContainer}>
+                                    <Image source={{ uri: imageUri }} style={[styles.imagePreview, { backgroundColor: theme.imageBackground }]} />
+                                </View>
+                            )}
+
+                            <View style={styles.inputGroup}>
+                                <Text style={[styles.label, { color: theme.textPrimary }]}>
+                                    Title <Text style={{ color: theme.danger }}>*</Text>
+                                </Text>
+                                <TextInput
+                                    style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.textPrimary }]}
+                                    placeholder="What did you make?"
+                                    placeholderTextColor={theme.textTertiary}
+                                    value={title}
+                                    onChangeText={setTitle}
+                                    maxLength={50}
+                                />
                             </View>
-                        )}
 
-                        <View style={styles.inputGroup}>
-                            <Text style={[styles.label, { color: theme.textPrimary }]}>Title <Text style={styles.required}>*</Text></Text>
-                            <TextInput
-                                style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.textPrimary }]}
-                                placeholder="What did you make?"
-                                value={title}
-                                onChangeText={setTitle}
-                                maxLength={50}
+                            <View style={styles.inputGroup}>
+                                <Text style={[styles.label, { color: theme.textPrimary }]}>
+                                    Description <Text style={{ color: theme.danger }}>*</Text>
+                                </Text>
+                                <TextInput
+                                    style={[styles.input, styles.textArea, { backgroundColor: theme.inputBackground, color: theme.textPrimary }]}
+                                    placeholder="Tell us about your dish..."
+                                    placeholderTextColor={theme.textTertiary}
+                                    value={description}
+                                    onChangeText={setDescription}
+                                    multiline
+                                    numberOfLines={3}
+                                    maxLength={200}
+                                    textAlignVertical="top"
+                                />
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={[styles.label, { color: theme.textPrimary }]}>
+                                    Cook Time <Text style={{ color: theme.danger }}>*</Text>
+                                </Text>
+                                <TextInput
+                                    style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.textPrimary }]}
+                                    placeholder="e.g. 30 min"
+                                    placeholderTextColor={theme.textTertiary}
+                                    value={cookTime}
+                                    onChangeText={setCookTime}
+                                    maxLength={20}
+                                />
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={[styles.label, { color: theme.textPrimary }]}>Difficulty</Text>
+                                <DifficultySelector selected={difficulty} onSelect={setDifficulty} theme={theme} />
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={[styles.label, { color: theme.textPrimary }]}>Kitchen Tools</Text>
+                                <UtensilSelector selected={selectedUtensils} onToggle={toggleUtensil} theme={theme} />
+                            </View>
+
+                            <IngredientList
+                                ingredients={ingredients}
+                                onUpdate={updateIngredient}
+                                onAdd={addIngredient}
+                                onRemove={removeIngredient}
+                                theme={theme}
                             />
-                        </View>
 
-                        <View style={styles.inputGroup}>
-                            <Text style={[styles.label, { color: theme.textPrimary }]}>Description <Text style={styles.required}>*</Text></Text>
-                            <TextInput
-                                style={[styles.input, styles.textArea, { backgroundColor: theme.inputBackground, color: theme.textPrimary }]}
-                                placeholder="Tell us about your dish..."
-                                value={description}
-                                onChangeText={setDescription}
-                                multiline
-                                numberOfLines={3}
-                                maxLength={200}
-                            />
-                        </View>
+                            <View style={styles.inputGroup}>
+                                <Text style={[styles.label, { color: theme.textPrimary }]}>Instructions</Text>
+                                <TextInput
+                                    style={[styles.input, styles.instructionsArea, { backgroundColor: theme.inputBackground, color: theme.textPrimary }]}
+                                    placeholder="Write your cooking instructions here..."
+                                    placeholderTextColor={theme.textTertiary}
+                                    value={instructions}
+                                    onChangeText={setInstructions}
+                                    multiline
+                                    numberOfLines={6}
+                                    textAlignVertical="top"
+                                />
+                            </View>
 
-                        <View style={styles.inputGroup}>
-                            <Text style={[styles.label, { color: theme.textPrimary }]}>Cook Time <Text style={styles.required}>*</Text></Text>
-                            <TextInput
-                                style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.textPrimary }]}
-                                placeholder="e.g. 30 min"
-                                value={cookTime}
-                                onChangeText={setCookTime}
-                                maxLength={20}
-                            />
-                        </View>
-
-                        <View style={styles.inputGroup}>
-                            <Text style={[styles.label, { color: theme.textPrimary }]}>Difficulty</Text>
-                            <DifficultySelector selected={difficulty} onSelect={setDifficulty} theme={theme} />
-                        </View>
-
-                        <View style={styles.inputGroup}>
-                            <Text style={[styles.label, { color: theme.textPrimary }]}>Kitchen Tools</Text>
-                            <UtensilSelector selected={selectedUtensils} onToggle={toggleUtensil} theme={theme} />
-                        </View>
-
-                        <IngredientList 
-                            ingredients={ingredients} 
-                            onUpdate={updateIngredient}
-                            onAdd={addIngredient}
-                            onRemove={removeIngredient}
-                            theme={theme}
-                        />
-
-                        <View style={styles.inputGroup}>
-                            <Text style={[styles.label, { color: theme.textPrimary }]}>Instructions</Text>
-                            <TextInput
-                                style={[styles.input, styles.instructionsArea, { backgroundColor: theme.inputBackground, color: theme.textPrimary }]}
-                                placeholder="Write your cooking instructions here..."
-                                value={instructions}
-                                onChangeText={setInstructions}
-                                multiline
-                                numberOfLines={6}
-                                textAlignVertical="top"
-                            />
-                        </View>
-
-                        <View style={{ height: hp(40) }} />
-                    </ScrollView>
-                </View>
-            </KeyboardAvoidingView>
+                            <View style={{ height: hp(40) }} />
+                        </ScrollView>
+                    </View>
+                </KeyboardAvoidingView>
+            </View>
         </Modal>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1 },
+    overlay: {
+        flex: 1,
+        justifyContent: 'flex-end',
+    },
+    overlayPressable: {
+        flex: 1,
+    },
+    keyboardAvoid: {
+        maxHeight: '92%',
+    },
+    modalContainer: {
+        borderTopLeftRadius: wp(24),
+        borderTopRightRadius: wp(24),
+        height: '100%',
+    },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 12,
+        paddingHorizontal: wp(20),
+        paddingBottom: hp(14),
         borderBottomWidth: 1,
     },
-    headerButton: { padding: 12, marginLeft: -4 },
-    headerTitle: { fontSize: 18, fontWeight: '700', flex: 1, textAlign: 'center', marginLeft: -28 },
-    postButton: { paddingVertical: 8, paddingHorizontal: 16, backgroundColor: '#3B82F6', borderRadius: 20 },
-    postButtonDisabled: { backgroundColor: '#E5E7EB' },
-    postButtonText: { color: '#FFFFFF', fontWeight: '600', fontSize: 14 },
+    headerButton: {
+        width: wp(44),
+        height: wp(44),
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    headerTitle: {
+        fontSize: fp(18),
+        fontWeight: '700',
+        flex: 1,
+        textAlign: 'center',
+    },
+    submitButton: {
+        paddingVertical: hp(8),
+        paddingHorizontal: wp(16),
+        borderRadius: wp(20),
+        minHeight: hp(36),
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    submitButtonText: {
+        fontWeight: '600',
+        fontSize: fp(14),
+    },
     scrollContainer: { flex: 1 },
-    scrollContent: { padding: 20 },
-    imagePreviewContainer: { marginBottom: 20, borderRadius: 16, overflow: 'hidden' },
-    imagePreview: { width: '100%', height: 200, backgroundColor: '#F3F4F6' },
-    inputGroup: { marginBottom: 20 },
-    label: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
-    required: { color: '#EF4444' },
-    input: { borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 15 },
-    textArea: { minHeight: 80, textAlignVertical: 'top' },
-    instructionsArea: { minHeight: 140, textAlignVertical: 'top', paddingTop: 12 },
+    scrollContent: { padding: wp(20) },
+    imagePreviewContainer: {
+        marginBottom: hp(20),
+        borderRadius: wp(16),
+        overflow: 'hidden',
+    },
+    imagePreview: {
+        width: '100%',
+        height: hp(200),
+    },
+    inputGroup: { marginBottom: hp(20) },
+    label: { fontSize: fp(14), fontWeight: '600', marginBottom: hp(8) },
+    input: {
+        borderRadius: wp(12),
+        paddingHorizontal: wp(16),
+        paddingVertical: hp(12),
+        fontSize: fp(15),
+    },
+    textArea: { minHeight: hp(80), textAlignVertical: 'top' },
+    instructionsArea: { minHeight: hp(140), textAlignVertical: 'top', paddingTop: hp(12) },
 });

@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useContext } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
+import { getCloudinaryUrl } from '../utils/cloudinaryUrl';
 import { wp, hp, fp } from '../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,16 +9,28 @@ import { useChefFeed } from '../context/ChefFeedContext';
 import { useFollow } from '../context/FollowContext';
 import { AuthContext } from '../context/AuthContext';
 import { api } from '../services/api';
+import { navigateToProfile } from '../utils/navigation';
 import DishDetailModal from '../components/posts/DishDetailModal';
 import CommentsModal from '../components/posts/CommentsModal';
 import CategoryHeader from '../components/home/CategoryHeader';
 
 const CATEGORIES = ['Following', 'All'];
 
+function relativeTime(date) {
+    if (!date) return '';
+    const s = Math.floor((Date.now() - new Date(date)) / 1000);
+    if (s < 60) return 'just now';
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+}
+
 export default function AllChefReviews({ navigation }) {
     const { theme } = useTheme();
     const insets = useSafeAreaInsets();
-    const { token } = useContext(AuthContext);
+    const { token, user } = useContext(AuthContext);
     const { feedItems, handleLike, handleSave, addComment } = useChefFeed();
     const { followedUsers } = useFollow();
 
@@ -92,19 +105,23 @@ export default function AllChefReviews({ navigation }) {
         return (
             <View key={item.id} style={[styles.feedCard, { backgroundColor: theme.chefCardBackground }]}>
                 <View style={[styles.cardHeader, { borderBottomColor: theme.border }]}>
-                    <Pressable 
+                    <Pressable
                         style={styles.headerLeft}
-                        onPress={() => navigation.navigate('OtherUserProfile', {
-                            userId: item.chef.id,
-                            userName: item.chef.name
-                        })}
+                        onPress={() => navigateToProfile(navigation, item.chef.id, item.chef.name, user?.id)}
                     >
                         <View style={[styles.chefAvatar, { backgroundColor: theme.primary }]}>
-                            <Text style={styles.chefInitial}>{item.chef.avatar}</Text>
+                            {item.chef.photo ? (
+                                <Image
+                                    source={{ uri: getCloudinaryUrl(item.chef.photo, { width: 80, height: 80, crop: 'fill', gravity: 'face' }) }}
+                                    style={styles.chefAvatarImg}
+                                />
+                            ) : (
+                                <Text style={styles.chefInitial}>{item.chef.avatar}</Text>
+                            )}
                         </View>
                         <View>
                             <Text style={[styles.chefName, { color: theme.textPrimary }]}>{item.chef.name}</Text>
-                            <Text style={[styles.timestamp, { color: theme.textSecondary }]}>2 hours ago</Text>
+                            <Text style={[styles.timestamp, { color: theme.textSecondary }]}>{relativeTime(item.createdAt)}</Text>
                         </View>
                     </Pressable>
                 </View>
@@ -114,7 +131,7 @@ export default function AllChefReviews({ navigation }) {
                         <View style={styles.contextRow}>
                             <Ionicons name="return-down-forward" size={fp(14)} color={theme.textTertiary} />
                             <Text style={[styles.contextText, { color: theme.textSecondary }]}>Reacted to </Text>
-                            <Pressable onPress={() => navigation.navigate('OtherUserProfile', { userId: item.reaction.targetAuthor.id, userName: item.reaction.targetAuthor.name })}>
+                            <Pressable onPress={() => navigateToProfile(navigation, item.reaction.targetAuthor.id, item.reaction.targetAuthor.name, user?.id)}>
                                 <Text style={[styles.targetAuthor, { color: theme.primary }]}>@{item.reaction.targetAuthor.name}</Text>
                             </Pressable>
                             <Text style={[styles.contextText, { color: theme.textSecondary }]}>'s post</Text>
@@ -184,7 +201,7 @@ export default function AllChefReviews({ navigation }) {
                 onAddComment={submitComment}
                 onAuthorPress={(comment) => {
                     setCommentsModalVisible(false);
-                    navigation.navigate('OtherUserProfile', { userId: comment.authorId, userName: comment.author });
+                    navigateToProfile(navigation, comment.authorId, comment.author, user?.id);
                 }}
                 theme={theme}
             />
@@ -199,7 +216,8 @@ const styles = StyleSheet.create({
     feedCard: { borderRadius: wp(16), marginBottom: hp(20), overflow: 'hidden', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
     cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: wp(12), borderBottomWidth: 1 },
     headerLeft: { flexDirection: 'row', alignItems: 'center', gap: wp(10) },
-    chefAvatar: { width: wp(40), height: wp(40), borderRadius: wp(20), justifyContent: 'center', alignItems: 'center' },
+    chefAvatar: { width: wp(40), height: wp(40), borderRadius: wp(20), justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+    chefAvatarImg: { width: '100%', height: '100%' },
     chefInitial: { color: '#FFF', fontSize: fp(18), fontWeight: '700' },
     chefName: { fontSize: fp(16), fontWeight: '700' },
     timestamp: { fontSize: fp(12) },

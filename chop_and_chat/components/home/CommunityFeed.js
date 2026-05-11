@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { usePosts } from '../../context/PostsContext';
 import { AuthContext } from '../../context/AuthContext';
+import { navigateToProfile } from '../../utils/navigation';
 import { api } from '../../services/api';
 import DishDetailModal from '../posts/DishDetailModal';
 import CommentsModal from '../posts/CommentsModal';
@@ -13,7 +14,7 @@ import CommentsModal from '../posts/CommentsModal';
 export default function CommunityFeed() {
     const navigation = useNavigation();
     const { theme } = useTheme();
-    const { token } = useContext(AuthContext);
+    const { token, user } = useContext(AuthContext);
     const { posts: allPosts, handleLike, handleSave, addComment } = usePosts();
 
     // Show only the 2 most recent posts in the home screen feed
@@ -102,10 +103,7 @@ export default function CommunityFeed() {
                                 <Pressable
                                     onPress={(e) => {
                                         e.stopPropagation();
-                                        navigation.navigate('OtherUserProfile', {
-                                            userId: post.authorId || post.id,
-                                            userName: post.author
-                                        });
+                                        navigateToProfile(navigation, post.authorId || post.id, post.author, user?.id);
                                     }}
                                     style={({pressed}) => pressed && {opacity: 0.7}}
                                 >
@@ -190,7 +188,7 @@ export default function CommunityFeed() {
                 onAddComment={handleAddComment}
                 onAuthorPress={(comment) => {
                     setCommentsModalVisible(false);
-                    navigation.navigate('OtherUserProfile', { userId: comment.authorId, userName: comment.author });
+                    navigateToProfile(navigation, comment.authorId, comment.author, user?.id);
                 }}
                 theme={theme}
             />

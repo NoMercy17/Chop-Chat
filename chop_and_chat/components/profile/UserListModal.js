@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable, Modal, FlatList, Image, TouchableWithoutFeedback } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { wp, hp, fp } from '../../utils/responsive';
+import { navigateToProfile } from '../../utils/navigation';
 
 function getInitials(name) {
   if (!name) return 'U';
@@ -10,7 +11,7 @@ function getInitials(name) {
   return name.substring(0, 2).toUpperCase();
 }
 
-export default function UserListModal({ visible, onClose, type, data, navigation, theme, onRemoveFollower, onUnfollow }) {
+export default function UserListModal({ visible, onClose, type, data, navigation, theme, currentUserId, onRemoveFollower, onUnfollow }) {
 
   const renderItem = ({ item }) => (
     <View style={[styles.row, { backgroundColor: theme.cardBackground, borderColor: theme.borderLight }]}>
@@ -18,7 +19,7 @@ export default function UserListModal({ visible, onClose, type, data, navigation
         style={({ pressed }) => [styles.userArea, pressed && { opacity: 0.7 }]}
         onPress={() => {
           onClose();
-          navigation.navigate('OtherUserProfile', { userId: item.id, userName: item.name });
+          navigateToProfile(navigation, item.id, item.name, currentUserId);
         }}
       >
         {item.avatar || item.profile_photo ? (

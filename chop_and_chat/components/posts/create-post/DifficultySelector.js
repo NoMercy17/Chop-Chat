@@ -1,15 +1,25 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { wp, hp, fp } from '../../../utils/responsive';
 
 const DIFFICULTY_OPTIONS = ['Easy', 'Medium', 'Hard'];
 
 export default function DifficultySelector({ selected, onSelect, theme }) {
     const getDifficultyColor = (diff) => {
         switch (diff) {
-            case 'Easy': return '#10B981';
-            case 'Medium': return '#F59E0B';
-            case 'Hard': return '#EF4444';
+            case 'Easy': return theme.success;
+            case 'Medium': return theme.warning;
+            case 'Hard': return theme.danger;
             default: return theme.textSecondary;
+        }
+    };
+
+    const getDifficultyBackground = (diff) => {
+        switch (diff) {
+            case 'Easy': return theme.successLight;
+            case 'Medium': return theme.warningLight;
+            case 'Hard': return theme.dangerLight;
+            default: return theme.inputBackground;
         }
     };
 
@@ -21,12 +31,12 @@ export default function DifficultySelector({ selected, onSelect, theme }) {
                     onPress={() => onSelect(diff)}
                     style={[
                         styles.difficultyChip,
-                        { 
-                            backgroundColor: selected === diff 
-                                ? getDifficultyColor(diff) + '20' 
+                        {
+                            backgroundColor: selected === diff
+                                ? getDifficultyBackground(diff)
                                 : theme.inputBackground,
-                            borderColor: selected === diff 
-                                ? getDifficultyColor(diff) 
+                            borderColor: selected === diff
+                                ? getDifficultyColor(diff)
                                 : theme.border,
                         }
                     ]}
@@ -46,16 +56,16 @@ export default function DifficultySelector({ selected, onSelect, theme }) {
 const styles = StyleSheet.create({
     difficultyRow: {
         flexDirection: 'row',
-        gap: 10,
+        gap: wp(10),
     },
     difficultyChip: {
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-        borderRadius: 20,
+        paddingVertical: hp(10),
+        paddingHorizontal: wp(20),
+        borderRadius: wp(20),
         borderWidth: 1,
     },
     difficultyChipText: {
-        fontSize: 14,
+        fontSize: fp(14),
         fontWeight: '600',
     },
 });

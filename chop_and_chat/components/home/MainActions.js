@@ -1,11 +1,17 @@
-import { useState, useCallback, useRef } from 'react';
-import { Text, View, StyleSheet, Pressable } from 'react-native';
+import { useState, useCallback, useRef, useContext, useEffect } from 'react';
+import { Text, View, StyleSheet, Pressable, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { wp, hp, fp } from '../../utils/responsive';
 import { useTheme } from '../../context/ThemeContext';
+import { AuthContext } from '../../context/AuthContext';
+import { usePosts } from '../../context/PostsContext';
 import { handlePhotoAction } from '../../utils/photoHandling';
+import { CloudinaryService } from '../../services/CloudinaryService';
+import { api } from '../../services/api';
 import CreatePostModal from '../posts/CreatePostModal';
 import RequestChefReviewModal from '../posts/RequestChefReviewModal';
+import ConfirmPostPopup from '../posts/ConfirmPostPopup';
+import ConfirmChefReviewPopup from '../posts/ConfirmChefReviewPopup';
 import FindRecipeModal from './main-actions/FindRecipeModal';
 import ImageSourceModal from './main-actions/ImageSourceModal';
 import ActionChoiceModal from './main-actions/ActionChoiceModal';
@@ -13,22 +19,44 @@ import ActionChoiceModal from './main-actions/ActionChoiceModal';
 const MODAL = {
     NONE: null,
     FIND_RECIPE: 'findRecipe',
+    DESTINATION_CHOICE: 'destinationChoice',
     IMAGE_SOURCE: 'imageSource',
-    ACTION_CHOICE: 'actionChoice',
     CREATE_POST: 'createPost',
+    CONFIRM_POST: 'confirmPost',
     CHEF_REVIEW: 'chefReview',
+    // Confirmation step before the actual upload — keeps both create + review-request atomic
+    CHEF_REVIEW_CONFIRM: 'chefReviewConfirm',
 };
 
-// Buffer for one modal to fade out before the next mounts. Long enough to avoid
-// tap-through (finger still pressed during swap) and slow Android dismiss.
-const MODAL_TRANSITION_MS = 450;
+const MODAL_TRANSITION_MS = 200;
+// Cloudinary free tier rejects files over 10 MB; 9 MB leaves a safety margin
+const MAX_UPLOAD_BYTES = 9 * 1024 * 1024;
 
 export default function MainActions() {
     const { theme } = useTheme();
+    const { token } = useContext(AuthContext);
+    const { refreshPosts } = usePosts();
 
     const [activeModal, setActiveModal] = useState(MODAL.NONE);
     const [selectedImage, setSelectedImage] = useState(null);
+    const [selectedDestination, setSelectedDestination] = useState(null);
+    const [pendingPostData, setPendingPostData] = useState(null);
+    const [pendingChefReviewData, setPendingChefReviewData] = useState(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [uploadStatus, setUploadStatus] = useState(null);
+
     const transitionRef = useRef(null);
+    // Stores the 500ms image→CreatePost transition timer so resetUploadState can cancel it.
+    const imageTransitionRef = useRef(null);
+    // Guards async upload callbacks from calling setState on an unmounted component.
+    const isMountedRef = useRef(true);
+    // Holds the file size reported by the OS picker for pre-upload validation.
+    // A ref avoids a re-render; null = size unknown (some Android versions omit it).
+    const fileSizeRef = useRef(null);
+    // Prevents double-launching the OS picker on rapid taps.
+    const isPickerActiveRef = useRef(false);
+
+    useEffect(() => { return () => { isMountedRef.current = false; }; }, []);
 
     const switchModal = useCallback((next) => {
         if (transitionRef.current) clearTimeout(transitionRef.current);
@@ -40,28 +68,172 @@ export default function MainActions() {
         }, MODAL_TRANSITION_MS);
     }, []);
 
-    const onImageCaptured = useCallback((uri) => {
+    const resetUploadState = useCallback(() => {
+        if (transitionRef.current) clearTimeout(transitionRef.current);
+        if (imageTransitionRef.current) {
+            clearTimeout(imageTransitionRef.current);
+            imageTransitionRef.current = null;
+        }
+        isPickerActiveRef.current = false;
+        fileSizeRef.current = null;
+        setActiveModal(MODAL.NONE);
+        setSelectedImage(null);
+        setSelectedDestination(null);
+        setPendingPostData(null);
+        setPendingChefReviewData(null);
+        setIsSubmitting(false);
+        setUploadStatus(null);
+    }, []);
+
+    // ImageSourceModal stays open while the system picker runs — the picker overlays
+    // everything anyway. After photo is returned, close ImageSource and open CreatePost.
+    // The 500ms delay lets residual OS touch events from picker dismissal settle before
+    // CreatePostModal's overlay mounts (without it the overlay Pressable eats the tap).
+    const onImageCaptured = useCallback((uri, fileSize) => {
         if (!uri) return;
         setSelectedImage(uri);
-        switchModal(MODAL.ACTION_CHOICE);
-    }, [switchModal]);
+        fileSizeRef.current = fileSize ?? null;
+        setActiveModal(MODAL.NONE);
+        if (imageTransitionRef.current) clearTimeout(imageTransitionRef.current);
+        imageTransitionRef.current = setTimeout(() => {
+            imageTransitionRef.current = null;
+            setActiveModal(MODAL.CREATE_POST);
+        }, 500);
+    }, []);
 
-    const handleGetAiRating = useCallback(() => {
-        switchModal(MODAL.NONE);
-        console.log('Navigate to AI Rating with image:', selectedImage);
-    }, [selectedImage, switchModal]);
+    // Wraps handlePhotoAction with a double-tap guard: without it a second tap while the
+    // OS picker is open would launch a second session after the first closes.
+    const handlePickerAction = useCallback((mode) => {
+        if (isPickerActiveRef.current) return;
+        isPickerActiveRef.current = true;
+        handlePhotoAction(mode, onImageCaptured).finally(() => {
+            isPickerActiveRef.current = false;
+        });
+    }, [onImageCaptured]);
 
     const handleCreatePostSubmit = useCallback((postData) => {
-        console.log('Post submitted:', postData);
-        setActiveModal(MODAL.NONE);
-        setSelectedImage(null);
-    }, []);
+        setPendingPostData(postData);
+        if (selectedDestination === 'feed') {
+            switchModal(MODAL.CONFIRM_POST);
+        } else if (selectedDestination === 'chef') {
+            switchModal(MODAL.CHEF_REVIEW);
+        } else {
+            console.log('AI Rating with data:', postData, 'image:', selectedImage);
+            resetUploadState();
+        }
+    }, [selectedDestination, selectedImage, switchModal, resetUploadState]);
 
-    const handleChefReviewSubmit = useCallback((requestData) => {
-        console.log('Chef Review requested:', requestData);
-        setActiveModal(MODAL.NONE);
-        setSelectedImage(null);
-    }, []);
+    const handleConfirmPost = useCallback(async () => {
+        if (!pendingPostData || !selectedImage) return;
+
+        if (fileSizeRef.current && fileSizeRef.current > MAX_UPLOAD_BYTES) {
+            Alert.alert('Image Too Large', 'Please choose a photo under 9 MB and try again.');
+            return;
+        }
+
+        setIsSubmitting(true);
+        setUploadStatus('Uploading photo…');
+        try {
+            const imageUrl = await CloudinaryService.uploadImage(selectedImage, 'posts');
+            if (!imageUrl) throw new Error('Image upload failed');
+
+            setUploadStatus('Posting…');
+            await api.post('/posts', {
+                title: pendingPostData.title,
+                description: pendingPostData.description,
+                image_url: imageUrl,
+                cook_time: pendingPostData.cookTime,
+                difficulty: pendingPostData.difficulty,
+                utensils: pendingPostData.utensils,
+                ingredients: pendingPostData.ingredients,
+                instructions: pendingPostData.instructions,
+                chef_review_requested: false,
+            }, token);
+
+            if (isMountedRef.current) {
+                refreshPosts();
+                resetUploadState();
+            }
+        } catch (err) {
+            Alert.alert('Upload Failed', err.message || 'Could not post. Please try again.');
+            if (isMountedRef.current) { setIsSubmitting(false); setUploadStatus(null); }
+        }
+    }, [pendingPostData, selectedImage, token, refreshPosts, resetUploadState]);
+
+    const handleCancelConfirm = useCallback(() => {
+        switchModal(MODAL.CREATE_POST);
+    }, [switchModal]);
+
+    // The actual upload — called from ConfirmChefReviewPopup, not from RequestChefReviewModal.
+    // Using POST /chef/submit-with-review ensures the post row and review_request row are
+    // created in a single DB transaction: if either insert fails, both are rolled back.
+    const handleChefReviewSubmit = useCallback(async ({ feedbackContext, chefFilter }) => {
+        if (!pendingPostData || !selectedImage) return;
+
+        if (fileSizeRef.current && fileSizeRef.current > MAX_UPLOAD_BYTES) {
+            Alert.alert('Image Too Large', 'Please choose a photo under 9 MB and try again.');
+            return;
+        }
+
+        setIsSubmitting(true);
+        setUploadStatus('Uploading photo…');
+
+        // Phase 1: upload the image. If this fails, nothing touches the DB.
+        let imageUrl;
+        try {
+            imageUrl = await CloudinaryService.uploadImage(selectedImage, 'posts');
+            if (!imageUrl) throw new Error('Image upload failed');
+        } catch (err) {
+            Alert.alert('Upload Failed', err.message || 'Could not upload the image. Please try again.');
+            if (isMountedRef.current) { setIsSubmitting(false); setUploadStatus(null); }
+            return;
+        }
+
+        setUploadStatus('Submitting…');
+        // Phase 2: create post + review request atomically via the combined endpoint.
+        // A failure here means nothing was written — the Cloudinary URL is the only
+        // orphaned artifact (no client-side cleanup is possible for Cloudinary).
+        try {
+            await api.post('/chef/submit-with-review', {
+                title: pendingPostData.title,
+                description: pendingPostData.description,
+                image_url: imageUrl,
+                cook_time: pendingPostData.cookTime,
+                difficulty: pendingPostData.difficulty,
+                utensils: pendingPostData.utensils,
+                ingredients: pendingPostData.ingredients,
+                instructions: pendingPostData.instructions,
+                context: feedbackContext,
+                chef_filter: chefFilter || 'All Chefs',
+            }, token);
+
+            if (isMountedRef.current) {
+                refreshPosts();
+                resetUploadState();
+            }
+        } catch (err) {
+            Alert.alert('Submission Failed', err.message || 'Could not submit for review. Please try again.');
+            if (isMountedRef.current) { setIsSubmitting(false); setUploadStatus(null); }
+        }
+    }, [pendingPostData, selectedImage, token, refreshPosts, resetUploadState]);
+
+    // Stores the chef review fields and advances to the confirmation popup.
+    // The actual upload only starts after the user confirms in ConfirmChefReviewPopup.
+    const handleChefReviewStage = useCallback((data) => {
+        setPendingChefReviewData(data);
+        switchModal(MODAL.CHEF_REVIEW_CONFIRM);
+    }, [switchModal]);
+
+    const handleChefReviewConfirm = useCallback(() => {
+        if (!pendingChefReviewData) return;
+        handleChefReviewSubmit(pendingChefReviewData);
+    }, [pendingChefReviewData, handleChefReviewSubmit]);
+
+    const handleCancelChefReviewConfirm = useCallback(() => {
+        // Go back to RequestChefReviewModal — pendingChefReviewData is kept so the modal
+        // can restore the form fields the user already filled in.
+        switchModal(MODAL.CHEF_REVIEW);
+    }, [switchModal]);
 
     return (
         <View style={styles.container}>
@@ -86,7 +258,7 @@ export default function MainActions() {
                     { backgroundColor: theme.success },
                     pressed && styles.actionBoxPressed,
                 ]}
-                onPress={() => setActiveModal(MODAL.IMAGE_SOURCE)}
+                onPress={() => setActiveModal(MODAL.DESTINATION_CHOICE)}
             >
                 <View style={[styles.iconContainer, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
                     <Ionicons name="camera" size={fp(24)} color="#FFFFFF" />
@@ -101,46 +273,60 @@ export default function MainActions() {
                 theme={theme}
             />
 
-            <ImageSourceModal
-                visible={activeModal === MODAL.IMAGE_SOURCE}
-                onClose={() => setActiveModal(MODAL.NONE)}
+            <ActionChoiceModal
+                visible={activeModal === MODAL.DESTINATION_CHOICE}
+                onClose={resetUploadState}
                 theme={theme}
-                onTakePhoto={() => handlePhotoAction('camera', onImageCaptured)}
-                onAccessGallery={() => handlePhotoAction('library', onImageCaptured)}
+                onPostToFeed={() => { setSelectedDestination('feed'); switchModal(MODAL.IMAGE_SOURCE); }}
+                onGetAiRating={() => { setSelectedDestination('ai'); switchModal(MODAL.IMAGE_SOURCE); }}
+                onGetChefReview={() => { setSelectedDestination('chef'); switchModal(MODAL.IMAGE_SOURCE); }}
             />
 
-            <ActionChoiceModal
-                visible={activeModal === MODAL.ACTION_CHOICE}
-                onClose={() => {
-                    setActiveModal(MODAL.NONE);
-                    setSelectedImage(null);
-                }}
+            <ImageSourceModal
+                visible={activeModal === MODAL.IMAGE_SOURCE}
+                onClose={resetUploadState}
                 theme={theme}
-                onPostToFeed={() => switchModal(MODAL.CREATE_POST)}
-                onGetAiRating={handleGetAiRating}
-                onGetChefReview={() => switchModal(MODAL.CHEF_REVIEW)}
+                onTakePhoto={() => handlePickerAction('camera')}
+                onAccessGallery={() => handlePickerAction('library')}
             />
 
             <CreatePostModal
                 visible={activeModal === MODAL.CREATE_POST}
                 imageUri={selectedImage}
-                onClose={() => {
-                    setActiveModal(MODAL.NONE);
-                    setSelectedImage(null);
-                }}
-                onBack={() => switchModal(MODAL.ACTION_CHOICE)}
+                destination={selectedDestination}
+                onClose={resetUploadState}
+                onBack={() => switchModal(MODAL.IMAGE_SOURCE)}
                 onSubmit={handleCreatePostSubmit}
+            />
+
+            <ConfirmPostPopup
+                visible={activeModal === MODAL.CONFIRM_POST}
+                onConfirm={handleConfirmPost}
+                onCancel={handleCancelConfirm}
+                onClose={resetUploadState}
+                loading={isSubmitting}
+                statusLabel={uploadStatus}
             />
 
             <RequestChefReviewModal
                 visible={activeModal === MODAL.CHEF_REVIEW}
-                imageUri={selectedImage}
-                onClose={() => {
-                    setActiveModal(MODAL.NONE);
-                    setSelectedImage(null);
-                }}
-                onBack={() => switchModal(MODAL.ACTION_CHOICE)}
-                onSubmit={handleChefReviewSubmit}
+                postData={pendingPostData}
+                onClose={resetUploadState}
+                onBack={() => switchModal(MODAL.CREATE_POST)}
+                onSubmit={handleChefReviewStage}
+                initialFeedbackContext={pendingChefReviewData?.feedbackContext}
+                initialChefFilter={pendingChefReviewData?.chefFilter}
+                loading={isSubmitting}
+            />
+
+            <ConfirmChefReviewPopup
+                visible={activeModal === MODAL.CHEF_REVIEW_CONFIRM}
+                onConfirm={handleChefReviewConfirm}
+                onCancel={handleCancelChefReviewConfirm}
+                onClose={resetUploadState}
+                loading={isSubmitting}
+                chefFilter={pendingChefReviewData?.chefFilter}
+                statusLabel={uploadStatus}
             />
         </View>
     );
