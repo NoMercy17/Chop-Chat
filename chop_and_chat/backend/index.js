@@ -1,12 +1,17 @@
 require('dotenv').config();
 
 // Fail fast if required env vars are missing — never start with insecure defaults.
-const REQUIRED_ENV = ['JWT_SECRET', 'DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
+const REQUIRED_ENV = [
+  'JWT_SECRET', 'DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME',
+  'GEMINI_API_KEY',
+  'CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET',
+];
 const missing = REQUIRED_ENV.filter(k => !process.env[k]);
 if (missing.length) {
   console.error(`FATAL: missing required env vars: ${missing.join(', ')}`);
   process.exit(1);
 }
+
 
 const express = require('express');
 const cors = require('cors');
@@ -20,6 +25,7 @@ const userRoutes = require('./routes/users');
 const notificationRoutes = require('./routes/notifications');
 const chefRoutes = require('./routes/chef');
 const postRoutes = require('./routes/posts');
+const aiRoutes = require('./routes/ai');
 
 const app = express();
 app.use(helmet());
@@ -57,6 +63,7 @@ app.use('/users', userRoutes);
 app.use('/notifications', notificationRoutes);
 app.use('/chef', chefRoutes);
 app.use('/posts', postRoutes);
+app.use('/ai', aiRoutes);
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Backend listening on http://0.0.0.0:${PORT}`);

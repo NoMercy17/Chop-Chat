@@ -4,6 +4,7 @@ import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { useNotifications, NOTIFICATION_TYPES } from '../../context/NotificationsContext';
+import { useChefFeed } from '../../context/ChefFeedContext';
 import ChefReviewModal from '../posts/ChefReviewModal';
 import NotificationListModal from './notifications/NotificationListModal';
 import NotificationDetailModal from './notifications/NotificationDetailModal';
@@ -16,6 +17,7 @@ export default function Header({ navigation }) {
     const [claiming, setClaiming] = useState(false);
     
     const { theme } = useTheme();
+    const { refreshFeed } = useChefFeed();
     const { 
         notifications, 
         unreadCount, 
@@ -100,7 +102,8 @@ export default function Header({ navigation }) {
         await submitChefReview(selectedNotification.id, requestId, postId, reaction_text);
         setChefReviewModalVisible(false);
         setSelectedNotification(null);
-    }, [selectedNotification, submitChefReview]);
+        refreshFeed();
+    }, [selectedNotification, submitChefReview, refreshFeed]);
 
     const handleCancelReview = useCallback(() => {
         cancelReviewClaim(selectedNotification?.id);
@@ -109,9 +112,11 @@ export default function Header({ navigation }) {
     }, [selectedNotification, cancelReviewClaim]);
 
     // Filter out claimed notifications (unless claimed by current user)
+    // Also filter out requests that the current user has already completed
     const visibleNotifications = notifications.filter(n => {
-        if (n.type === NOTIFICATION_TYPES.CHEF_REVIEW_REQUEST && n.claimedBy) {
-            return n.claimedBy === currentUser?.id;
+        if (n.type === NOTIFICATION_TYPES.CHEF_REVIEW_REQUEST) {
+            if (n.data?.requestStatus === 'completed') return false;
+            if (n.claimedBy) return n.claimedBy === currentUser?.id;
         }
         return true;
     });

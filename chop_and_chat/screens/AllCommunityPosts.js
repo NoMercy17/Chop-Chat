@@ -30,6 +30,7 @@ export default function AllCommunityPosts({ navigation }) {
     const [dishDetailModalVisible, setDishDetailModalVisible] = useState(false);
     const [selectedDish, setSelectedDish] = useState(null);
     const [newComment, setNewComment] = useState('');
+    const [commentError, setCommentError] = useState(null);
     
     const filteredPosts = selectedCategory === 'All'
         ? posts
@@ -53,9 +54,28 @@ export default function AllCommunityPosts({ navigation }) {
     const handleAddComment = async () => {
         const text = newComment.trim();
         if (!text || !selectedPost) return;
+
+        const tempId = `temp-${Date.now()}`;
+        setComments(curr => [...curr, {
+            id: tempId, authorId: user?.id,
+            author: user?.name || 'You',
+            initials: (user?.name || 'YO').substring(0, 2).toUpperCase(),
+            text, timestamp: 'just now',
+        }]);
         setNewComment('');
-        const comment = await addComment(selectedPost.id, text);
-        if (comment) setComments(curr => [...curr, comment]);
+
+        const result = await addComment(selectedPost.id, text);
+        if (result?.blocked) {
+            setComments(curr => curr.filter(c => c.id !== tempId));
+            setNewComment(text);
+            setCommentError(result.message);
+        } else if (result) {
+            setComments(curr => curr.map(c => c.id === tempId ? result : c));
+            setCommentError(null);
+        } else {
+            setComments(curr => curr.filter(c => c.id !== tempId));
+            setNewComment(text);
+        }
     };
 
     return (
@@ -137,8 +157,9 @@ export default function AllCommunityPosts({ navigation }) {
                 comments={comments}
                 loading={commentsLoading}
                 newComment={newComment}
-                onCommentChange={setNewComment}
+                onCommentChange={(t) => { setNewComment(t); setCommentError(null); }}
                 onAddComment={handleAddComment}
+                errorMessage={commentError}
                 onAuthorPress={(comment) => {
                     setCommentsModalVisible(false);
                     navigateToProfile(navigation, comment.authorId, comment.author, user?.id);

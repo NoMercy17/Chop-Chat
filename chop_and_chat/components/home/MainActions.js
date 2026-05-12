@@ -8,10 +8,13 @@ import { usePosts } from '../../context/PostsContext';
 import { handlePhotoAction } from '../../utils/photoHandling';
 import { CloudinaryService } from '../../services/CloudinaryService';
 import { api } from '../../services/api';
+import { AiReviewService } from '../../services/AiReviewService';
 import CreatePostModal from '../posts/CreatePostModal';
 import RequestChefReviewModal from '../posts/RequestChefReviewModal';
 import ConfirmPostPopup from '../posts/ConfirmPostPopup';
 import ConfirmChefReviewPopup from '../posts/ConfirmChefReviewPopup';
+import ConfirmAiReviewPopup from '../posts/ConfirmAiReviewPopup';
+import AiReviewResultModal from '../posts/AiReviewResultModal';
 import FindRecipeModal from './main-actions/FindRecipeModal';
 import ImageSourceModal from './main-actions/ImageSourceModal';
 import ActionChoiceModal from './main-actions/ActionChoiceModal';
@@ -26,6 +29,8 @@ const MODAL = {
     CHEF_REVIEW: 'chefReview',
     // Confirmation step before the actual upload — keeps both create + review-request atomic
     CHEF_REVIEW_CONFIRM: 'chefReviewConfirm',
+    CONFIRM_AI_REVIEW: 'confirmAiReview',
+    AI_REVIEW_RESULT: 'aiReviewResult',
 };
 
 const MODAL_TRANSITION_MS = 200;
@@ -44,6 +49,11 @@ export default function MainActions() {
     const [pendingChefReviewData, setPendingChefReviewData] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [uploadStatus, setUploadStatus] = useState(null);
+    const [aiReviewResult, setAiReviewResult] = useState(null);
+    // Holds the Cloudinary URL + public_id from the AI upload phase so the "Share"
+    // path can reuse the URL without re-uploading, and the "discard" path can delete it.
+    const aiUploadedImageUrlRef = useRef(null);
+    const aiUploadedPublicIdRef = useRef(null);
 
     const transitionRef = useRef(null);
     // Stores the 500ms image→CreatePost transition timer so resetUploadState can cancel it.
@@ -76,11 +86,14 @@ export default function MainActions() {
         }
         isPickerActiveRef.current = false;
         fileSizeRef.current = null;
+        aiUploadedImageUrlRef.current = null;
+        aiUploadedPublicIdRef.current = null;
         setActiveModal(MODAL.NONE);
         setSelectedImage(null);
         setSelectedDestination(null);
         setPendingPostData(null);
         setPendingChefReviewData(null);
+        setAiReviewResult(null);
         setIsSubmitting(false);
         setUploadStatus(null);
     }, []);
@@ -118,10 +131,114 @@ export default function MainActions() {
         } else if (selectedDestination === 'chef') {
             switchModal(MODAL.CHEF_REVIEW);
         } else {
-            console.log('AI Rating with data:', postData, 'image:', selectedImage);
-            resetUploadState();
+            switchModal(MODAL.CONFIRM_AI_REVIEW);
         }
-    }, [selectedDestination, selectedImage, switchModal, resetUploadState]);
+    }, [selectedDestination, switchModal]);
+
+    const handleConfirmAiReview = useCallback(async () => {
+        if (!pendingPostData || !selectedImage) return;
+
+        if (fileSizeRef.current && fileSizeRef.current > MAX_UPLOAD_BYTES) {
+            Alert.alert('Image Too Large', 'Please choose a photo under 9 MB and try again.');
+            return;
+        }
+
+        setIsSubmitting(true);
+        setUploadStatus('Uploading photo…');
+
+        let uploadResult;
+        try {
+            uploadResult = await CloudinaryService.uploadImage(selectedImage, 'posts', { returnMeta: true });
+            if (!uploadResult?.url) throw new Error('Image upload failed');
+        } catch (err) {
+            Alert.alert('Upload Failed', err.message || 'Could not upload the image. Please try again.');
+            if (isMountedRef.current) { setIsSubmitting(false); setUploadStatus(null); }
+            return;
+        }
+
+        // Persist URL + publicId — Share reuses URL, Close triggers cleanup by publicId
+        aiUploadedImageUrlRef.current = uploadResult.url;
+        aiUploadedPublicIdRef.current = uploadResult.publicId;
+
+        setUploadStatus('Analyzing your dish…');
+
+        try {
+            const result = await AiReviewService.analyze({
+                imageUrl:    uploadResult.url,
+                title:       pendingPostData.title,
+                description: pendingPostData.description,
+                ingredients: pendingPostData.ingredients,
+                difficulty:  pendingPostData.difficulty,
+                cookTime:    pendingPostData.cookTime,
+                token,
+            });
+
+            if (isMountedRef.current) {
+                setAiReviewResult(result);
+                setIsSubmitting(false);
+                setUploadStatus(null);
+                switchModal(MODAL.AI_REVIEW_RESULT);
+            }
+        } catch (err) {
+            // Gemini failed after image was already uploaded — delete the orphan
+            if (aiUploadedPublicIdRef.current) {
+                api.delete(`/ai/cleanup?public_id=${encodeURIComponent(aiUploadedPublicIdRef.current)}`, token)
+                   .catch(() => {});
+                aiUploadedPublicIdRef.current = null;
+                aiUploadedImageUrlRef.current = null;
+            }
+            const title = err.status === 402 ? 'Daily Limit Reached'
+                        : err.status === 429 ? 'AI Service Busy'
+                        : 'Analysis Failed';
+            const message = err.data?.message || err.message || 'Could not analyze your dish. Please try again.';
+            Alert.alert(title, message);
+            if (isMountedRef.current) { setIsSubmitting(false); setUploadStatus(null); }
+        }
+    }, [pendingPostData, selectedImage, token, switchModal]);
+
+    // Direct post using the already-uploaded Cloudinary URL — no re-upload, no confirm popup.
+    const handleAiReviewShare = useCallback(async () => {
+        if (!pendingPostData || !aiUploadedImageUrlRef.current) return;
+
+        setIsSubmitting(true);
+        setUploadStatus('Posting to feed…');
+
+        try {
+            await api.post('/posts', {
+                title:                 pendingPostData.title,
+                description:           pendingPostData.description,
+                image_url:             aiUploadedImageUrlRef.current,
+                cook_time:             pendingPostData.cookTime,
+                difficulty:            pendingPostData.difficulty,
+                utensils:              pendingPostData.utensils,
+                ingredients:           pendingPostData.ingredients,
+                instructions:          pendingPostData.instructions,
+                chef_review_requested: false,
+            }, token);
+
+            if (isMountedRef.current) {
+                refreshPosts();
+                resetUploadState();
+            }
+        } catch (err) {
+            const title = err.status === 429 ? 'Daily Limit Reached'
+                        : String(err.data?.error || '').startsWith('Image rejected') ? 'Image Not Eligible'
+                        : 'Post Failed';
+            Alert.alert(title, err.message || 'Could not post. Please try again.');
+            if (isMountedRef.current) { setIsSubmitting(false); setUploadStatus(null); }
+        }
+    }, [pendingPostData, token, refreshPosts, resetUploadState]);
+
+    // User closed the result modal without sharing — delete the orphaned Cloudinary image.
+    const handleAiReviewClose = useCallback(() => {
+        if (aiUploadedPublicIdRef.current) {
+            api.delete(
+                `/ai/cleanup?public_id=${encodeURIComponent(aiUploadedPublicIdRef.current)}`,
+                token
+            ).catch(() => {});
+        }
+        resetUploadState();
+    }, [token, resetUploadState]);
 
     const handleConfirmPost = useCallback(async () => {
         if (!pendingPostData || !selectedImage) return;
@@ -155,7 +272,10 @@ export default function MainActions() {
                 resetUploadState();
             }
         } catch (err) {
-            Alert.alert('Upload Failed', err.message || 'Could not post. Please try again.');
+            const title = err.status === 429 ? 'Daily Limit Reached'
+                        : String(err.data?.error || '').startsWith('Image rejected') ? 'Image Not Eligible'
+                        : 'Post Failed';
+            Alert.alert(title, err.message || 'Could not post. Please try again.');
             if (isMountedRef.current) { setIsSubmitting(false); setUploadStatus(null); }
         }
     }, [pendingPostData, selectedImage, token, refreshPosts, resetUploadState]);
@@ -212,7 +332,10 @@ export default function MainActions() {
                 resetUploadState();
             }
         } catch (err) {
-            Alert.alert('Submission Failed', err.message || 'Could not submit for review. Please try again.');
+            const title = err.status === 429 ? 'Daily Limit Reached'
+                        : String(err.data?.error || '').startsWith('Image rejected') ? 'Image Not Eligible'
+                        : 'Submission Failed';
+            Alert.alert(title, err.message || 'Could not submit for review. Please try again.');
             if (isMountedRef.current) { setIsSubmitting(false); setUploadStatus(null); }
         }
     }, [pendingPostData, selectedImage, token, refreshPosts, resetUploadState]);
@@ -326,6 +449,26 @@ export default function MainActions() {
                 onClose={resetUploadState}
                 loading={isSubmitting}
                 chefFilter={pendingChefReviewData?.chefFilter}
+                statusLabel={uploadStatus}
+            />
+
+            <ConfirmAiReviewPopup
+                visible={activeModal === MODAL.CONFIRM_AI_REVIEW}
+                onConfirm={handleConfirmAiReview}
+                onCancel={() => switchModal(MODAL.CREATE_POST)}
+                onClose={resetUploadState}
+                loading={isSubmitting}
+                statusLabel={uploadStatus}
+            />
+
+            <AiReviewResultModal
+                visible={activeModal === MODAL.AI_REVIEW_RESULT}
+                review={aiReviewResult?.review}
+                quota={aiReviewResult?.quota}
+                dishImage={selectedImage}
+                onClose={handleAiReviewClose}
+                onShare={handleAiReviewShare}
+                loading={isSubmitting}
                 statusLabel={uploadStatus}
             />
         </View>

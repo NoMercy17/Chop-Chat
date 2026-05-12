@@ -69,7 +69,10 @@ export const CloudinaryService = {
       const data = await response.json();
       
       if (data.secure_url) {
-        return data.secure_url;
+        // returnMeta: true is used by the AI flow to get the public_id for later cleanup
+        return options.returnMeta
+          ? { url: data.secure_url, publicId: data.public_id }
+          : data.secure_url;
       } else if (data.error) {
         console.error('❌ CloudinaryService Error:', data.error.message);
         return null;

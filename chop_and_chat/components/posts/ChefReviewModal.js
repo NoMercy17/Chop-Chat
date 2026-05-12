@@ -4,12 +4,9 @@ import {
     Text,
     Image,
     StyleSheet,
-    Modal,
     Pressable,
     TextInput,
     Alert,
-    KeyboardAvoidingView,
-    Platform,
     ScrollView,
     ActivityIndicator
 } from 'react-native';
@@ -18,6 +15,7 @@ import { wp, hp, fp } from '../../utils/responsive';
 import { useTheme } from '../../context/ThemeContext';
 import { AuthContext } from '../../context/AuthContext';
 import { api } from '../../services/api';
+import BottomSheetModal from '../common/BottomSheetModal';
 
 function getDifficultyColor(difficulty, theme) {
     switch (difficulty?.toLowerCase()) {
@@ -96,263 +94,209 @@ export default function ChefReviewModal({ visible, onClose, request, onSubmit })
     const postTitle = request.post_title || request.data?.postTitle || 'Dish';
 
     return (
-        <Modal
+        <BottomSheetModal
             visible={visible}
-            transparent={true}
-            animationType="slide"
-            onRequestClose={onClose}
+            onClose={onClose}
+            title="Write Chef Review"
+            leftIcon="close"
+            onLeftPress={onClose}
+            keyboardAvoidMaxHeight="90%"
         >
-            <View style={[styles.overlay, { backgroundColor: theme.overlayBackground }]}>
-                <Pressable style={styles.overlayPressable} onPress={onClose} />
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    style={styles.keyboardAvoid}
-                >
-                    <View style={[styles.modalContainer, { backgroundColor: theme.modalBackground }]}>
-                        <View style={[styles.header, { borderBottomColor: theme.border }]}>
-                            <Text style={[styles.title, { color: theme.textPrimary }]}>
-                                Write Chef Review
+            <ScrollView
+                style={styles.scrollContent}
+                contentContainerStyle={styles.scrollContentContainer}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+            >
+                {/* Who / what is being reviewed */}
+                <View style={[styles.infoCard, { backgroundColor: theme.primaryLightest }]}>
+                    <Text style={[styles.infoLabel, { color: theme.primary }]}>
+                        Reviewing for {requesterName}
+                    </Text>
+                    <Text style={[styles.infoTitle, { color: theme.textPrimary }]}>
+                        {postTitle}
+                    </Text>
+                    {request.context && (
+                        <View style={[styles.contextBox, { borderTopColor: theme.border }]}>
+                            <Text style={[styles.contextLabel, { color: theme.textSecondary }]}>
+                                User's context:
                             </Text>
-                            <Pressable
-                                onPress={onClose}
-                                style={({ pressed }) => [styles.closeButton, pressed && { opacity: 0.6 }]}
-                            >
-                                <Ionicons name="close" size={fp(24)} color={theme.textPrimary} />
-                            </Pressable>
+                            <Text style={[styles.contextText, { color: theme.textPrimary }]}>
+                                {request.context}
+                            </Text>
                         </View>
+                    )}
+                </View>
 
-                        <ScrollView
-                            style={styles.scrollContent}
-                            contentContainerStyle={styles.scrollContentContainer}
-                            showsVerticalScrollIndicator={false}
-                            keyboardShouldPersistTaps="handled"
-                        >
-                            {/* Who / what is being reviewed */}
-                            <View style={[styles.infoCard, { backgroundColor: theme.primaryLightest }]}>
-                                <Text style={[styles.infoLabel, { color: theme.primary }]}>
-                                    Reviewing for {requesterName}
-                                </Text>
-                                <Text style={[styles.infoTitle, { color: theme.textPrimary }]}>
-                                    {postTitle}
-                                </Text>
-                                {request.context && (
-                                    <View style={[styles.contextBox, { borderTopColor: theme.border }]}>
-                                        <Text style={[styles.contextLabel, { color: theme.textSecondary }]}>
-                                            User's context:
-                                        </Text>
-                                        <Text style={[styles.contextText, { color: theme.textPrimary }]}>
-                                            {request.context}
-                                        </Text>
+                {/* Collapsible full recipe panel — chef can expand while composing */}
+                <Pressable
+                    style={[styles.recipePanelToggle, { backgroundColor: theme.cardBackgroundAlt, borderColor: theme.border }]}
+                    onPress={() => setRecipeExpanded(prev => !prev)}
+                >
+                    <View style={styles.recipePanelToggleLeft}>
+                        <Ionicons name="receipt-outline" size={fp(18)} color={theme.primary} />
+                        <Text style={[styles.recipePanelToggleText, { color: theme.textPrimary }]}>
+                            Full Recipe
+                        </Text>
+                    </View>
+                    <Ionicons
+                        name={recipeExpanded ? 'chevron-up' : 'chevron-down'}
+                        size={fp(18)}
+                        color={theme.textSecondary}
+                    />
+                </Pressable>
+
+                {recipeExpanded && (
+                    <View style={[styles.recipePanel, { backgroundColor: theme.cardBackgroundAlt, borderColor: theme.border }]}>
+                        {postFullData ? (
+                            <>
+                                {postFullData.image && (
+                                    <View style={styles.recipePanelImageContainer}>
+                                        <Image
+                                            source={{ uri: postFullData.image }}
+                                            style={styles.recipePanelImage}
+                                            resizeMode="cover"
+                                        />
                                     </View>
                                 )}
-                            </View>
 
-                            {/* Collapsible full recipe panel — chef can expand while composing */}
-                            <Pressable
-                                style={[styles.recipePanelToggle, { backgroundColor: theme.cardBackgroundAlt, borderColor: theme.border }]}
-                                onPress={() => setRecipeExpanded(prev => !prev)}
-                            >
-                                <View style={styles.recipePanelToggleLeft}>
-                                    <Ionicons name="receipt-outline" size={fp(18)} color={theme.primary} />
-                                    <Text style={[styles.recipePanelToggleText, { color: theme.textPrimary }]}>
-                                        Full Recipe
-                                    </Text>
-                                </View>
-                                <Ionicons
-                                    name={recipeExpanded ? 'chevron-up' : 'chevron-down'}
-                                    size={fp(18)}
-                                    color={theme.textSecondary}
-                                />
-                            </Pressable>
-
-                            {recipeExpanded && (
-                                <View style={[styles.recipePanel, { backgroundColor: theme.cardBackgroundAlt, borderColor: theme.border }]}>
-                                    {postFullData ? (
-                                        <>
-                                            {postFullData.image && (
-                                                <View style={styles.recipePanelImageContainer}>
-                                                    <Image
-                                                        source={{ uri: postFullData.image }}
-                                                        style={styles.recipePanelImage}
-                                                        resizeMode="cover"
-                                                    />
-                                                </View>
-                                            )}
-
-                                            <View style={styles.recipePanelMeta}>
-                                                {postFullData.difficulty && (
-                                                    <View style={[
-                                                        styles.difficultyBadge,
-                                                        { backgroundColor: getDifficultyColor(postFullData.difficulty, theme) + '22' }
-                                                    ]}>
-                                                        <Text style={[styles.difficultyText, { color: getDifficultyColor(postFullData.difficulty, theme) }]}>
-                                                            {postFullData.difficulty}
-                                                        </Text>
-                                                    </View>
-                                                )}
-                                                {postFullData.cookTime && (
-                                                    <View style={styles.metaBadge}>
-                                                        <Ionicons name="time-outline" size={fp(14)} color={theme.textSecondary} />
-                                                        <Text style={[styles.metaText, { color: theme.textSecondary }]}>
-                                                            {postFullData.cookTime}
-                                                        </Text>
-                                                    </View>
-                                                )}
-                                            </View>
-
-                                            {postFullData.description && (
-                                                <>
-                                                    <Text style={[styles.panelSectionTitle, { color: theme.textPrimary }]}>
-                                                        Description
-                                                    </Text>
-                                                    <Text style={[styles.panelText, { color: theme.textSecondary }]}>
-                                                        {postFullData.description}
-                                                    </Text>
-                                                </>
-                                            )}
-
-                                            {postFullData.utensils?.length > 0 && (
-                                                <>
-                                                    <Text style={[styles.panelSectionTitle, { color: theme.textPrimary }]}>
-                                                        Kitchen Tools
-                                                    </Text>
-                                                    <View style={styles.utensilRow}>
-                                                        {postFullData.utensils.map((id) => {
-                                                            const u = UTENSIL_MAP[id];
-                                                            if (!u) return null;
-                                                            return (
-                                                                <View key={id} style={[styles.utensilChip, { backgroundColor: theme.primaryLightest, borderColor: theme.primary }]}>
-                                                                    <Ionicons name={u.icon} size={fp(13)} color={theme.primary} />
-                                                                    <Text style={[styles.utensilChipText, { color: theme.primary }]}>{u.label}</Text>
-                                                                </View>
-                                                            );
-                                                        })}
-                                                    </View>
-                                                </>
-                                            )}
-
-                                            {postFullData.ingredients?.length > 0 && (
-                                                <>
-                                                    <Text style={[styles.panelSectionTitle, { color: theme.textPrimary }]}>
-                                                        Ingredients
-                                                    </Text>
-                                                    {postFullData.ingredients.map((ing, i) => (
-                                                        <Text key={i} style={[styles.panelText, { color: theme.textSecondary }]}>
-                                                            • {ing}
-                                                        </Text>
-                                                    ))}
-                                                </>
-                                            )}
-
-                                            {postFullData.instructions && (
-                                                <>
-                                                    <Text style={[styles.panelSectionTitle, { color: theme.textPrimary }]}>
-                                                        Steps
-                                                    </Text>
-                                                    <Text style={[styles.panelText, { color: theme.textSecondary }]}>
-                                                        {postFullData.instructions}
-                                                    </Text>
-                                                </>
-                                            )}
-                                        </>
-                                    ) : postFetchError ? (
-                                        <Text style={[styles.fetchErrorText, { color: theme.textSecondary }]}>
-                                            Could not load recipe details
-                                        </Text>
-                                    ) : (
-                                        <ActivityIndicator
-                                            size="small"
-                                            color={theme.primary}
-                                            style={{ marginVertical: hp(16) }}
-                                        />
+                                <View style={styles.recipePanelMeta}>
+                                    {postFullData.difficulty && (
+                                        <View style={[
+                                            styles.difficultyBadge,
+                                            { backgroundColor: getDifficultyColor(postFullData.difficulty, theme) + '22' }
+                                        ]}>
+                                            <Text style={[styles.difficultyText, { color: getDifficultyColor(postFullData.difficulty, theme) }]}>
+                                                {postFullData.difficulty}
+                                            </Text>
+                                        </View>
+                                    )}
+                                    {postFullData.cookTime && (
+                                        <View style={styles.metaBadge}>
+                                            <Ionicons name="time-outline" size={fp(14)} color={theme.textSecondary} />
+                                            <Text style={[styles.metaText, { color: theme.textSecondary }]}>
+                                                {postFullData.cookTime}
+                                            </Text>
+                                        </View>
                                     )}
                                 </View>
-                            )}
 
-                            <Text style={[styles.label, { color: theme.textPrimary }]}>
-                                Your Professional Feedback
-                            </Text>
-                            <TextInput
-                                style={[
-                                    styles.textInput,
-                                    {
-                                        backgroundColor: theme.inputBackground,
-                                        color: theme.textPrimary,
-                                        borderColor: theme.border
-                                    }
-                                ]}
-                                placeholder="Presentation looks great! To improve the flavor, try adding some fresh herbs..."
-                                placeholderTextColor={theme.textTertiary}
-                                value={reviewText}
-                                onChangeText={setReviewText}
-                                multiline
-                                numberOfLines={6}
-                                textAlignVertical="top"
-                            />
-
-                            <Pressable
-                                style={({ pressed }) => [
-                                    styles.submitButton,
-                                    { backgroundColor: theme.primary },
-                                    (pressed || loading) && { opacity: 0.8 }
-                                ]}
-                                onPress={handleSubmit}
-                                disabled={loading}
-                            >
-                                {loading ? (
-                                    <ActivityIndicator color={theme.textInverse} />
-                                ) : (
+                                {postFullData.description && (
                                     <>
-                                        <Ionicons name="checkmark-circle" size={fp(20)} color={theme.textInverse} />
-                                        <Text style={[styles.submitButtonText, { color: theme.textInverse }]}>
-                                            Submit Review
+                                        <Text style={[styles.panelSectionTitle, { color: theme.textPrimary }]}>
+                                            Description
+                                        </Text>
+                                        <Text style={[styles.panelText, { color: theme.textSecondary }]}>
+                                            {postFullData.description}
                                         </Text>
                                     </>
                                 )}
-                            </Pressable>
-                        </ScrollView>
+
+                                {postFullData.utensils?.length > 0 && (
+                                    <>
+                                        <Text style={[styles.panelSectionTitle, { color: theme.textPrimary }]}>
+                                            Kitchen Tools
+                                        </Text>
+                                        <View style={styles.utensilRow}>
+                                            {postFullData.utensils.map((id) => {
+                                                const u = UTENSIL_MAP[id];
+                                                if (!u) return null;
+                                                return (
+                                                    <View key={id} style={[styles.utensilChip, { backgroundColor: theme.primaryLightest, borderColor: theme.primary }]}>
+                                                        <Ionicons name={u.icon} size={fp(13)} color={theme.primary} />
+                                                        <Text style={[styles.utensilChipText, { color: theme.primary }]}>{u.label}</Text>
+                                                    </View>
+                                                );
+                                            })}
+                                        </View>
+                                    </>
+                                )}
+
+                                {postFullData.ingredients?.length > 0 && (
+                                    <>
+                                        <Text style={[styles.panelSectionTitle, { color: theme.textPrimary }]}>
+                                            Ingredients
+                                        </Text>
+                                        {postFullData.ingredients.map((ing, i) => (
+                                            <Text key={i} style={[styles.panelText, { color: theme.textSecondary }]}>
+                                                • {ing}
+                                            </Text>
+                                        ))}
+                                    </>
+                                )}
+
+                                {postFullData.instructions && (
+                                    <>
+                                        <Text style={[styles.panelSectionTitle, { color: theme.textPrimary }]}>
+                                            Steps
+                                        </Text>
+                                        <Text style={[styles.panelText, { color: theme.textSecondary }]}>
+                                            {postFullData.instructions}
+                                        </Text>
+                                    </>
+                                )}
+                            </>
+                        ) : postFetchError ? (
+                            <Text style={[styles.fetchErrorText, { color: theme.textSecondary }]}>
+                                Could not load recipe details
+                            </Text>
+                        ) : (
+                            <ActivityIndicator
+                                size="small"
+                                color={theme.primary}
+                                style={{ marginVertical: hp(16) }}
+                            />
+                        )}
                     </View>
-                </KeyboardAvoidingView>
-            </View>
-        </Modal>
+                )}
+
+                <Text style={[styles.label, { color: theme.textPrimary }]}>
+                    Your Professional Feedback
+                </Text>
+                <TextInput
+                    style={[
+                        styles.textInput,
+                        {
+                            backgroundColor: theme.inputBackground,
+                            color: theme.textPrimary,
+                            borderColor: theme.border
+                        }
+                    ]}
+                    placeholder="Presentation looks great! To improve the flavor, try adding some fresh herbs..."
+                    placeholderTextColor={theme.textTertiary}
+                    value={reviewText}
+                    onChangeText={setReviewText}
+                    multiline
+                    numberOfLines={6}
+                    textAlignVertical="top"
+                />
+
+                <Pressable
+                    style={({ pressed }) => [
+                        styles.submitButton,
+                        { backgroundColor: theme.primary },
+                        (pressed || loading) && { opacity: 0.8 }
+                    ]}
+                    onPress={handleSubmit}
+                    disabled={loading}
+                >
+                    {loading ? (
+                        <ActivityIndicator color={theme.textInverse} />
+                    ) : (
+                        <>
+                            <Ionicons name="checkmark-circle" size={fp(20)} color={theme.textInverse} />
+                            <Text style={[styles.submitButtonText, { color: theme.textInverse }]}>
+                                Submit Review
+                            </Text>
+                        </>
+                    )}
+                </Pressable>
+            </ScrollView>
+        </BottomSheetModal>
     );
 }
 
 const styles = StyleSheet.create({
-    overlay: {
-        flex: 1,
-        justifyContent: 'flex-end',
-    },
-    overlayPressable: {
-        position: 'absolute',
-        top: 0, left: 0, right: 0, bottom: 0,
-    },
-    keyboardAvoid: {
-        maxHeight: '90%',
-        width: '100%',
-    },
-    modalContainer: {
-        borderTopLeftRadius: wp(24),
-        borderTopRightRadius: wp(24),
-        height: '100%',
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: hp(16),
-        paddingHorizontal: wp(20),
-        borderBottomWidth: 1,
-    },
-    title: {
-        fontSize: fp(18),
-        fontWeight: '700',
-    },
-    closeButton: {
-        position: 'absolute',
-        right: wp(20),
-        padding: wp(4),
-    },
     scrollContent: {
         flex: 1,
         padding: wp(20),
@@ -509,3 +453,4 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
 });
+

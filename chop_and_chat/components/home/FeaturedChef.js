@@ -29,6 +29,7 @@ export default function FeaturedChef() {
     const [comments, setComments] = useState([]);
     const [commentsLoading, setCommentsLoading] = useState(false);
     const [newComment, setNewComment] = useState('');
+    const [commentError, setCommentError] = useState(null);
 
     // Derive the selected item from context based on ID
     const selectedItem = useMemo(() => {
@@ -59,15 +60,35 @@ export default function FeaturedChef() {
     const submitComment = useCallback(async () => {
         const text = newComment.trim();
         if (!text || !selectedItemId) return;
+
+        const tempId = `temp-${Date.now()}`;
+        setComments(curr => [...curr, {
+            id: tempId, authorId: user?.id,
+            author: user?.name || 'You',
+            initials: (user?.name || 'YO').substring(0, 2).toUpperCase(),
+            text, timestamp: 'just now',
+        }]);
         setNewComment('');
-        const comment = await addComment(selectedItemId, text);
-        if (comment) setComments(curr => [...curr, comment]);
-    }, [newComment, selectedItemId, addComment]);
+
+        const result = await addComment(selectedItemId, text);
+        if (result?.blocked) {
+            setComments(curr => curr.filter(c => c.id !== tempId));
+            setNewComment(text);
+            setCommentError(result.message);
+        } else if (result) {
+            setComments(curr => curr.map(c => c.id === tempId ? result : c));
+            setCommentError(null);
+        } else {
+            setComments(curr => curr.filter(c => c.id !== tempId));
+            setNewComment(text);
+        }
+    }, [newComment, selectedItemId, addComment, user]);
 
     const handleCloseComments = () => {
         setCommentsModalVisible(false);
         setComments([]);
         setNewComment('');
+        setCommentError(null);
     };
 
     const renderQuickCard = (item) => {
@@ -222,8 +243,9 @@ export default function FeaturedChef() {
                 comments={comments}
                 loading={commentsLoading}
                 newComment={newComment}
-                onCommentChange={setNewComment}
+                onCommentChange={(t) => { setNewComment(t); setCommentError(null); }}
                 onAddComment={submitComment}
+                errorMessage={commentError}
                 onAuthorPress={(comment) => {
                     handleCloseComments();
                     navigateToProfile(navigation, comment.authorId, comment.author, user?.id);

@@ -42,6 +42,7 @@ export default function AllChefReviews({ navigation }) {
     const [comments, setComments] = useState([]);
     const [commentsLoading, setCommentsLoading] = useState(false);
     const [newComment, setNewComment] = useState('');
+    const [commentError, setCommentError] = useState(null);
 
     const filteredItems = useMemo(() => {
         let items = selectedCategory === 'All'
@@ -91,9 +92,28 @@ export default function AllChefReviews({ navigation }) {
     const submitComment = async () => {
         const text = newComment.trim();
         if (!text || !selectedItem) return;
+
+        const tempId = `temp-${Date.now()}`;
+        setComments(curr => [...curr, {
+            id: tempId, authorId: user?.id,
+            author: user?.name || 'You',
+            initials: (user?.name || 'YO').substring(0, 2).toUpperCase(),
+            text, timestamp: 'just now',
+        }]);
         setNewComment('');
-        const comment = await addComment(selectedItem.id, text);
-        if (comment) setComments(curr => [...curr, comment]);
+
+        const result = await addComment(selectedItem.id, text);
+        if (result?.blocked) {
+            setComments(curr => curr.filter(c => c.id !== tempId));
+            setNewComment(text);
+            setCommentError(result.message);
+        } else if (result) {
+            setComments(curr => curr.map(c => c.id === tempId ? result : c));
+            setCommentError(null);
+        } else {
+            setComments(curr => curr.filter(c => c.id !== tempId));
+            setNewComment(text);
+        }
     };
 
     const renderFeedCard = (item) => {
@@ -197,8 +217,9 @@ export default function AllChefReviews({ navigation }) {
                 comments={comments}
                 loading={commentsLoading}
                 newComment={newComment}
-                onCommentChange={setNewComment}
+                onCommentChange={(t) => { setNewComment(t); setCommentError(null); }}
                 onAddComment={submitComment}
+                errorMessage={commentError}
                 onAuthorPress={(comment) => {
                     setCommentsModalVisible(false);
                     navigateToProfile(navigation, comment.authorId, comment.author, user?.id);

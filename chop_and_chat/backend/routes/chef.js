@@ -3,27 +3,16 @@ const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const pool = require('../db');
 const { authenticateToken, requireChef } = require('../middleware');
+const { validateFoodImage } = require('../services/gemini');
+const { moderateText } = require('../services/moderation');
+const cloudinary = require('../services/cloudinary');
+const { relativeTime, initials, getPublicIdFromUrl } = require('../utils/helpers');
 
-const reviewRequestLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
-const feedLimiter           = rateLimit({ windowMs: 15 * 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false });
-const commentsReadLimiter   = rateLimit({ windowMs: 15 * 60 * 1000, max: 180, standardHeaders: true, legacyHeaders: false });
-const commentsWriteLimiter  = rateLimit({ windowMs: 15 * 60 * 1000, max: 40, standardHeaders: true, legacyHeaders: false });
-
-function relativeTime(date) {
-  const s = Math.floor((Date.now() - new Date(date)) / 1000);
-  if (s < 60) return 'just now';
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
-
-function initials(name) {
-  const parts = (name || '').trim().split(/\s+/);
-  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  return (name || '').substring(0, 2).toUpperCase();
-}
+const reviewRequestLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10,  standardHeaders: true, legacyHeaders: false });
+const feedLimiter          = rateLimit({ windowMs: 15 * 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false });
+const commentsReadLimiter  = rateLimit({ windowMs: 15 * 60 * 1000, max: 180, standardHeaders: true, legacyHeaders: false });
+const commentsWriteLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 60,  standardHeaders: true, legacyHeaders: false, message: { error: 'too_many_requests', message: 'You\'re posting too many comments. Please slow down.' } });
+const commentsBurstLimiter = rateLimit({ windowMs: 2000,            max: 1,   standardHeaders: true, legacyHeaders: false, message: { error: 'too_many_requests', message: 'Please wait a moment before posting another comment.' } });
 
 // Creates a post + chef review request atomically in a single DB transaction.
 // This replaces the old two-call flow (POST /posts then POST /chef/review-request) where
@@ -35,6 +24,29 @@ router.post('/submit-with-review', reviewRequestLimiter, authenticateToken, asyn
   if (!image_url?.trim()) return res.status(400).json({ error: 'image_url is required' });
   if (difficulty && !['Easy', 'Medium', 'Hard'].includes(difficulty)) {
     return res.status(400).json({ error: 'difficulty must be Easy, Medium, or Hard' });
+  }
+
+  const cleanImageUrl = image_url.trim();
+
+  // Per-user daily chef review request cap — each request triggers a Gemini validation call
+  const { rows: chefDailyRows } = await pool.query(
+    `SELECT COUNT(*) AS count FROM chef_review_requests
+     WHERE requester_id = $1 AND created_at > NOW() - INTERVAL '24 hours'`,
+    [req.user.id]
+  );
+  if (parseInt(chefDailyRows[0].count, 10) >= 3) {
+    return res.status(429).json({ error: 'daily_chef_request_limit_exceeded', message: "You've reached the daily chef review request limit (3). Try again tomorrow." });
+  }
+
+  const validation = await validateFoodImage(cleanImageUrl);
+  if (!validation.isValidForFeed) {
+    const publicId = getPublicIdFromUrl(cleanImageUrl);
+    if (publicId && publicId.startsWith('posts/')) {
+      await cloudinary.uploader.destroy(publicId).catch(err => {
+        console.error('[POST /chef/submit-with-review] Failed to delete orphaned Cloudinary image:', err.message);
+      });
+    }
+    return res.status(400).json({ error: `Image rejected: ${validation.reason}` });
   }
 
   const client = await pool.connect();
@@ -50,7 +62,7 @@ router.post('/submit-with-review', reviewRequestLimiter, authenticateToken, asyn
       req.user.id,
       title.trim(),
       description?.trim() || null,
-      image_url.trim(),
+      cleanImageUrl,
       cook_time || null,
       difficulty || null,
       JSON.stringify(utensils || []),
@@ -397,7 +409,7 @@ router.get('/:id/comments', commentsReadLimiter, authenticateToken, async (req, 
 });
 
 // POST a comment on a chef reaction
-router.post('/:id/comments', commentsWriteLimiter, authenticateToken, async (req, res) => {
+router.post('/:id/comments', commentsBurstLimiter, commentsWriteLimiter, authenticateToken, async (req, res) => {
   try {
     const reactionId = parseInt(req.params.id, 10);
     if (Number.isNaN(reactionId)) return res.status(400).json({ error: 'invalid reaction id' });
@@ -406,6 +418,14 @@ router.post('/:id/comments', commentsWriteLimiter, authenticateToken, async (req
 
     const rxCheck = await pool.query('SELECT chef_id FROM chef_reactions WHERE id = $1', [reactionId]);
     if (!rxCheck.rows.length) return res.status(404).json({ error: 'reaction not found' });
+
+    const mod = moderateText(text);
+    if (mod.flagged) {
+      return res.status(400).json({
+        error: 'comment_rejected',
+        message: 'Your comment was not posted — it contains content that violates our community guidelines.',
+      });
+    }
 
     const { rows } = await pool.query(
       'INSERT INTO comments (chef_reaction_id, user_id, comment_text) VALUES ($1, $2, $3) RETURNING id, created_at',

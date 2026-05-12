@@ -111,7 +111,16 @@ export function PostsProvider({ children }) {
             return result?.comment ?? null;
         } catch (error) {
             console.error(`[PostsContext:addComment] ${postId}:`, error.message);
-            Alert.alert('Could not post comment', 'Please try again.');
+            if (error.data?.error === 'comment_rejected') {
+                return { blocked: true, message: error.message };
+            }
+            if (error.status === 429) {
+                return { blocked: true, message: 'You\'re posting too fast. Please wait a moment.' };
+            }
+            if (error.status === 404) {
+                return { blocked: true, message: 'This post no longer exists.' };
+            }
+            Alert.alert('Could not post comment', error.message || 'Please try again.');
             return null;
         }
     }, [token, updateCommentCount]);

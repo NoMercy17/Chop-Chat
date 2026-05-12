@@ -250,6 +250,21 @@ LEFT JOIN comments c ON p.id = c.post_id
 LEFT JOIN chef_reactions cr ON p.id = cr.post_id
 GROUP BY p.id, u.id;
 
+-- Tracks per-user AI review usage for daily quota enforcement and cost analytics.
+CREATE TABLE IF NOT EXISTS ai_review_logs (
+  id         SERIAL PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  image_url  TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Backfill column on existing databases (no-op if already present).
+ALTER TABLE ai_review_logs ADD COLUMN IF NOT EXISTS image_url TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_ai_review_logs_user_created
+  ON ai_review_logs(user_id, created_at DESC);
+
+
 -- View: User stats
 CREATE OR REPLACE VIEW user_stats AS
 SELECT 
