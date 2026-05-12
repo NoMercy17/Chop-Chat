@@ -42,7 +42,7 @@ router.post('/analyze', aiLimiter, authenticateToken, async (req, res) => {
     const used = parseInt(usageRows[0].used, 10);
 
     if (used >= DAILY_QUOTA) {
-      return res.status(402).json({
+      return res.status(429).json({
         error: 'daily_quota_exceeded',
         message: `You've used all ${DAILY_QUOTA} AI reviews for today. Try again tomorrow.`,
         quota: { used, limit: DAILY_QUOTA },
@@ -58,12 +58,14 @@ router.post('/analyze', aiLimiter, authenticateToken, async (req, res) => {
       cookTime:    cook_time   || '',
     });
 
+    const isFeedEligible = review.isFood && !['fruit', 'vegetable', 'non_food'].includes(review.foodCategory);
+
     // Log usage only after a successful Gemini response — failed calls don't count.
     // image_url is stored so POST /posts can verify the image was already AI-reviewed
     // and skip the redundant validateFoodImage call on the share path.
     await pool.query(
-      'INSERT INTO ai_review_logs (user_id, image_url) VALUES ($1, $2)',
-      [userId, image_url.trim()]
+      'INSERT INTO ai_review_logs (user_id, image_url, is_feed_eligible) VALUES ($1, $2, $3)',
+      [userId, image_url.trim(), isFeedEligible]
     );
 
     res.json({

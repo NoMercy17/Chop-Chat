@@ -16,7 +16,7 @@ export default function ConfirmAiReviewPopup({ visible, onConfirm, onCancel, onC
             loading={loading}
             statusLabel={statusLabel}
             iconName="flash"
-            iconColor={theme.warning}now 
+            iconColor={theme.warning}
             iconBgColor={theme.warningLight}
             title="Analyze with AI?"
             subtitle="Your dish photo and recipe details will be analyzed by AI. You'll receive a detailed score and feedback within seconds."

@@ -42,7 +42,7 @@ router.post('/', postsWriteLimiter, authenticateToken, async (req, res) => {
     // the analysis already confirmed food eligibility, so a second Gemini call is redundant.
     const { rows: aiLogRows } = await pool.query(
       `SELECT 1 FROM ai_review_logs
-       WHERE user_id = $1 AND image_url = $2 AND created_at > NOW() - INTERVAL '30 minutes'
+       WHERE user_id = $1 AND image_url = $2 AND is_feed_eligible = true AND created_at > NOW() - INTERVAL '30 minutes'
        LIMIT 1`,
       [req.user.id, cleanImageUrl]
     );

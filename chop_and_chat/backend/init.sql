@@ -255,11 +255,13 @@ CREATE TABLE IF NOT EXISTS ai_review_logs (
   id         SERIAL PRIMARY KEY,
   user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   image_url  TEXT,
+  is_feed_eligible BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Backfill column on existing databases (no-op if already present).
 ALTER TABLE ai_review_logs ADD COLUMN IF NOT EXISTS image_url TEXT;
+ALTER TABLE ai_review_logs ADD COLUMN IF NOT EXISTS is_feed_eligible BOOLEAN DEFAULT false;
 
 CREATE INDEX IF NOT EXISTS idx_ai_review_logs_user_created
   ON ai_review_logs(user_id, created_at DESC);
