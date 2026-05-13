@@ -103,6 +103,10 @@ export const lightTheme = {
   chefReviewButtonBg: '#f7e9faff',
   cancelButtonBg: '#FEF2F2',
 
+  // Paid / premium feature (chef review payment)
+  paid: '#7C3AED',
+  paidLight: '#EDE9FE',
+
   // Chef/Community card
   chefCardBackground: '#FFFFFF',
   chefCardHeaderBg: '#FFFFFF',
@@ -207,6 +211,10 @@ export const darkTheme = {
   aiRatingButtonBg: '#3D3520',
   chefReviewButtonBg: '#2E2535',
   cancelButtonBg: '#3D2020',
+
+  // Paid / premium feature (chef review payment)
+  paid: '#A78BFA',
+  paidLight: '#2E1065',
 
   // Chef/Community card
   chefCardBackground: '#1E293B',  

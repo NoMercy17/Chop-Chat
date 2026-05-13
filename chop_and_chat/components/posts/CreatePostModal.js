@@ -3,6 +3,7 @@ import {
     View, Text, StyleSheet, ScrollView, Pressable,
     TextInput, Image, Alert
 } from 'react-native';
+import { moderateText } from '../../utils/moderation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { wp, hp, fp } from '../../utils/responsive';
@@ -62,6 +63,28 @@ export default function CreatePostModal({ visible, onClose, onBack, imageUri, on
             Alert.alert('Missing Fields', 'Please fill in all required fields marked with *');
             return;
         }
+
+        const textFields = [
+            { value: title,        label: 'title' },
+            { value: description,  label: 'description' },
+            { value: cookTime,     label: 'cook time' },
+            { value: instructions, label: 'instructions' },
+        ];
+        for (const { value, label } of textFields) {
+            if (value.trim() && moderateText(value).flagged) {
+                Alert.alert(
+                    'Content Not Allowed',
+                    `Your post ${label} contains content that violates our community guidelines. Please revise it.`
+                );
+                return;
+            }
+        }
+        const badIngredient = ingredients.find(i => i.trim() && moderateText(i).flagged);
+        if (badIngredient) {
+            Alert.alert('Content Not Allowed', 'One or more ingredients contain content that violates our community guidelines.');
+            return;
+        }
+
         onSubmit({
             title: title.trim(),
             description: description.trim(),

@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useContext, useEffect } from 'react';
 import { Text, View, StyleSheet, Pressable, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useStripe } from '@stripe/stripe-react-native';
 import { wp, hp, fp } from '../../utils/responsive';
 import { useTheme } from '../../context/ThemeContext';
 import { AuthContext } from '../../context/AuthContext';
@@ -15,6 +16,7 @@ import ConfirmPostPopup from '../posts/ConfirmPostPopup';
 import ConfirmChefReviewPopup from '../posts/ConfirmChefReviewPopup';
 import ConfirmAiReviewPopup from '../posts/ConfirmAiReviewPopup';
 import AiReviewResultModal from '../posts/AiReviewResultModal';
+import ChefReviewPaidWarning from '../posts/ChefReviewPaidWarning';
 import FindRecipeModal from './main-actions/FindRecipeModal';
 import ImageSourceModal from './main-actions/ImageSourceModal';
 import ActionChoiceModal from './main-actions/ActionChoiceModal';
@@ -23,6 +25,7 @@ const MODAL = {
     NONE: null,
     FIND_RECIPE: 'findRecipe',
     DESTINATION_CHOICE: 'destinationChoice',
+    CHEF_REVIEW_WARNING: 'chefReviewWarning',
     IMAGE_SOURCE: 'imageSource',
     CREATE_POST: 'createPost',
     CONFIRM_POST: 'confirmPost',
@@ -41,6 +44,7 @@ export default function MainActions() {
     const { theme } = useTheme();
     const { token } = useContext(AuthContext);
     const { refreshPosts } = usePosts();
+    const { initPaymentSheet, presentPaymentSheet } = useStripe();
 
     const [activeModal, setActiveModal] = useState(MODAL.NONE);
     const [selectedImage, setSelectedImage] = useState(null);
@@ -54,6 +58,9 @@ export default function MainActions() {
     // path can reuse the URL without re-uploading, and the "discard" path can delete it.
     const aiUploadedImageUrlRef = useRef(null);
     const aiUploadedPublicIdRef = useRef(null);
+    // Holds the Cloudinary URL uploaded during the chef review pre-payment validation step.
+    // Reused by handleChefReviewSubmit so the image isn't uploaded twice.
+    const chefReviewUploadedUrlRef = useRef(null);
 
     const transitionRef = useRef(null);
     // Stores the 500ms image→CreatePost transition timer so resetUploadState can cancel it.
@@ -88,6 +95,7 @@ export default function MainActions() {
         fileSizeRef.current = null;
         aiUploadedImageUrlRef.current = null;
         aiUploadedPublicIdRef.current = null;
+        chefReviewUploadedUrlRef.current = null;
         setActiveModal(MODAL.NONE);
         setSelectedImage(null);
         setSelectedDestination(null);
@@ -284,40 +292,19 @@ export default function MainActions() {
         switchModal(MODAL.CREATE_POST);
     }, [switchModal]);
 
-    // The actual upload — called from ConfirmChefReviewPopup, not from RequestChefReviewModal.
-    // Using POST /chef/submit-with-review ensures the post row and review_request row are
-    // created in a single DB transaction: if either insert fails, both are rolled back.
+    // Called after successful payment. Reuses the already-uploaded + validated Cloudinary URL
+    // stored in chefReviewUploadedUrlRef — no second upload, no second Gemini call.
     const handleChefReviewSubmit = useCallback(async ({ feedbackContext, chefFilter }) => {
-        if (!pendingPostData || !selectedImage) return;
-
-        if (fileSizeRef.current && fileSizeRef.current > MAX_UPLOAD_BYTES) {
-            Alert.alert('Image Too Large', 'Please choose a photo under 9 MB and try again.');
-            return;
-        }
+        if (!pendingPostData || !chefReviewUploadedUrlRef.current) return;
 
         setIsSubmitting(true);
-        setUploadStatus('Uploading photo…');
-
-        // Phase 1: upload the image. If this fails, nothing touches the DB.
-        let imageUrl;
-        try {
-            imageUrl = await CloudinaryService.uploadImage(selectedImage, 'posts');
-            if (!imageUrl) throw new Error('Image upload failed');
-        } catch (err) {
-            Alert.alert('Upload Failed', err.message || 'Could not upload the image. Please try again.');
-            if (isMountedRef.current) { setIsSubmitting(false); setUploadStatus(null); }
-            return;
-        }
-
         setUploadStatus('Submitting…');
-        // Phase 2: create post + review request atomically via the combined endpoint.
-        // A failure here means nothing was written — the Cloudinary URL is the only
-        // orphaned artifact (no client-side cleanup is possible for Cloudinary).
+
         try {
             await api.post('/chef/submit-with-review', {
                 title: pendingPostData.title,
                 description: pendingPostData.description,
-                image_url: imageUrl,
+                image_url: chefReviewUploadedUrlRef.current,
                 cook_time: pendingPostData.cookTime,
                 difficulty: pendingPostData.difficulty,
                 utensils: pendingPostData.utensils,
@@ -332,13 +319,11 @@ export default function MainActions() {
                 resetUploadState();
             }
         } catch (err) {
-            const title = err.status === 429 ? 'Daily Limit Reached'
-                        : String(err.data?.error || '').startsWith('Image rejected') ? 'Image Not Eligible'
-                        : 'Submission Failed';
+            const title = err.status === 429 ? 'Daily Limit Reached' : 'Submission Failed';
             Alert.alert(title, err.message || 'Could not submit for review. Please try again.');
             if (isMountedRef.current) { setIsSubmitting(false); setUploadStatus(null); }
         }
-    }, [pendingPostData, selectedImage, token, refreshPosts, resetUploadState]);
+    }, [pendingPostData, token, refreshPosts, resetUploadState]);
 
     // Stores the chef review fields and advances to the confirmation popup.
     // The actual upload only starts after the user confirms in ConfirmChefReviewPopup.
@@ -347,10 +332,91 @@ export default function MainActions() {
         switchModal(MODAL.CHEF_REVIEW_CONFIRM);
     }, [switchModal]);
 
-    const handleChefReviewConfirm = useCallback(() => {
-        if (!pendingChefReviewData) return;
+    const handleChefReviewConfirm = useCallback(async () => {
+        if (!pendingChefReviewData || !selectedImage) return;
+
+        if (fileSizeRef.current && fileSizeRef.current > MAX_UPLOAD_BYTES) {
+            Alert.alert('Image Too Large', 'Please choose a photo under 9 MB and try again.');
+            return;
+        }
+
+        setIsSubmitting(true);
+
+        // Phase 1: upload image (skip if already uploaded, e.g. after a canceled payment retry)
+        if (!chefReviewUploadedUrlRef.current) {
+            setUploadStatus('Uploading photo…');
+            try {
+                const imageUrl = await CloudinaryService.uploadImage(selectedImage, 'posts');
+                if (!imageUrl) throw new Error('Image upload failed');
+                chefReviewUploadedUrlRef.current = imageUrl;
+            } catch (err) {
+                Alert.alert('Upload Failed', err.message || 'Could not upload the image. Please try again.');
+                if (isMountedRef.current) { setIsSubmitting(false); setUploadStatus(null); }
+                return;
+            }
+
+            // Phase 2: validate image is food BEFORE charging — backend deletes Cloudinary image if invalid
+            setUploadStatus('Checking image…');
+            try {
+                await api.post('/chef/validate-image', { image_url: chefReviewUploadedUrlRef.current }, token);
+            } catch (err) {
+                chefReviewUploadedUrlRef.current = null;
+                if (isMountedRef.current) { setIsSubmitting(false); setUploadStatus(null); }
+                const title = err.status === 400 ? 'Image Not Eligible'
+                            : err.status === 503 ? 'Validation Unavailable'
+                            : 'Validation Error';
+                const message = err.data?.message || err.message || 'Could not validate image. Please try again.';
+                const buttons = err.status === 503
+                    ? [{ text: 'OK', onPress: resetUploadState }]
+                    : [
+                        { text: 'Pick New Image', onPress: () => { setSelectedImage(null); switchModal(MODAL.IMAGE_SOURCE); } },
+                        { text: 'Cancel', style: 'cancel', onPress: resetUploadState },
+                    ];
+                Alert.alert(title, message, buttons);
+                return;
+            }
+        }
+
+        // Phase 3: set up and present payment sheet
+        setUploadStatus('Setting up payment…');
+
+        let clientSecret;
+        try {
+            const result = await api.post('/payments/create-intent', {}, token);
+            clientSecret = result.clientSecret;
+        } catch (err) {
+            Alert.alert('Payment Error', err.message || 'Could not initialize payment. Please try again.');
+            if (isMountedRef.current) { setIsSubmitting(false); setUploadStatus(null); }
+            return;
+        }
+
+        const { error: initError } = await initPaymentSheet({
+            merchantDisplayName: 'Chop & Chat',
+            paymentIntentClientSecret: clientSecret,
+            style: 'alwaysDark',
+        });
+
+        if (initError) {
+            Alert.alert('Payment Error', initError.message || 'Could not set up payment sheet.');
+            if (isMountedRef.current) { setIsSubmitting(false); setUploadStatus(null); }
+            return;
+        }
+
+        if (isMountedRef.current) { setIsSubmitting(false); setUploadStatus(null); }
+
+        const { error: paymentError } = await presentPaymentSheet();
+
+        if (paymentError) {
+            if (paymentError.code !== 'Canceled') {
+                Alert.alert('Payment Failed', paymentError.message || 'Your payment could not be processed. Please try again.');
+            }
+            // Image is already uploaded and validated — keep chefReviewUploadedUrlRef so
+            // a retry skips the upload+validate steps and goes straight to payment.
+            return;
+        }
+
         handleChefReviewSubmit(pendingChefReviewData);
-    }, [pendingChefReviewData, handleChefReviewSubmit]);
+    }, [pendingChefReviewData, selectedImage, handleChefReviewSubmit, token, initPaymentSheet, presentPaymentSheet, switchModal, resetUploadState]);
 
     const handleCancelChefReviewConfirm = useCallback(() => {
         // Go back to RequestChefReviewModal — pendingChefReviewData is kept so the modal
@@ -402,7 +468,13 @@ export default function MainActions() {
                 theme={theme}
                 onPostToFeed={() => { setSelectedDestination('feed'); switchModal(MODAL.IMAGE_SOURCE); }}
                 onGetAiRating={() => { setSelectedDestination('ai'); switchModal(MODAL.IMAGE_SOURCE); }}
-                onGetChefReview={() => { setSelectedDestination('chef'); switchModal(MODAL.IMAGE_SOURCE); }}
+                onGetChefReview={() => { setSelectedDestination('chef'); switchModal(MODAL.CHEF_REVIEW_WARNING); }}
+            />
+
+            <ChefReviewPaidWarning
+                visible={activeModal === MODAL.CHEF_REVIEW_WARNING}
+                onConfirm={() => switchModal(MODAL.IMAGE_SOURCE)}
+                onCancel={resetUploadState}
             />
 
             <ImageSourceModal

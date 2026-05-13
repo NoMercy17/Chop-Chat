@@ -5,6 +5,7 @@ const REQUIRED_ENV = [
   'JWT_SECRET', 'DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME',
   'GEMINI_API_KEY',
   'CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET',
+  'STRIPE_SECRET_KEY',
 ];
 const missing = REQUIRED_ENV.filter(k => !process.env[k]);
 if (missing.length) {
@@ -26,6 +27,7 @@ const notificationRoutes = require('./routes/notifications');
 const chefRoutes = require('./routes/chef');
 const postRoutes = require('./routes/posts');
 const aiRoutes = require('./routes/ai');
+const paymentRoutes = require('./routes/payments');
 
 const app = express();
 app.use(helmet());
@@ -64,6 +66,7 @@ app.use('/notifications', notificationRoutes);
 app.use('/chef', chefRoutes);
 app.use('/posts', postRoutes);
 app.use('/ai', aiRoutes);
+app.use('/payments', paymentRoutes);
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Backend listening on http://0.0.0.0:${PORT}`);

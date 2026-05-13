@@ -26,6 +26,34 @@ router.post('/', postsWriteLimiter, authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'difficulty must be Easy, Medium, or Hard' });
     }
 
+    // Moderate all user-written text fields before hitting Gemini or the DB
+    const textFields = [
+      { value: title,        label: 'title' },
+      { value: description,  label: 'description' },
+      { value: cook_time,    label: 'cook time' },
+      { value: instructions, label: 'instructions' },
+    ];
+    for (const { value, label } of textFields) {
+      if (value?.trim() && moderateText(value).flagged) {
+        return res.status(400).json({
+          error: 'content_rejected',
+          field: label,
+          message: `Your post ${label} contains content that violates our community guidelines.`,
+        });
+      }
+    }
+    if (Array.isArray(ingredients)) {
+      for (const ing of ingredients) {
+        if (ing?.trim() && moderateText(ing).flagged) {
+          return res.status(400).json({
+            error: 'content_rejected',
+            field: 'ingredients',
+            message: 'One or more ingredients contain content that violates our community guidelines.',
+          });
+        }
+      }
+    }
+
     const cleanImageUrl = image_url.trim();
 
     // Per-user daily post cap — protects Gemini free-tier budget (each post triggers validation)
@@ -38,27 +66,34 @@ router.post('/', postsWriteLimiter, authenticateToken, async (req, res) => {
       return res.status(429).json({ error: 'daily_post_limit_exceeded', message: "You've reached the daily post limit (5). Try again tomorrow." });
     }
 
-    // Skip validateFoodImage if this exact image was successfully AI-analyzed in the last 30 min —
-    // the analysis already confirmed food eligibility, so a second Gemini call is redundant.
+    // Check if we already have an AI review validation for this image in the last 30 mins
     const { rows: aiLogRows } = await pool.query(
-      `SELECT 1 FROM ai_review_logs
-       WHERE user_id = $1 AND image_url = $2 AND is_feed_eligible = true AND created_at > NOW() - INTERVAL '30 minutes'
-       LIMIT 1`,
+      `SELECT is_feed_eligible FROM ai_review_logs
+       WHERE user_id = $1 AND image_url = $2 AND created_at > NOW() - INTERVAL '30 minutes'
+       ORDER BY created_at DESC LIMIT 1`,
       [req.user.id, cleanImageUrl]
     );
-    const alreadyAiValidated = aiLogRows.length > 0;
 
-    if (!alreadyAiValidated) {
+    let isValid = true;
+    let rejectReason = '';
+
+    if (aiLogRows.length > 0) {
+      isValid = aiLogRows[0].is_feed_eligible;
+      rejectReason = 'Image was flagged as non-food by AI review.';
+    } else {
       const validation = await validateFoodImage(cleanImageUrl);
-      if (!validation.isValidForFeed) {
-        const publicId = getPublicIdFromUrl(cleanImageUrl);
-        if (publicId && publicId.startsWith('posts/')) {
-          await cloudinary.uploader.destroy(publicId).catch(err => {
-            console.error('[POST /posts] Failed to delete orphaned Cloudinary image:', err.message);
-          });
-        }
-        return res.status(400).json({ error: `Image rejected: ${validation.reason}` });
+      isValid = validation.isValidForFeed;
+      rejectReason = validation.reason;
+    }
+
+    if (!isValid) {
+      const publicId = getPublicIdFromUrl(cleanImageUrl);
+      if (publicId && publicId.startsWith('posts/')) {
+        await cloudinary.uploader.destroy(publicId).catch(err => {
+          console.error('[POST /posts] Failed to delete orphaned Cloudinary image:', err.message);
+        });
       }
+      return res.status(400).json({ error: `Image rejected: ${rejectReason}` });
     }
 
     const { rows } = await pool.query(`

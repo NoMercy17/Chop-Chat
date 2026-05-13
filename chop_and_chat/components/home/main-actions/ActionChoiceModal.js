@@ -61,14 +61,19 @@ export default function ActionChoiceModal({
                         <Pressable
                             style={({ pressed }) => [
                                 styles.actionButton,
-                                { backgroundColor: theme.chefReviewButtonBg }, 
+                                { backgroundColor: theme.chefReviewButtonBg },
                                 pressed && styles.actionButtonPressed
                             ]}
                             onPress={onGetChefReview}
                         >
                             <View style={styles.textContainer}>
-                                <Text style={[styles.buttonTitle, { color: theme.textPrimary }]}>Get Chef Review</Text>
-                                <Text style={[styles.buttonSubtitle, { color: theme.textSecondary }]}>Get feedback from real chefs</Text>
+                                <View style={styles.chefTitleRow}>
+                                    <Text style={[styles.buttonTitle, { color: theme.textPrimary }]}>Get Chef Review</Text>
+                                                    <View style={[styles.paidBadge, { backgroundColor: theme.paid }]}>
+                                        <Text style={[styles.paidBadgeText, { color: theme.textInverse }]}>PAID</Text>
+                                    </View>
+                                </View>
+                                <Text style={[styles.buttonSubtitle, { color: theme.textSecondary }]}>Get feedback from real chefs · $0.50</Text>
                             </View>
                             <Text style={[styles.arrow, { color: theme.textTertiary }]}>→</Text>
                         </Pressable>
@@ -163,5 +168,20 @@ const styles = StyleSheet.create({
     cancelButtonText: {
         fontSize: fp(16),
         fontWeight: "700",
+    },
+    chefTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(8),
+    },
+    paidBadge: {
+        borderRadius: wp(6),
+        paddingHorizontal: wp(6),
+        paddingVertical: hp(2),
+    },
+    paidBadgeText: {
+        fontSize: fp(10),
+        fontWeight: '800',
+        letterSpacing: 0.8,
     },
 });

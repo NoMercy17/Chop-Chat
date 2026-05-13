@@ -3,12 +3,17 @@ const https = require('https');
 const http = require('http');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({
-  model: 'gemini-flash-lite-latest',
-  generationConfig: {
-    responseMimeType: 'application/json',
-  }
-});
+
+// Three-model fallback chain — each has its own free-tier quota bucket.
+// Order: newest → stable pinned → oldest. If one hits 429, the next is tried automatically.
+const MODEL_NAMES = [
+  'gemini-2.5-flash-lite',
+  'gemini-2.0-flash-lite',
+  'gemini-2.5-flash',
+];
+const MODEL_CHAIN = MODEL_NAMES.map(name =>
+  genAI.getGenerativeModel({ model: name, generationConfig: { responseMimeType: 'application/json' } })
+);
 
 const DAILY_QUOTA = 3;
 
@@ -183,6 +188,28 @@ function parseResponse(rawText) {
   };
 }
 
+// Tries each model in MODEL_CHAIN in order. Falls back to the next only on 429 or 503 errors.
+// Any other error (timeout, parse failure, network) is re-thrown immediately from the model
+// that produced it — don't waste retries on non-quota failures.
+// Throws GEMINI_QUOTA_EXCEEDED if all models are exhausted on quota or capacity.
+async function tryModelChain(callFn) {
+  for (let i = 0; i < MODEL_CHAIN.length; i++) {
+    try {
+      return await callFn(MODEL_CHAIN[i]);
+    } catch (err) {
+      if (err.message?.includes('429') || err.message?.includes('503')) {
+        const hasNext = i < MODEL_CHAIN.length - 1;
+        console.warn(`[Gemini] ${MODEL_NAMES[i]} unavailable (429/503)${hasNext ? `, trying ${MODEL_NAMES[i + 1]}` : ''}`);
+        if (hasNext) continue;
+        const quotaErr = new Error('Image validation temporarily unavailable. Please try again in a few minutes.');
+        quotaErr.code = 'GEMINI_QUOTA_EXCEEDED';
+        throw quotaErr;
+      }
+      throw err;
+    }
+  }
+}
+
 async function validateFoodImage(imageUrl) {
   const resizedUrl = transformCloudinaryUrl(imageUrl);
 
@@ -211,35 +238,24 @@ Return ONLY a JSON object with this exact structure:
 }
 `;
 
+  const inlineData = { inlineData: { mimeType: 'image/jpeg', data: imageBuffer.toString('base64') } };
+
   try {
-    const callPromise = model.generateContent([
-      prompt,
-      {
-        inlineData: {
-          mimeType: 'image/jpeg',
-          data: imageBuffer.toString('base64'),
-        },
-      },
-    ]);
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Gemini validation timed out')), 12000)
-    );
-    const geminiResult = await Promise.race([callPromise, timeoutPromise]);
-
-    let text = geminiResult.response.text().trim()
-      .replace(/^```json\s*/i, '')
-      .replace(/^```\s*/, '')
-      .replace(/\s*```$/, '');
-
-    const parsed = JSON.parse(text);
-    return {
-      isValidForFeed: !!parsed.isValidForFeed,
-      reason: String(parsed.reason || 'Image validation failed.')
-    };
+    return await tryModelChain(async (m) => {
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Gemini validation timed out')), 12000)
+      );
+      const result = await Promise.race([m.generateContent([prompt, inlineData]), timeout]);
+      let text = result.response.text().trim()
+        .replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+      const parsed = JSON.parse(text);
+      return { isValidForFeed: !!parsed.isValidForFeed, reason: String(parsed.reason || 'Image validation failed.') };
+    });
   } catch (err) {
+    if (err.code === 'GEMINI_QUOTA_EXCEEDED') throw err;
+    // Fail closed on API errors so we don't let invalid photos bypass the review
     console.error('[validateFoodImage] error:', err.message);
-    // On API failure or timeout, fail open so users aren't blocked by Gemini downtime
-    return { isValidForFeed: true, reason: 'Validation skipped due to API error.' };
+    return { isValidForFeed: false, reason: 'AI validation is temporarily unavailable due to high server load. Please try again.' };
   }
 }
 
@@ -256,20 +272,15 @@ async function analyzeDish({ imageUrl, title, description, ingredients, difficul
   }
 
   const prompt = buildPrompt({ title, description, ingredients, difficulty, cookTime });
+  const inlineData = { inlineData: { mimeType: 'image/jpeg', data: imageBuffer.toString('base64') } };
 
-  let geminiResult;
   try {
-    geminiResult = await model.generateContent([
-      prompt,
-      {
-        inlineData: {
-          mimeType: 'image/jpeg',
-          data: imageBuffer.toString('base64'),
-        },
-      },
-    ]);
+    const result = await tryModelChain(async (m) => {
+      return await m.generateContent([prompt, inlineData]);
+    });
+    return parseResponse(result.response.text());
   } catch (err) {
-    if (err.message?.includes('429')) {
+    if (err.code === 'GEMINI_QUOTA_EXCEEDED') {
       const rateErr = new Error(`Gemini API call failed: ${err.message}`);
       rateErr.code = 'GEMINI_RATE_LIMIT';
       throw rateErr;
@@ -278,9 +289,6 @@ async function analyzeDish({ imageUrl, title, description, ingredients, difficul
     apiErr.code = 'GEMINI_API_ERROR';
     throw apiErr;
   }
-
-  const rawText = geminiResult.response.text();
-  return parseResponse(rawText);
 }
 
 module.exports = { analyzeDish, validateFoodImage, DAILY_QUOTA };

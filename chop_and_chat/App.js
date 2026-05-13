@@ -2,6 +2,7 @@ import React, { useContext } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StripeProvider } from '@stripe/stripe-react-native';
 import HomeScreen from './screens/HomeScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import OtherUserProfileScreen from './screens/OtherUserProfileScreen';
@@ -61,12 +62,17 @@ function AppContent() {
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <ThemeProvider>
-        <AuthProvider>
-          <AppContent />
-        </AuthProvider>
-      </ThemeProvider>
-    </SafeAreaProvider>
+    <StripeProvider
+      publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || ''}
+      merchantIdentifier="merchant.com.anonymous.chop_and_chat"
+    >
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <AppContent />
+          </AuthProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </StripeProvider>
   );
 }

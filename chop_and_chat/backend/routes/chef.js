@@ -14,6 +14,56 @@ const commentsReadLimiter  = rateLimit({ windowMs: 15 * 60 * 1000, max: 180, sta
 const commentsWriteLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 60,  standardHeaders: true, legacyHeaders: false, message: { error: 'too_many_requests', message: 'You\'re posting too many comments. Please slow down.' } });
 const commentsBurstLimiter = rateLimit({ windowMs: 2000,            max: 1,   standardHeaders: true, legacyHeaders: false, message: { error: 'too_many_requests', message: 'Please wait a moment before posting another comment.' } });
 
+// Pre-payment image validation — called before the payment sheet opens so the user
+// is never charged for a non-food photo. Deletes the Cloudinary image if invalid.
+router.post('/validate-image', reviewRequestLimiter, authenticateToken, async (req, res) => {
+  const { image_url } = req.body;
+  if (!image_url?.trim()) return res.status(400).json({ error: 'image_url is required' });
+
+  const cleanImageUrl = image_url.trim();
+
+  const { rows: aiLogRows } = await pool.query(
+    `SELECT is_feed_eligible FROM ai_review_logs
+     WHERE user_id = $1 AND image_url = $2 AND created_at > NOW() - INTERVAL '30 minutes'
+     ORDER BY created_at DESC LIMIT 1`,
+    [req.user.id, cleanImageUrl]
+  );
+
+  let isValid, reason;
+  if (aiLogRows.length > 0) {
+    isValid = aiLogRows[0].is_feed_eligible;
+    reason = 'Image was flagged as non-food by a recent AI check.';
+  } else {
+    try {
+      const validation = await validateFoodImage(cleanImageUrl);
+      isValid = validation.isValidForFeed;
+      reason = validation.reason;
+    } catch (err) {
+      if (err.code === 'GEMINI_QUOTA_EXCEEDED') {
+        // Delete the uploaded image — we can't validate it, don't charge the user
+        const publicId = getPublicIdFromUrl(cleanImageUrl);
+        if (publicId && publicId.startsWith('posts/')) {
+          await cloudinary.uploader.destroy(publicId).catch(() => {});
+        }
+        return res.status(503).json({ error: 'validation_unavailable', message: err.message });
+      }
+      throw err;
+    }
+  }
+
+  if (!isValid) {
+    const publicId = getPublicIdFromUrl(cleanImageUrl);
+    if (publicId && publicId.startsWith('posts/')) {
+      await cloudinary.uploader.destroy(publicId).catch(err => {
+        console.error('[POST /chef/validate-image] Failed to delete orphaned Cloudinary image:', err.message);
+      });
+    }
+    return res.status(400).json({ error: 'image_rejected', message: `Your photo doesn't appear to contain food. Please use a food photo.` });
+  }
+
+  res.json({ isValid: true });
+});
+
 // Creates a post + chef review request atomically in a single DB transaction.
 // This replaces the old two-call flow (POST /posts then POST /chef/review-request) where
 // a failure after post creation would leave an orphaned post with no review request row.
@@ -34,19 +84,38 @@ router.post('/submit-with-review', reviewRequestLimiter, authenticateToken, asyn
      WHERE requester_id = $1 AND created_at > NOW() - INTERVAL '24 hours'`,
     [req.user.id]
   );
-  if (parseInt(chefDailyRows[0].count, 10) >= 3) {
-    return res.status(429).json({ error: 'daily_chef_request_limit_exceeded', message: "You've reached the daily chef review request limit (3). Try again tomorrow." });
+  if (parseInt(chefDailyRows[0].count, 10) >= 5) {
+    return res.status(429).json({ error: 'daily_chef_request_limit_exceeded', message: "You've reached the daily chef review request limit (5). Try again tomorrow." });
   }
 
-  const validation = await validateFoodImage(cleanImageUrl);
-  if (!validation.isValidForFeed) {
+  // Check if we already have an AI review validation for this image in the last 30 mins
+  const { rows: aiLogRows } = await pool.query(
+    `SELECT is_feed_eligible FROM ai_review_logs
+     WHERE user_id = $1 AND image_url = $2 AND created_at > NOW() - INTERVAL '30 minutes'
+     ORDER BY created_at DESC LIMIT 1`,
+    [req.user.id, cleanImageUrl]
+  );
+
+  let isValid = true;
+  let rejectReason = '';
+
+  if (aiLogRows.length > 0) {
+    isValid = aiLogRows[0].is_feed_eligible;
+    rejectReason = 'Image was flagged as non-food by AI review.';
+  } else {
+    const validation = await validateFoodImage(cleanImageUrl);
+    isValid = validation.isValidForFeed;
+    rejectReason = validation.reason;
+  }
+
+  if (!isValid) {
     const publicId = getPublicIdFromUrl(cleanImageUrl);
     if (publicId && publicId.startsWith('posts/')) {
       await cloudinary.uploader.destroy(publicId).catch(err => {
         console.error('[POST /chef/submit-with-review] Failed to delete orphaned Cloudinary image:', err.message);
       });
     }
-    return res.status(400).json({ error: `Image rejected: ${validation.reason}` });
+    return res.status(400).json({ error: `Image rejected: ${rejectReason}` });
   }
 
   const client = await pool.connect();

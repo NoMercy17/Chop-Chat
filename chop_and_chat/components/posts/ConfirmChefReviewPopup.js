@@ -17,13 +17,13 @@ export default function ConfirmChefReviewPopup({ visible, onConfirm, onCancel, o
             loading={loading}
             statusLabel={statusLabel}
             iconName="ribbon"
-            iconColor={theme.primary}
-            iconBgColor={theme.primaryLighter}
-            title="Submit for chef review?"
-            subtitle={`Your request will be sent to ${audienceLabel}. A chef will review your dish and provide professional feedback.`}
-            confirmText="Send Request"
-            confirmIcon="paper-plane-outline"
-            confirmColor={theme.primary}
+            iconColor={theme.paid}
+            iconBgColor={theme.paidLight}
+            title="Ready to pay & submit?"
+            subtitle={`Your request will be sent to ${audienceLabel}. Tapping below opens a secure $0.50 payment — once paid, the review request is submitted.`}
+            confirmText="Pay $0.50 & Submit"
+            confirmIcon="card-outline"
+            confirmColor={theme.paid}
         />
     );
 }
