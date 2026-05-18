@@ -286,7 +286,7 @@ router.post('/review-request', reviewRequestLimiter, authenticateToken, async (r
 });
 
 // Get pending review requests (for Chefs)
-router.get('/review-requests', authenticateToken, requireChef, async (req, res) => {
+router.get('/review-requests', feedLimiter, authenticateToken, requireChef, async (req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT crr.*, p.title as post_title, u.name as requester_name 
@@ -305,7 +305,7 @@ router.get('/review-requests', authenticateToken, requireChef, async (req, res) 
 });
 
 // Claim a review request
-router.patch('/review-requests/:id/claim', authenticateToken, requireChef, async (req, res) => {
+router.patch('/review-requests/:id/claim', reviewRequestLimiter, authenticateToken, requireChef, async (req, res) => {
   // Parse and validate before touching the DB — passing the raw param string when it is
   // 'undefined' causes PostgreSQL to throw "invalid input syntax for type integer".
   const requestId = parseInt(req.params.id, 10);
@@ -328,7 +328,7 @@ router.patch('/review-requests/:id/claim', authenticateToken, requireChef, async
 });
 
 // Submit a Chef Review
-router.post('/reviews', authenticateToken, requireChef, async (req, res) => {
+router.post('/reviews', reviewRequestLimiter, authenticateToken, requireChef, async (req, res) => {
   try {
     const { post_id, reaction_text, request_id } = req.body;
     const chef_id = req.user.id;

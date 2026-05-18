@@ -1,6 +1,5 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const https = require('https');
-const http = require('http');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -26,13 +25,25 @@ function transformCloudinaryUrl(url) {
   return url;
 }
 
+function assertCloudinaryUrl(url) {
+  let parsed;
+  try { parsed = new URL(url); } catch {
+    throw Object.assign(new Error('Invalid image URL'), { code: 'INVALID_IMAGE_URL' });
+  }
+  if (parsed.protocol !== 'https:' || parsed.hostname !== 'res.cloudinary.com') {
+    throw Object.assign(new Error('Image URL must be from res.cloudinary.com'), { code: 'INVALID_IMAGE_URL' });
+  }
+}
+
 // Fetches an image from a URL and returns raw bytes as a Buffer.
 // Follows a single level of HTTP redirect (Cloudinary never chains more than one).
 function fetchImageBuffer(url) {
+  assertCloudinaryUrl(url);
   return new Promise((resolve, reject) => {
-    const lib = url.startsWith('https') ? https : http;
+    const lib = https;
     const req = lib.get(url, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        try { assertCloudinaryUrl(res.headers.location); } catch (e) { return reject(e); }
         return resolve(fetchImageBuffer(res.headers.location));
       }
       if (res.statusCode !== 200) {
