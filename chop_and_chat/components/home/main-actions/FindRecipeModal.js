@@ -80,12 +80,12 @@ export default function FindRecipeModal({ visible, onClose, theme }) {
     };
 
     const getDifficultyColor = (difficulty) => {
-        if (!difficulty) return '#6B7280';
+        if (!difficulty) return theme.textSecondary;
         switch (difficulty.toLowerCase()) {
-            case 'easy': return '#10B981';
-            case 'medium': return '#F59E0B';
-            case 'hard': return '#EF4444';
-            default: return '#6B7280';
+            case 'easy': return theme.success;
+            case 'medium': return theme.warning;
+            case 'hard': return theme.danger;
+            default: return theme.textSecondary;
         }
     };
 
@@ -184,8 +184,8 @@ export default function FindRecipeModal({ visible, onClose, theme }) {
                         )}
                         renderItem={({ item }) => {
                             const getSourceColor = () => {
-                                if (item.isGlobal) return '#3B82F6';
-                                return '#10B981';
+                                if (item.isGlobal) return theme.primary;
+                                return theme.success;
                             };
                             
                             const getSourceIcon = () => {
@@ -299,7 +299,8 @@ const styles = StyleSheet.create({
         marginTop: hp(4),
     },
     closeButton: {
-        padding: 8,
+        padding: wp(8),
+        borderRadius: wp(20),
     },
     searchContainer: {
         flexDirection: 'row',
@@ -330,7 +331,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: hp(8),
         paddingHorizontal: wp(16),
-        borderRadius: 20,
+        borderRadius: wp(20),
         borderWidth: 1,
     },
     resultsSection: {
@@ -342,10 +343,11 @@ const styles = StyleSheet.create({
         padding: wp(12),
         borderRadius: wp(16),
         marginBottom: hp(12),
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: hp(2) },
+        shadowOpacity: 0.08,
+        shadowRadius: wp(8),
+        elevation: 3,
     },
     recipeImagePlaceholder: {
         width: wp(60),

@@ -8,6 +8,7 @@ export default function BottomSheetModal({
     visible,
     onClose,
     title,
+    subtitle,
     leftIcon,
     onLeftPress,
     rightComponent,
@@ -50,9 +51,16 @@ export default function BottomSheetModal({
                                 )}
 
                                 {/* Title */}
-                                <Text style={[styles.title, { color: theme.textPrimary }]}>
-                                    {title}
-                                </Text>
+                                <View style={styles.titleBlock}>
+                                    <Text style={[styles.title, { color: theme.textPrimary }]}>
+                                        {title}
+                                    </Text>
+                                    {subtitle && (
+                                        <Text style={[styles.subtitle, { color: theme.textTertiary }]}>
+                                            {subtitle}
+                                        </Text>
+                                    )}
+                                </View>
 
                                 {/* Right Component (or placeholder to balance title centering) */}
                                 {rightComponent ? (
@@ -101,11 +109,20 @@ const styles = StyleSheet.create({
         paddingVertical: hp(16),
         borderBottomWidth: 1,
     },
+    titleBlock: {
+        flex: 1,
+        alignItems: 'center',
+    },
     title: {
         fontSize: fp(18),
         fontWeight: '700',
-        flex: 1,
         textAlign: 'center',
+    },
+    subtitle: {
+        fontSize: fp(12),
+        fontWeight: '500',
+        textAlign: 'center',
+        marginTop: hp(2),
     },
     headerButton: {
         padding: wp(4),

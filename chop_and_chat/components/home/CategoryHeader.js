@@ -22,7 +22,7 @@ export default function CategoryHeader({
         ]}
         onPress={onBack}
       >
-        <Ionicons name="arrow-back" size={fp(24)} color="rgba(255, 255, 255, 0.85)" />
+        <Ionicons name="arrow-back" size={fp(24)} color={theme.textInverse} />
       </Pressable>
       <View style={styles.categoryContainer}>
         {categories.map((category) => (
@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   categoryTabActive: {
-    borderBottomColor: '#FFFFFF',
+    borderBottomColor: 'rgba(255,255,255,1)',
   },
   categoryTabPressed: {
     opacity: 0.7,
@@ -93,6 +93,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.6)',
   },
   categoryTextActive: {
-    color: '#FFFFFF',
+    color: 'rgba(255,255,255,1)',
   },
 });

@@ -38,6 +38,8 @@ export function getCloudinaryUrl(urlOrPublicId, options = {}) {
       const rest = parsed.href.slice(uploadIdx + 8);
       return `${base}${transform}/${rest}`;
     }
+    // Non-Cloudinary absolute URL (e.g. Unsplash) — return as-is, no transformation
+    return urlOrPublicId;
   } catch {
     // Not an absolute URL — fall through to treat as public_id
   }

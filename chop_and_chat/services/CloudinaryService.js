@@ -15,7 +15,7 @@ export const CloudinaryService = {
    * @param {string} [folder]
    * @param {object} [options]
    * @param {string} [options.public_id] - When set, overrides `folder` (public_id path includes folder)
-   * @param {boolean} [options.overwrite] - Replace an existing asset with the same public_id
+   * @param {boolean} [options.returnMeta] - When true, returns { url, publicId } instead of just the URL
    */
   uploadImage: async (imageUri, folder = 'profile_photos', options = {}) => {
     try {
@@ -43,7 +43,6 @@ export const CloudinaryService = {
       formData.append('upload_preset', uploadPreset);
       if (options.public_id) {
         formData.append('public_id', options.public_id);
-        if (options.overwrite) formData.append('overwrite', 'true');
       } else {
         formData.append('folder', folder);
       }

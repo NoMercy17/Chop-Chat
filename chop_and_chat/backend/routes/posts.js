@@ -7,6 +7,7 @@ const { validateFoodImage } = require('../services/gemini');
 const { moderateText } = require('../services/moderation');
 const cloudinary = require('../services/cloudinary');
 const { relativeTime, initials, getPublicIdFromUrl } = require('../utils/helpers');
+const { shouldNotify } = require('../utils/notificationPrefs');
 
 const postsReadLimiter     = rateLimit({ windowMs: 15 * 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false });
 const postsWriteLimiter    = rateLimit({ windowMs: 15 * 60 * 1000, max: 40,  standardHeaders: true, legacyHeaders: false });
@@ -26,6 +27,34 @@ router.post('/', postsWriteLimiter, authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'difficulty must be Easy, Medium, or Hard' });
     }
 
+    // Moderate all user-written text fields before hitting Gemini or the DB
+    const textFields = [
+      { value: title,        label: 'title' },
+      { value: description,  label: 'description' },
+      { value: cook_time,    label: 'cook time' },
+      { value: instructions, label: 'instructions' },
+    ];
+    for (const { value, label } of textFields) {
+      if (value?.trim() && moderateText(value).flagged) {
+        return res.status(400).json({
+          error: 'content_rejected',
+          field: label,
+          message: `Your post ${label} contains content that violates our community guidelines.`,
+        });
+      }
+    }
+    if (Array.isArray(ingredients)) {
+      for (const ing of ingredients) {
+        if (ing?.trim() && moderateText(ing).flagged) {
+          return res.status(400).json({
+            error: 'content_rejected',
+            field: 'ingredients',
+            message: 'One or more ingredients contain content that violates our community guidelines.',
+          });
+        }
+      }
+    }
+
     const cleanImageUrl = image_url.trim();
 
     // Per-user daily post cap — protects Gemini free-tier budget (each post triggers validation)
@@ -38,27 +67,34 @@ router.post('/', postsWriteLimiter, authenticateToken, async (req, res) => {
       return res.status(429).json({ error: 'daily_post_limit_exceeded', message: "You've reached the daily post limit (5). Try again tomorrow." });
     }
 
-    // Skip validateFoodImage if this exact image was successfully AI-analyzed in the last 30 min —
-    // the analysis already confirmed food eligibility, so a second Gemini call is redundant.
+    // Check if we already have an AI review validation for this image in the last 30 mins
     const { rows: aiLogRows } = await pool.query(
-      `SELECT 1 FROM ai_review_logs
-       WHERE user_id = $1 AND image_url = $2 AND is_feed_eligible = true AND created_at > NOW() - INTERVAL '30 minutes'
-       LIMIT 1`,
+      `SELECT is_feed_eligible FROM ai_review_logs
+       WHERE user_id = $1 AND image_url = $2 AND created_at > NOW() - INTERVAL '30 minutes'
+       ORDER BY created_at DESC LIMIT 1`,
       [req.user.id, cleanImageUrl]
     );
-    const alreadyAiValidated = aiLogRows.length > 0;
 
-    if (!alreadyAiValidated) {
+    let isValid = true;
+    let rejectReason = '';
+
+    if (aiLogRows.length > 0) {
+      isValid = aiLogRows[0].is_feed_eligible;
+      rejectReason = 'Image was flagged as non-food by AI review.';
+    } else {
       const validation = await validateFoodImage(cleanImageUrl);
-      if (!validation.isValidForFeed) {
-        const publicId = getPublicIdFromUrl(cleanImageUrl);
-        if (publicId && publicId.startsWith('posts/')) {
-          await cloudinary.uploader.destroy(publicId).catch(err => {
-            console.error('[POST /posts] Failed to delete orphaned Cloudinary image:', err.message);
-          });
-        }
-        return res.status(400).json({ error: `Image rejected: ${validation.reason}` });
+      isValid = validation.isValidForFeed;
+      rejectReason = validation.reason;
+    }
+
+    if (!isValid) {
+      const publicId = getPublicIdFromUrl(cleanImageUrl);
+      if (publicId && publicId.startsWith('posts/')) {
+        await cloudinary.uploader.destroy(publicId).catch(err => {
+          console.error('[POST /posts] Failed to delete orphaned Cloudinary image:', err.message);
+        });
       }
+      return res.status(400).json({ error: `Image rejected: ${rejectReason}` });
     }
 
     const { rows } = await pool.query(`
@@ -153,10 +189,11 @@ router.get('/mine', postsReadLimiter, authenticateToken, async (req, res) => {
 router.get('/', postsReadLimiter, authenticateToken, async (req, res) => {
   try {
     const { rows } = await pool.query(`
-      SELECT 
+      SELECT
         p.*,
         u.name as author,
         u.id as author_id,
+        u.profile_photo as author_photo,
         (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as likes,
         (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comments,
         EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = $1) as liked,
@@ -172,6 +209,7 @@ router.get('/', postsReadLimiter, authenticateToken, async (req, res) => {
       id: r.id,
       author: r.author,
       authorId: r.author_id,
+      authorPhoto: r.author_photo || null,
       title: r.title,
       description: r.description,
       image: r.image_url,
@@ -223,7 +261,7 @@ router.get('/search', postsReadLimiter, authenticateToken, async (req, res) => {
     if (utensils) {
       const utensilList = Array.isArray(utensils) ? utensils : utensils.split(',');
       params.push(utensilList);
-      sql += ` AND p.utensils ?| $${params.length}`;
+      sql += ` AND p.utensils ?& $${params.length}`;
     }
 
     sql += ` ORDER BY p.is_global DESC, p.created_at DESC LIMIT 100`;
@@ -361,33 +399,52 @@ router.post('/like', likesWriteLimiter, authenticateToken, async (req, res) => {
 
     if (existing.rows.length) {
       await pool.query('DELETE FROM post_likes WHERE id = $1', [existing.rows[0].id]);
+      // Remove the associated like notification so the badge reflects reality
+      if (post_id) {
+        await pool.query(
+          "DELETE FROM notifications WHERE type = 'post_likes' AND data->>'postId' = $1 AND data->>'likerId' = $2",
+          [String(post_id), String(user_id)]
+        );
+      } else if (chef_reaction_id) {
+        await pool.query(
+          "DELETE FROM notifications WHERE type = 'post_likes' AND data->>'chefReactionId' = $1 AND data->>'likerId' = $2",
+          [String(chef_reaction_id), String(user_id)]
+        );
+      }
       return res.json({ liked: false });
     } else {
       await pool.query(
         'INSERT INTO post_likes (user_id, post_id, chef_reaction_id) VALUES ($1, $2, $3)',
         [user_id, post_id || null, chef_reaction_id || null]
       );
-      // Notify content owner (skip if liking own content)
       const likerName = req.user.name || 'Someone';
       if (post_id) {
         const postData = await pool.query('SELECT user_id, title FROM posts WHERE id = $1', [post_id]);
         if (postData.rows.length && postData.rows[0].user_id !== user_id) {
-          await pool.query(
-            'INSERT INTO notifications (user_id, type, title, subtitle, data) VALUES ($1, $2, $3, $4, $5)',
-            [postData.rows[0].user_id, 'post_likes', 'Post Liked',
-             `${likerName} liked your ${postData.rows[0].title}`,
-             JSON.stringify({ postId: post_id, likerId: user_id, likerName })]
-          );
+          const likeCount = await pool.query('SELECT COUNT(*) AS count FROM post_likes WHERE post_id = $1', [post_id]);
+          const count = parseInt(likeCount.rows[0].count, 10);
+          if (await shouldNotify(postData.rows[0].user_id, 'post_likes', pool, count)) {
+            await pool.query(
+              'INSERT INTO notifications (user_id, type, title, subtitle, data, ref_post_id) VALUES ($1, $2, $3, $4, $5, $6)',
+              [postData.rows[0].user_id, 'post_likes', 'Post Liked',
+               `${likerName} liked your ${postData.rows[0].title}`,
+               JSON.stringify({ postId: post_id, likerId: user_id, likerName }), post_id]
+            );
+          }
         }
       } else if (chef_reaction_id) {
         const rxData = await pool.query('SELECT chef_id FROM chef_reactions WHERE id = $1', [chef_reaction_id]);
         if (rxData.rows.length && rxData.rows[0].chef_id !== user_id) {
-          await pool.query(
-            'INSERT INTO notifications (user_id, type, title, subtitle, data) VALUES ($1, $2, $3, $4, $5)',
-            [rxData.rows[0].chef_id, 'post_likes', 'Post Liked',
-             `${likerName} liked your review`,
-             JSON.stringify({ chefReactionId: chef_reaction_id, likerId: user_id, likerName })]
-          );
+          const likeCount = await pool.query('SELECT COUNT(*) AS count FROM post_likes WHERE chef_reaction_id = $1', [chef_reaction_id]);
+          const count = parseInt(likeCount.rows[0].count, 10);
+          if (await shouldNotify(rxData.rows[0].chef_id, 'post_likes', pool, count)) {
+            await pool.query(
+              'INSERT INTO notifications (user_id, type, title, subtitle, data, ref_chef_reaction_id) VALUES ($1, $2, $3, $4, $5, $6)',
+              [rxData.rows[0].chef_id, 'post_likes', 'Post Liked',
+               `${likerName} liked your review`,
+               JSON.stringify({ chefReactionId: chef_reaction_id, likerId: user_id, likerName }), chef_reaction_id]
+            );
+          }
         }
       }
       return res.status(201).json({ liked: true });
@@ -485,12 +542,17 @@ router.post('/:id/comments', commentsBurstLimiter, commentsWriteLimiter, authent
 
     const { user_id: authorId, title: postTitle } = postCheck.rows[0];
     if (authorId !== req.user.id) {
-      await pool.query(
-        'INSERT INTO notifications (user_id, type, title, subtitle, data) VALUES ($1, $2, $3, $4, $5)',
-        [authorId, 'comment_on_post', 'New Comment',
-         `${commenterName} commented on your ${postTitle}`,
-         JSON.stringify({ postId, commentId: row.id, commenterId: req.user.id, commenterName, commentText: text })]
-      );
+      const commentCount = await pool.query('SELECT COUNT(*) AS count FROM comments WHERE post_id = $1', [postId]);
+      const count = parseInt(commentCount.rows[0].count, 10);
+      if (await shouldNotify(authorId, 'comment_on_post', pool, count)) {
+        await pool.query(
+          'INSERT INTO notifications (user_id, type, title, subtitle, data, ref_post_id) VALUES ($1, $2, $3, $4, $5, $6)',
+          [authorId, 'comment_on_post', 'New Comment',
+           `${commenterName} commented on your ${postTitle}`,
+           JSON.stringify({ postId, commentId: row.id, commenterId: req.user.id, commenterName, commentText: text }),
+           postId]
+        );
+      }
     }
 
     res.status(201).json({

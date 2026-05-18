@@ -11,6 +11,7 @@ function relativeTime(date) {
     return `${Math.floor(h / 24)}d ago`;
 }
 import { View, Text, StyleSheet, Modal, Pressable, ScrollView, Image } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { getCloudinaryUrl } from '../../utils/cloudinaryUrl';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -61,8 +62,21 @@ export default function ChefPostDetailModal({
                 >
                         
                         {/* --- HEADER --- */}
-                        <View style={[styles.header, { borderBottomColor: theme.border }]}>
-                            <Pressable 
+                        <View style={[styles.header, { borderBottomColor: item.chef.photo ? 'transparent' : theme.border }]}>
+                            {item.chef.photo && (
+                                <Image
+                                    source={{ uri: getCloudinaryUrl(item.chef.photo, { width: 800, height: 160, crop: 'fill', gravity: 'face' }) }}
+                                    style={styles.headerBg}
+                                    blurRadius={8}
+                                />
+                            )}
+                            {item.chef.photo && (
+                                <LinearGradient
+                                    colors={['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.65)']}
+                                    style={StyleSheet.absoluteFill}
+                                />
+                            )}
+                            <Pressable
                                 style={styles.headerLeft}
                                 onPress={() => handleUserPress(item.chef)}
                             >
@@ -73,16 +87,19 @@ export default function ChefPostDetailModal({
                                             style={styles.avatarImg}
                                         />
                                     ) : (
-                                        <Text style={styles.avatarText}>{item.chef.avatar}</Text>
+                                        <Text style={[styles.avatarText, { color: theme.textInverse }]}>{item.chef.avatar}</Text>
                                     )}
                                 </View>
                                 <View>
-                                    <Text style={[styles.chefName, { color: theme.textPrimary }]}>{item.chef.name}</Text>
-                                    <Text style={[styles.timestamp, { color: theme.textSecondary }]}>{relativeTime(item.createdAt)}</Text>
+                                    <Text style={[styles.chefName, { color: item.chef.photo ? theme.textInverse : theme.textPrimary }]}>{item.chef.name}</Text>
+                                    <Text style={[styles.timestamp, { color: item.chef.photo ? 'rgba(255,255,255,0.75)' : theme.textSecondary }]}>{relativeTime(item.createdAt)}</Text>
                                 </View>
                             </Pressable>
-                            <Pressable onPress={onClose} style={styles.closeButton}>
-                                <Ionicons name="close" size={fp(24)} color={theme.textSecondary} />
+                            <Pressable
+                                onPress={onClose}
+                                style={[styles.closeButton, item.chef.photo && { backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: wp(16) }]}
+                            >
+                                <Ionicons name="close" size={fp(24)} color={item.chef.photo ? theme.textInverse : theme.textSecondary} />
                             </Pressable>
                         </View>
 
@@ -199,6 +216,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: wp(16),
         borderBottomWidth: 1,
+        overflow: 'hidden',
+    },
+    headerBg: {
+        ...StyleSheet.absoluteFillObject,
+        resizeMode: 'cover',
     },
     headerLeft: {
         flexDirection: 'row',
@@ -218,7 +240,6 @@ const styles = StyleSheet.create({
         height: '100%',
     },
     avatarText: {
-        color: '#FFF',
         fontWeight: '700',
         fontSize: fp(14),
     },

@@ -17,12 +17,15 @@ export default function OtherUserProfileScreen({ navigation, route }) {
   const { token } = useContext(AuthContext);
   const insets = useSafeAreaInsets();
 
-  const { userId, userName, userAvatar } = route.params || {};
+  const { userId, userName, userAvatar: passedAvatar } = route.params || {};
 
   const [userPosts, setUserPosts] = useState([]);
   const [postsLoading, setPostsLoading] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
+  // Start with the passed avatar (instant display), then replace with fresh fetch
+  const [profilePhoto, setProfilePhoto] = useState(passedAvatar || null);
+  const [displayName, setDisplayName] = useState(userName || '');
   const [dishDetailModalVisible, setDishDetailModalVisible] = useState(false);
   const [selectedDish, setSelectedDish] = useState(null);
 
@@ -39,6 +42,19 @@ export default function OtherUserProfileScreen({ navigation, route }) {
     setFollowingCount(following);
   }, [userId, getFollowersCount, getFollowingCount]);
 
+  const loadProfile = useCallback(async () => {
+    if (!userId || !token) return;
+    try {
+      const data = await api.get(`/users/${userId}/profile`, token);
+      if (data.user) {
+        setProfilePhoto(data.user.profile_photo || null);
+        setDisplayName(data.user.name || userName || '');
+      }
+    } catch (err) {
+      console.error('[OtherUserProfileScreen] loadProfile:', err.message);
+    }
+  }, [userId, token, userName]);
+
   const loadPosts = useCallback(async () => {
     if (!userId || !token) return;
     setPostsLoading(true);
@@ -52,7 +68,7 @@ export default function OtherUserProfileScreen({ navigation, route }) {
     }
   }, [userId, token]);
 
-  useFocusEffect(useCallback(() => { loadCounts(); loadPosts(); }, [loadCounts, loadPosts]));
+  useFocusEffect(useCallback(() => { loadCounts(); loadPosts(); loadProfile(); }, [loadCounts, loadPosts, loadProfile]));
 
   const handleFollow = () => {
     if (followInFlight.current) return;
@@ -79,16 +95,16 @@ export default function OtherUserProfileScreen({ navigation, route }) {
         </Pressable>
         
         <View style={styles.profileImageContainer}>
-          {userAvatar ? (
-            <Image source={{ uri: userAvatar }} style={[styles.profileImage, { borderColor: theme.profileImageBorder }]} />
+          {profilePhoto ? (
+            <Image source={{ uri: profilePhoto }} style={[styles.profileImage, { borderColor: theme.profileImageBorder }]} />
           ) : (
             <View style={[styles.profileImage, styles.avatarPlaceholder, { borderColor: theme.profileImageBorder, backgroundColor: theme.primary }]}>
-              <Text style={styles.avatarInitials}>{getInitials(userName)}</Text>
+              <Text style={styles.avatarInitials}>{getInitials(displayName)}</Text>
             </View>
           )}
         </View>
-        
-        <Text style={[styles.username, { color: theme.profileTextPrimary }]}>{userName}</Text>
+
+        <Text style={[styles.username, { color: theme.profileTextPrimary }]}>{displayName}</Text>
         <Text style={[styles.bio, { color: theme.profileTextSecondary }]} numberOfLines={2}>{userBio}</Text>
 
         <Pressable style={({ pressed }) => [styles.followButton, { backgroundColor: isFollowing ? theme.inputBackground : theme.primary }, pressed && styles.followButtonPressed]} onPress={handleFollow}>
@@ -96,20 +112,22 @@ export default function OtherUserProfileScreen({ navigation, route }) {
         </Pressable>
       </View>
 
-      <View style={[styles.statsBar, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-        <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: theme.textPrimary }]}>{userPosts.length}</Text>
-          <Text style={[styles.statText, { color: theme.textSecondary }]}>Recipes</Text>
+      <View style={styles.statsBar}>
+        <View style={styles.statHero}>
+          <Text style={[styles.statHeroValue, { color: theme.textPrimary }]}>{userPosts.length}</Text>
+          <Text style={[styles.statHeroLabel, { color: theme.primary }]}>RECIPES</Text>
         </View>
         <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-        <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: theme.textPrimary }]}>{followerCount}</Text>
-          <Text style={[styles.statText, { color: theme.textSecondary }]}>Followers</Text>
-        </View>
-        <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-        <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: theme.textPrimary }]}>{followingCount}</Text>
-          <Text style={[styles.statText, { color: theme.textSecondary }]}>Following</Text>
+        <View style={styles.statSecondaryGroup}>
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: theme.textPrimary }]}>{followerCount}</Text>
+            <Text style={[styles.statText, { color: theme.textSecondary }]}>Followers</Text>
+          </View>
+          <View style={[styles.statInnerDivider, { backgroundColor: theme.border }]} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: theme.textPrimary }]}>{followingCount}</Text>
+            <Text style={[styles.statText, { color: theme.textSecondary }]}>Following</Text>
+          </View>
         </View>
       </View>
 
@@ -120,14 +138,25 @@ export default function OtherUserProfileScreen({ navigation, route }) {
         ) : userPosts.length === 0 ? (
           <Text style={[styles.emptyText, { color: theme.textTertiary }]}>No recipes yet</Text>
         ) : (
-          userPosts.map((recipe) => (
-            <RecipeCard
-              key={recipe.id}
-              recipe={recipe}
-              variant="compact"
-              theme={theme}
-              onPress={() => { setSelectedDish(recipe); setDishDetailModalVisible(true); }}
-            />
+          // Pair items into rows of 2 — avoids FlatList inside ScrollView
+          userPosts.reduce((rows, item, idx) => {
+            if (idx % 2 === 0) rows.push([]);
+            rows[rows.length - 1].push(item);
+            return rows;
+          }, []).map((row, rowIdx) => (
+            <View key={rowIdx} style={styles.gridRow}>
+              {row.map(recipe => (
+                <View key={recipe.id} style={styles.gridItem}>
+                  <RecipeCard
+                    recipe={recipe}
+                    variant="grid"
+                    theme={theme}
+                    onPress={() => { setSelectedDish(recipe); setDishDetailModalVisible(true); }}
+                  />
+                </View>
+              ))}
+              {row.length === 1 && <View style={styles.gridItem} />}
+            </View>
           ))
         )}
       </View>
@@ -156,12 +185,19 @@ const styles = StyleSheet.create({
   followButton: { paddingHorizontal: wp(32), paddingVertical: hp(10), borderRadius: wp(20) },
   followButtonText: { fontSize: fp(15), fontWeight: "700" },
   followButtonPressed: { opacity: 0.8, transform: [{ scale: 0.98 }] },
-  statsBar: { flexDirection: "row", justifyContent: "space-around", marginVertical: hp(20), marginHorizontal: wp(20), padding: wp(16), borderRadius: wp(16), borderWidth: 1 },
-  statItem: { alignItems: "center", flex: 1 },
+  statsBar: { flexDirection: "row", alignItems: "center", marginVertical: hp(18), marginHorizontal: wp(24) },
+  statHero: { alignItems: "center", paddingHorizontal: wp(16), paddingVertical: hp(6), minWidth: wp(90) },
+  statHeroValue: { fontSize: fp(32), fontWeight: "800", letterSpacing: -0.5 },
+  statHeroLabel: { fontSize: fp(10), fontWeight: "700", letterSpacing: 1.5, marginTop: hp(2) },
+  statDivider: { width: 1, height: hp(44) },
+  statSecondaryGroup: { flex: 1, flexDirection: "row", alignItems: "center" },
+  statItem: { flex: 1, alignItems: "center", paddingVertical: hp(6) },
   statValue: { fontSize: fp(20), fontWeight: "700" },
-  statText: { fontSize: fp(12), marginTop: hp(2) },
-  statDivider: { width: 1, height: hp(30) },
+  statText: { fontSize: fp(11), marginTop: hp(2) },
+  statInnerDivider: { width: 1, height: hp(28) },
   recipesSection: { paddingHorizontal: wp(20), paddingBottom: hp(40) },
   sectionTitle: { fontSize: fp(20), fontWeight: "700", marginBottom: hp(16) },
-  emptyText: { fontSize: fp(14), textAlign: 'center', marginTop: hp(12) }
+  emptyText: { fontSize: fp(14), textAlign: 'center', marginTop: hp(12) },
+  gridRow: { flexDirection: 'row', gap: wp(12), marginBottom: wp(12) },
+  gridItem: { flex: 1 }
 });

@@ -117,17 +117,26 @@ export default function CommunityFeed() {
 
                         <View style={[styles.postContent, { backgroundColor: theme.postContentBackground }]}>
                             <Text style={[styles.postTitle, { color: theme.textPrimary }]}>{post.title}</Text>
-                            <Text style={[styles.postDescription, { color: theme.textPrimary }]}>{post.description}</Text>
-                            
-                            <View style={[styles.postMeta, { backgroundColor: theme.postMetaBackground }]}>
+                            <Text style={[styles.postDescription, { color: theme.textSecondary }]}>{post.description}</Text>
+
+                            <View style={[styles.postMeta, { backgroundColor: theme.postMetaBackground, borderTopColor: theme.borderLight }]}>
                                 <Pressable
                                     onPress={(e) => {
                                         e.stopPropagation();
-                                        navigateToProfile(navigation, post.authorId || post.id, post.author, user?.id);
+                                        navigateToProfile(navigation, post.authorId || post.id, post.author, user?.id, post.authorPhoto);
                                     }}
-                                    style={({pressed}) => pressed && {opacity: 0.7}}
+                                    style={({ pressed }) => [styles.authorRow, pressed && { opacity: 0.7 }]}
                                 >
-                                    <Text style={[styles.postAuthor, { color: theme.primary }]}>by {post.author}</Text>
+                                    {post.authorPhoto ? (
+                                        <Image source={{ uri: post.authorPhoto }} style={styles.authorAvatar} />
+                                    ) : (
+                                        <View style={[styles.authorAvatarPlaceholder, { backgroundColor: theme.primary }]}>
+                                            <Text style={[styles.authorInitial, { color: theme.textInverse }]}>
+                                                {post.author ? post.author[0].toUpperCase() : '?'}
+                                            </Text>
+                                        </View>
+                                    )}
+                                    <Text style={[styles.postAuthor, { color: theme.primary }]}>{post.author}</Text>
                                 </Pressable>
                                 <View style={styles.postStats}>
                                     <Pressable 
@@ -191,7 +200,7 @@ export default function CommunityFeed() {
                 >
                     <View style={[styles.glassBackground, { backgroundColor: theme.primary }]}>
                         <View style={styles.moreCardContent}>
-                            <Text style={styles.moreCardText}>More</Text>
+                            <Text style={[styles.moreCardText, { color: theme.textInverse }]}>More</Text>
                         </View>
                     </View>
                 </Pressable>
@@ -265,7 +274,6 @@ const styles = StyleSheet.create({
         paddingBottom: hp(32),
     },
     postCard: {
-        backgroundColor: '#FFFFFF',
         borderRadius: SPACING.radiusLarge,
         marginBottom: SPACING.itemGap,
         overflow: 'hidden',
@@ -276,17 +284,17 @@ const styles = StyleSheet.create({
         elevation: 3,
     },
     postCardPressed: {
-        opacity: 0.95,
-        transform: [{ scale: 0.99 }],
+        opacity: 0.92,
+        transform: [{ scale: 0.97 }],
     },
     dishImage: {
         width: '100%',
-        height: hp(140),
+        height: hp(180),
         resizeMode: 'cover',
     },
     dishImagePlaceholder: {
         width: '100%',
-        height: hp(140),
+        height: hp(180),
         backgroundColor: '#F3F4F6',
         justifyContent: 'center',
         alignItems: 'center',
@@ -294,7 +302,6 @@ const styles = StyleSheet.create({
     imagePlaceholderText: {
         fontSize: fp(14),
         fontWeight: '600',
-        color: '#9CA3AF',
         letterSpacing: 2,
     },
     postContent: {
@@ -304,12 +311,10 @@ const styles = StyleSheet.create({
     postTitle: {
         fontSize: fp(18),
         fontWeight: '700',
-        color: '#111827',
         letterSpacing: -0.3,
     },
     postDescription: {
         fontSize: fp(14),
-        color: '#6B7280',
         lineHeight: hp(18),
     },
     postMeta: {
@@ -319,11 +324,30 @@ const styles = StyleSheet.create({
         marginTop: hp(4),
         paddingTop: hp(6),
         borderTopWidth: 1,
-        borderTopColor: '#F3F4F6',
+    },
+    authorRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(6),
+    },
+    authorAvatar: {
+        width: wp(24),
+        height: wp(24),
+        borderRadius: wp(12),
+    },
+    authorAvatarPlaceholder: {
+        width: wp(24),
+        height: wp(24),
+        borderRadius: wp(12),
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    authorInitial: {
+        fontSize: fp(11),
+        fontWeight: '700',
     },
     postAuthor: {
         fontSize: fp(13),
-        color: '#9CA3AF',
         fontWeight: '500',
     },
     postStats: {
@@ -338,10 +362,10 @@ const styles = StyleSheet.create({
     },
     statButtonPressed: {
         opacity: 0.6,
+        transform: [{ scale: 0.85 }],
     },
     statText: {
         fontSize: fp(13),
-        color: '#6B7280',
         fontWeight: '600',
     },
     moreCard: {
@@ -369,7 +393,6 @@ const styles = StyleSheet.create({
     moreCardText: {
         fontSize: fp(14),
         fontWeight: '600',
-        color: '#FFFFFF',
         letterSpacing: 0.3,
     },
 });

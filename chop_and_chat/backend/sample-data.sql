@@ -420,6 +420,10 @@ WHERE c.post_id IS NOT NULL
       AND (n.data->>'commentId')::int = c.id
   );
 
+-- Mark all seeded accounts as email-verified (they use a hardcoded password for local dev)
+UPDATE users SET email_verified = TRUE
+WHERE email IN ('john@test.com', 'jane@test.com', 'gordon@test.com', 'maria@test.com');
+
 -- ============================================================================
 -- VERIFICATION QUERIES (uncomment to inspect after seeding)
 -- ============================================================================

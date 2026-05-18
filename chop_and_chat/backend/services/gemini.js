@@ -1,34 +1,89 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const https = require('https');
-const http = require('http');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({
-  model: 'gemini-flash-lite-latest',
-  generationConfig: {
-    responseMimeType: 'application/json',
-  }
-});
+
+// Three-model fallback chain — each has its own free-tier quota bucket.
+// Order: newest → stable pinned → oldest. If one hits 429, the next is tried automatically.
+const MODEL_NAMES = [
+  'gemini-2.5-flash-lite',
+  'gemini-2.0-flash-lite',
+  'gemini-2.5-flash',
+];
+const MODEL_CHAIN = MODEL_NAMES.map(name =>
+  genAI.getGenerativeModel({ model: name, generationConfig: { responseMimeType: 'application/json' } })
+);
 
 const DAILY_QUOTA = 3;
 
-// Resize via Cloudinary URL transformation to reduce payload size sent to Gemini.
-// w_800: cap width at 800px; f_jpg: force JPEG output; q_70: 70% quality
-function transformCloudinaryUrl(url) {
-  if (url.includes('/upload/')) {
-    return url.replace('/upload/', '/upload/w_800,c_scale,f_jpg,q_70/');
+
+// Extracts the Cloudinary public ID from a stored image URL.
+// Uses plain string operations — no regex on user input to avoid ReDoS.
+// Accepts only paths under known upload folders: posts/ or profile_photos/
+// e.g. ".../upload/posts/abc123.jpg"          → "posts/abc123"
+//      ".../upload/v1234/profile_photos/x.jpg" → "profile_photos/x"
+const KNOWN_FOLDERS = ['posts/', 'profile_photos/'];
+const PUBLIC_ID_RE = /^(posts|profile_photos)\/[\w.\-]+$/;
+
+function extractPublicId(url) {
+  let pathname;
+  try {
+    pathname = new URL(url).pathname;
+  } catch {
+    throw Object.assign(new Error('Invalid image URL'), { code: 'INVALID_IMAGE_URL' });
   }
-  return url;
+
+  const uploadMarker = '/upload/';
+  const uploadIdx = pathname.indexOf(uploadMarker);
+  if (uploadIdx === -1) {
+    throw Object.assign(new Error('Image URL is not from a recognised Cloudinary folder'), { code: 'INVALID_IMAGE_URL' });
+  }
+
+  const afterUpload = pathname.slice(uploadIdx + uploadMarker.length);
+
+  // Find the first known folder segment — skips version/transformation prefixes
+  let folderStart = -1;
+  for (const folder of KNOWN_FOLDERS) {
+    const idx = afterUpload.indexOf(folder);
+    if (idx !== -1 && (folderStart === -1 || idx < folderStart)) {
+      folderStart = idx;
+    }
+  }
+  if (folderStart === -1) {
+    throw Object.assign(new Error('Image URL is not from a recognised Cloudinary folder'), { code: 'INVALID_IMAGE_URL' });
+  }
+
+  const withFolder = afterUpload.slice(folderStart);
+  const dotIdx = withFolder.lastIndexOf('.');
+  const publicId = dotIdx !== -1 ? withFolder.slice(0, dotIdx) : withFolder;
+
+  if (!PUBLIC_ID_RE.test(publicId)) {
+    throw Object.assign(new Error('Image public ID contains invalid characters'), { code: 'INVALID_IMAGE_URL' });
+  }
+
+  return publicId;
+}
+
+// Builds the resized fetch URL from server-controlled components only.
+// The hostname and cloud name come from env — not from user input.
+function buildCloudinaryFetchUrl(publicId) {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  if (!cloudName) throw new Error('CLOUDINARY_CLOUD_NAME is not configured');
+  return `https://res.cloudinary.com/${cloudName}/image/upload/w_800,c_scale,f_jpg,q_70/${publicId}`;
 }
 
 // Fetches an image from a URL and returns raw bytes as a Buffer.
 // Follows a single level of HTTP redirect (Cloudinary never chains more than one).
 function fetchImageBuffer(url) {
   return new Promise((resolve, reject) => {
-    const lib = url.startsWith('https') ? https : http;
-    const req = lib.get(url, (res) => {
+    const req = https.get(url, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return resolve(fetchImageBuffer(res.headers.location));
+        // Redirect must also stay on res.cloudinary.com
+        const loc = res.headers.location;
+        if (!loc.startsWith('https://res.cloudinary.com/')) {
+          return reject(Object.assign(new Error('Redirect to unexpected host blocked'), { code: 'INVALID_IMAGE_URL' }));
+        }
+        return resolve(fetchImageBuffer(loc));
       }
       if (res.statusCode !== 200) {
         return reject(new Error(`Image fetch failed with status ${res.statusCode}`));
@@ -183,12 +238,35 @@ function parseResponse(rawText) {
   };
 }
 
+// Tries each model in MODEL_CHAIN in order. Falls back to the next only on 429 or 503 errors.
+// Any other error (timeout, parse failure, network) is re-thrown immediately from the model
+// that produced it — don't waste retries on non-quota failures.
+// Throws GEMINI_QUOTA_EXCEEDED if all models are exhausted on quota or capacity.
+async function tryModelChain(callFn) {
+  for (let i = 0; i < MODEL_CHAIN.length; i++) {
+    try {
+      return await callFn(MODEL_CHAIN[i]);
+    } catch (err) {
+      if (err.message?.includes('429') || err.message?.includes('503')) {
+        const hasNext = i < MODEL_CHAIN.length - 1;
+        console.warn(`[Gemini] ${MODEL_NAMES[i]} unavailable (429/503)${hasNext ? `, trying ${MODEL_NAMES[i + 1]}` : ''}`);
+        if (hasNext) continue;
+        const quotaErr = new Error('Image validation temporarily unavailable. Please try again in a few minutes.');
+        quotaErr.code = 'GEMINI_QUOTA_EXCEEDED';
+        throw quotaErr;
+      }
+      throw err;
+    }
+  }
+}
+
 async function validateFoodImage(imageUrl) {
-  const resizedUrl = transformCloudinaryUrl(imageUrl);
+  const publicId = extractPublicId(imageUrl);
+  const fetchUrl = buildCloudinaryFetchUrl(publicId);
 
   let imageBuffer;
   try {
-    imageBuffer = await fetchImageBuffer(resizedUrl);
+    imageBuffer = await fetchImageBuffer(fetchUrl);
   } catch (err) {
     const fetchErr = new Error(`Failed to fetch image for validation: ${err.message}`);
     fetchErr.code = 'GEMINI_IMAGE_FETCH_ERROR';
@@ -211,44 +289,34 @@ Return ONLY a JSON object with this exact structure:
 }
 `;
 
+  const inlineData = { inlineData: { mimeType: 'image/jpeg', data: imageBuffer.toString('base64') } };
+
   try {
-    const callPromise = model.generateContent([
-      prompt,
-      {
-        inlineData: {
-          mimeType: 'image/jpeg',
-          data: imageBuffer.toString('base64'),
-        },
-      },
-    ]);
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Gemini validation timed out')), 12000)
-    );
-    const geminiResult = await Promise.race([callPromise, timeoutPromise]);
-
-    let text = geminiResult.response.text().trim()
-      .replace(/^```json\s*/i, '')
-      .replace(/^```\s*/, '')
-      .replace(/\s*```$/, '');
-
-    const parsed = JSON.parse(text);
-    return {
-      isValidForFeed: !!parsed.isValidForFeed,
-      reason: String(parsed.reason || 'Image validation failed.')
-    };
+    return await tryModelChain(async (m) => {
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Gemini validation timed out')), 12000)
+      );
+      const result = await Promise.race([m.generateContent([prompt, inlineData]), timeout]);
+      let text = result.response.text().trim()
+        .replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+      const parsed = JSON.parse(text);
+      return { isValidForFeed: !!parsed.isValidForFeed, reason: String(parsed.reason || 'Image validation failed.') };
+    });
   } catch (err) {
+    if (err.code === 'GEMINI_QUOTA_EXCEEDED') throw err;
+    // Fail closed on API errors so we don't let invalid photos bypass the review
     console.error('[validateFoodImage] error:', err.message);
-    // On API failure or timeout, fail open so users aren't blocked by Gemini downtime
-    return { isValidForFeed: true, reason: 'Validation skipped due to API error.' };
+    return { isValidForFeed: false, reason: 'AI validation is temporarily unavailable due to high server load. Please try again.' };
   }
 }
 
 async function analyzeDish({ imageUrl, title, description, ingredients, difficulty, cookTime }) {
-  const resizedUrl = transformCloudinaryUrl(imageUrl);
+  const publicId = extractPublicId(imageUrl);
+  const fetchUrl = buildCloudinaryFetchUrl(publicId);
 
   let imageBuffer;
   try {
-    imageBuffer = await fetchImageBuffer(resizedUrl);
+    imageBuffer = await fetchImageBuffer(fetchUrl);
   } catch (err) {
     const fetchErr = new Error(`Failed to fetch dish image: ${err.message}`);
     fetchErr.code = 'GEMINI_IMAGE_FETCH_ERROR';
@@ -256,20 +324,15 @@ async function analyzeDish({ imageUrl, title, description, ingredients, difficul
   }
 
   const prompt = buildPrompt({ title, description, ingredients, difficulty, cookTime });
+  const inlineData = { inlineData: { mimeType: 'image/jpeg', data: imageBuffer.toString('base64') } };
 
-  let geminiResult;
   try {
-    geminiResult = await model.generateContent([
-      prompt,
-      {
-        inlineData: {
-          mimeType: 'image/jpeg',
-          data: imageBuffer.toString('base64'),
-        },
-      },
-    ]);
+    const result = await tryModelChain(async (m) => {
+      return await m.generateContent([prompt, inlineData]);
+    });
+    return parseResponse(result.response.text());
   } catch (err) {
-    if (err.message?.includes('429')) {
+    if (err.code === 'GEMINI_QUOTA_EXCEEDED') {
       const rateErr = new Error(`Gemini API call failed: ${err.message}`);
       rateErr.code = 'GEMINI_RATE_LIMIT';
       throw rateErr;
@@ -278,9 +341,6 @@ async function analyzeDish({ imageUrl, title, description, ingredients, difficul
     apiErr.code = 'GEMINI_API_ERROR';
     throw apiErr;
   }
-
-  const rawText = geminiResult.response.text();
-  return parseResponse(rawText);
 }
 
 module.exports = { analyzeDish, validateFoodImage, DAILY_QUOTA };
