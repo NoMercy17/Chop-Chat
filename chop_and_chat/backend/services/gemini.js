@@ -17,21 +17,51 @@ const MODEL_CHAIN = MODEL_NAMES.map(name =>
 const DAILY_QUOTA = 3;
 
 
-// Extracts the Cloudinary public ID from a stored image URL and validates it.
-// Accepts paths under the two known upload folders only — blocks path traversal.
+// Extracts the Cloudinary public ID from a stored image URL.
+// Uses plain string operations — no regex on user input to avoid ReDoS.
+// Accepts only paths under known upload folders: posts/ or profile_photos/
 // e.g. ".../upload/posts/abc123.jpg"          → "posts/abc123"
 //      ".../upload/v1234/profile_photos/x.jpg" → "profile_photos/x"
+const KNOWN_FOLDERS = ['posts/', 'profile_photos/'];
 const PUBLIC_ID_RE = /^(posts|profile_photos)\/[\w.\-]+$/;
 
 function extractPublicId(url) {
-  const match = url.match(/\/upload\/(?:[^/]+\/)*((posts|profile_photos)\/[\w.\-]+?)(?:\.[a-z]{2,4})?(?:[?#]|$)/i);
-  if (!match || !PUBLIC_ID_RE.test(match[1])) {
-    throw Object.assign(
-      new Error('Image URL is not from a recognised Cloudinary folder'),
-      { code: 'INVALID_IMAGE_URL' }
-    );
+  let pathname;
+  try {
+    pathname = new URL(url).pathname;
+  } catch {
+    throw Object.assign(new Error('Invalid image URL'), { code: 'INVALID_IMAGE_URL' });
   }
-  return match[1];
+
+  const uploadMarker = '/upload/';
+  const uploadIdx = pathname.indexOf(uploadMarker);
+  if (uploadIdx === -1) {
+    throw Object.assign(new Error('Image URL is not from a recognised Cloudinary folder'), { code: 'INVALID_IMAGE_URL' });
+  }
+
+  const afterUpload = pathname.slice(uploadIdx + uploadMarker.length);
+
+  // Find the first known folder segment — skips version/transformation prefixes
+  let folderStart = -1;
+  for (const folder of KNOWN_FOLDERS) {
+    const idx = afterUpload.indexOf(folder);
+    if (idx !== -1 && (folderStart === -1 || idx < folderStart)) {
+      folderStart = idx;
+    }
+  }
+  if (folderStart === -1) {
+    throw Object.assign(new Error('Image URL is not from a recognised Cloudinary folder'), { code: 'INVALID_IMAGE_URL' });
+  }
+
+  const withFolder = afterUpload.slice(folderStart);
+  const dotIdx = withFolder.lastIndexOf('.');
+  const publicId = dotIdx !== -1 ? withFolder.slice(0, dotIdx) : withFolder;
+
+  if (!PUBLIC_ID_RE.test(publicId)) {
+    throw Object.assign(new Error('Image public ID contains invalid characters'), { code: 'INVALID_IMAGE_URL' });
+  }
+
+  return publicId;
 }
 
 // Builds the resized fetch URL from server-controlled components only.
