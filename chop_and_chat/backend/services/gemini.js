@@ -16,35 +16,44 @@ const MODEL_CHAIN = MODEL_NAMES.map(name =>
 
 const DAILY_QUOTA = 3;
 
-// Resize via Cloudinary URL transformation to reduce payload size sent to Gemini.
-// w_800: cap width at 800px; f_jpg: force JPEG output; q_70: 70% quality
-function transformCloudinaryUrl(url) {
-  if (url.includes('/upload/')) {
-    return url.replace('/upload/', '/upload/w_800,c_scale,f_jpg,q_70/');
+
+// Extracts the Cloudinary public ID from a stored image URL and validates it.
+// Accepts paths under the two known upload folders only — blocks path traversal.
+// e.g. ".../upload/posts/abc123.jpg"          → "posts/abc123"
+//      ".../upload/v1234/profile_photos/x.jpg" → "profile_photos/x"
+const PUBLIC_ID_RE = /^(posts|profile_photos)\/[\w.\-]+$/;
+
+function extractPublicId(url) {
+  const match = url.match(/\/upload\/(?:[^/]+\/)*((posts|profile_photos)\/[\w.\-]+?)(?:\.[a-z]{2,4})?(?:[?#]|$)/i);
+  if (!match || !PUBLIC_ID_RE.test(match[1])) {
+    throw Object.assign(
+      new Error('Image URL is not from a recognised Cloudinary folder'),
+      { code: 'INVALID_IMAGE_URL' }
+    );
   }
-  return url;
+  return match[1];
 }
 
-function assertCloudinaryUrl(url) {
-  let parsed;
-  try { parsed = new URL(url); } catch {
-    throw Object.assign(new Error('Invalid image URL'), { code: 'INVALID_IMAGE_URL' });
-  }
-  if (parsed.protocol !== 'https:' || parsed.hostname !== 'res.cloudinary.com') {
-    throw Object.assign(new Error('Image URL must be from res.cloudinary.com'), { code: 'INVALID_IMAGE_URL' });
-  }
+// Builds the resized fetch URL from server-controlled components only.
+// The hostname and cloud name come from env — not from user input.
+function buildCloudinaryFetchUrl(publicId) {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  if (!cloudName) throw new Error('CLOUDINARY_CLOUD_NAME is not configured');
+  return `https://res.cloudinary.com/${cloudName}/image/upload/w_800,c_scale,f_jpg,q_70/${publicId}`;
 }
 
 // Fetches an image from a URL and returns raw bytes as a Buffer.
 // Follows a single level of HTTP redirect (Cloudinary never chains more than one).
 function fetchImageBuffer(url) {
-  assertCloudinaryUrl(url);
   return new Promise((resolve, reject) => {
-    const lib = https;
-    const req = lib.get(url, (res) => {
+    const req = https.get(url, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        try { assertCloudinaryUrl(res.headers.location); } catch (e) { return reject(e); }
-        return resolve(fetchImageBuffer(res.headers.location));
+        // Redirect must also stay on res.cloudinary.com
+        const loc = res.headers.location;
+        if (!loc.startsWith('https://res.cloudinary.com/')) {
+          return reject(Object.assign(new Error('Redirect to unexpected host blocked'), { code: 'INVALID_IMAGE_URL' }));
+        }
+        return resolve(fetchImageBuffer(loc));
       }
       if (res.statusCode !== 200) {
         return reject(new Error(`Image fetch failed with status ${res.statusCode}`));
@@ -222,11 +231,12 @@ async function tryModelChain(callFn) {
 }
 
 async function validateFoodImage(imageUrl) {
-  const resizedUrl = transformCloudinaryUrl(imageUrl);
+  const publicId = extractPublicId(imageUrl);
+  const fetchUrl = buildCloudinaryFetchUrl(publicId);
 
   let imageBuffer;
   try {
-    imageBuffer = await fetchImageBuffer(resizedUrl);
+    imageBuffer = await fetchImageBuffer(fetchUrl);
   } catch (err) {
     const fetchErr = new Error(`Failed to fetch image for validation: ${err.message}`);
     fetchErr.code = 'GEMINI_IMAGE_FETCH_ERROR';
@@ -271,11 +281,12 @@ Return ONLY a JSON object with this exact structure:
 }
 
 async function analyzeDish({ imageUrl, title, description, ingredients, difficulty, cookTime }) {
-  const resizedUrl = transformCloudinaryUrl(imageUrl);
+  const publicId = extractPublicId(imageUrl);
+  const fetchUrl = buildCloudinaryFetchUrl(publicId);
 
   let imageBuffer;
   try {
-    imageBuffer = await fetchImageBuffer(resizedUrl);
+    imageBuffer = await fetchImageBuffer(fetchUrl);
   } catch (err) {
     const fetchErr = new Error(`Failed to fetch dish image: ${err.message}`);
     fetchErr.code = 'GEMINI_IMAGE_FETCH_ERROR';
