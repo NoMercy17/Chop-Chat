@@ -129,6 +129,14 @@ export function ChefFeedProvider({ children }) {
         }
     }, [token, updateCommentCount]);
 
+    const updateChefPhoto = useCallback((userId, newPhotoUrl) => {
+        setFeedItems(curr => curr.map(item =>
+            item.chef?.id === userId
+                ? { ...item, chef: { ...item.chef, photo: newPhotoUrl } }
+                : item
+        ));
+    }, []);
+
     const value = useMemo(() => ({
         feedItems,
         loading,
@@ -138,7 +146,8 @@ export function ChefFeedProvider({ children }) {
         unsaveByPostId,
         updateCommentCount,
         addComment,
-    }), [feedItems, loading, refreshFeed, handleLike, handleSave, unsaveByPostId, updateCommentCount, addComment]);
+        updateChefPhoto,
+    }), [feedItems, loading, refreshFeed, handleLike, handleSave, unsaveByPostId, updateCommentCount, addComment, updateChefPhoto]);
 
     return (
         <ChefFeedContext.Provider value={value}>

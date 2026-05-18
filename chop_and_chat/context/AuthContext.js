@@ -20,7 +20,8 @@ export function AuthProvider({ children }) {
     if (!userData) return null;
     return {
       ...userData,
-      isChef: userData.isChef || userData.role === 'chef'
+      isChef: userData.isChef || userData.role === 'chef',
+      email_verified: userData.email_verified ?? true,
     };
   };
 
@@ -87,6 +88,9 @@ export function AuthProvider({ children }) {
       }
       return { success: false, error: 'Invalid response from server' };
     } catch (error) {
+      if (error.data?.error === 'EMAIL_NOT_VERIFIED') {
+        return { success: false, error: 'EMAIL_NOT_VERIFIED', email };
+      }
       console.error('[AuthContext:login] Login request failed:', error.message);
       return { success: false, error: error.message };
     }
@@ -97,7 +101,7 @@ export function AuthProvider({ children }) {
       await api.post('/register', userData);
       return { success: true };
     } catch (error) {
-      console.error('[AuthContext:register] Registration request failed:', error.message);
+      console.error('[AuthContext:register] Request failed:', error.message);
       return { success: false, error: error.message };
     }
   }, []);
@@ -109,7 +113,7 @@ export function AuthProvider({ children }) {
     signIn,
     signOut,
     login,
-    register
+    register,
   }), [user, token, loading, signIn, signOut, login, register]);
 
   return (

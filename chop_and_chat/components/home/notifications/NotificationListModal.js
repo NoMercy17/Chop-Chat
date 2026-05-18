@@ -15,8 +15,8 @@ export default function NotificationListModal({
 }) {
     return (
         <Modal visible={visible} transparent={true} animationType='slide' onRequestClose={onClose}>
-            <View style={[styles.modalOverlay, { backgroundColor: theme.overlayBackground }]}>
-                <View style={[styles.modalContainer, { backgroundColor: theme.modalBackground }]}>
+            <Pressable style={[styles.modalOverlay, { backgroundColor: theme.overlayBackground }]} onPress={onClose}>
+                <Pressable style={[styles.modalContainer, { backgroundColor: theme.modalBackground }]} onPress={() => {}}>
                     <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
                         <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Notifications</Text>
                     </View>
@@ -52,8 +52,8 @@ export default function NotificationListModal({
                     >
                         <Text style={[styles.closeButtonText, { color: theme.textMuted }]}>Close</Text>
                     </Pressable>
-                </View>
-            </View>
+                </Pressable>
+            </Pressable>
         </Modal>
     );
 }
@@ -61,11 +61,9 @@ export default function NotificationListModal({
 const styles = StyleSheet.create({
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'flex-end',
     },
     modalContainer: {
-        backgroundColor: '#FFFFFF',
         borderTopLeftRadius: wp(24),
         borderTopRightRadius: wp(24),
         maxHeight: '85%',
@@ -83,12 +81,10 @@ const styles = StyleSheet.create({
         paddingTop: hp(24),
         paddingBottom: hp(16),
         borderBottomWidth: 1,
-        borderBottomColor: '#F3F4F6',
     },
     modalTitle: {
         fontSize: fp(28),
         fontWeight: '700',
-        color: '#111827',
     },
     notificationList: {
         paddingHorizontal: wp(20),
@@ -106,7 +102,6 @@ const styles = StyleSheet.create({
         margin: wp(20),
         marginTop: hp(12),
         paddingVertical: hp(14),
-        backgroundColor: '#F3F4F6',
         borderRadius: wp(12),
         alignItems: 'center',
     },
@@ -115,7 +110,6 @@ const styles = StyleSheet.create({
         transform: [{ scale: 0.98 }],
     },
     closeButtonText: {
-        color: '#374151',
         fontSize: fp(16),
         fontWeight: '600',
     },

@@ -70,7 +70,8 @@ export default function RequestChefReviewModal({
         <BottomSheetModal
             visible={visible}
             onClose={handleClose}
-            title="Request Chef Review"
+            title="Chef Review"
+            subtitle="Step 2 of 2"
             leftIcon="arrow-back"
             onLeftPress={handleBackPress}
             keyboardAvoidMaxHeight="85%"

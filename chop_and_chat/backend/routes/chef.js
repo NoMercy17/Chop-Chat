@@ -7,6 +7,7 @@ const { validateFoodImage } = require('../services/gemini');
 const { moderateText } = require('../services/moderation');
 const cloudinary = require('../services/cloudinary');
 const { relativeTime, initials, getPublicIdFromUrl } = require('../utils/helpers');
+const { shouldNotify } = require('../utils/notificationPrefs');
 
 const reviewRequestLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10,  standardHeaders: true, legacyHeaders: false });
 const feedLimiter          = rateLimit({ windowMs: 15 * 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false });
@@ -166,19 +167,25 @@ router.post('/submit-with-review', reviewRequestLimiter, authenticateToken, asyn
     }
 
     const requesterName = req.user.name || 'A user';
-    for (const chefId of chefIds) {
-      await pool.query(
-        'INSERT INTO notifications (user_id, type, title, subtitle, data) VALUES ($1, $2, $3, $4, $5)',
+    // Dedup: if this requestId already has notifications (network retry), skip fan-out
+    const existingFanOut = await pool.query(
+      "SELECT 1 FROM notifications WHERE type = 'chef_review_request' AND data->>'requestId' = $1 LIMIT 1",
+      [String(reviewRequestId)]
+    );
+    // chef_review_request bypasses shouldNotify — always delivered, not user-configurable.
+    // See notification_preferences CHECK constraint in init.sql.
+    if (!existingFanOut.rows.length) {
+      await Promise.all(chefIds.map(chefId => pool.query(
+        'INSERT INTO notifications (user_id, type, title, subtitle, data, ref_post_id) VALUES ($1, $2, $3, $4, $5, $6)',
         [
           chefId,
           'chef_review_request',
           'Review Request',
           `${requesterName} wants your feedback on their ${post.title}`,
-          // requestId and postImage are included so the chef's notification UI can show
-          // the dish image and claim the request without extra lookups.
-          JSON.stringify({ requestId: reviewRequestId, postId: post.id, requesterName, postTitle: post.title, postImage: post.image_url })
+          JSON.stringify({ requestId: reviewRequestId, postId: post.id, requesterName, postTitle: post.title, postImage: post.image_url }),
+          post.id,
         ]
-      );
+      )));
     }
 
     res.status(201).json({
@@ -249,17 +256,25 @@ router.post('/review-request', reviewRequestLimiter, authenticateToken, async (r
     const postImage = postData.rows[0]?.image_url || null;
     const requesterName = req.user.name || 'A user';
 
-    for (const chefId of chefIds) {
-      await pool.query(
-        'INSERT INTO notifications (user_id, type, title, subtitle, data) VALUES ($1, $2, $3, $4, $5)',
+    // Dedup: skip fan-out if notifications already exist for this requestId (network retry)
+    const existingFanOut2 = await pool.query(
+      "SELECT 1 FROM notifications WHERE type = 'chef_review_request' AND data->>'requestId' = $1 LIMIT 1",
+      [String(reviewRequest.id)]
+    );
+    // chef_review_request bypasses shouldNotify — always delivered, not user-configurable.
+    // See notification_preferences CHECK constraint in init.sql.
+    if (!existingFanOut2.rows.length) {
+      await Promise.all(chefIds.map(chefId => pool.query(
+        'INSERT INTO notifications (user_id, type, title, subtitle, data, ref_post_id) VALUES ($1, $2, $3, $4, $5, $6)',
         [
           chefId,
           'chef_review_request',
           'Review Request',
           `${requesterName} wants your feedback on their ${postTitle}`,
-          JSON.stringify({ requestId: reviewRequest.id, postId: post_id, requesterName, postTitle, postImage })
+          JSON.stringify({ requestId: reviewRequest.id, postId: post_id, requesterName, postTitle, postImage }),
+          post_id,
         ]
-      );
+      )));
     }
 
     res.status(201).json({ reviewRequest });
@@ -328,10 +343,6 @@ router.post('/reviews', authenticateToken, requireChef, async (req, res) => {
       reaction = reactionInsert.rows[0];
     } catch (insertErr) {
       if (insertErr.code === '23505') {
-        // Reaction already exists — this happens when the claim succeeded and the reaction
-        // was saved, but the status update to 'completed' failed. Make the endpoint idempotent:
-        // if a request_id is provided, find the existing reaction, mark the request complete,
-        // and return success so the chef isn't stuck in a broken state.
         if (request_id) {
           const existing = await pool.query(
             'SELECT * FROM chef_reactions WHERE chef_id = $1 AND post_id = $2',
@@ -342,6 +353,24 @@ router.post('/reviews', authenticateToken, requireChef, async (req, res) => {
               "UPDATE chef_review_requests SET status = 'completed', updated_at = now() WHERE id = $1 AND claimed_by = $2 AND post_id = $3",
               [request_id, chef_id, post_id]
             );
+            // Send notification if the original INSERT succeeded but the response was lost
+            const postAuthorRetry = await pool.query('SELECT user_id, title FROM posts WHERE id = $1', [post_id]);
+            if (postAuthorRetry.rows.length && postAuthorRetry.rows[0].user_id !== chef_id) {
+              const existingNotif = await pool.query(
+                "SELECT 1 FROM notifications WHERE type = 'chef_review_received' AND data->>'reactionId' = $1 LIMIT 1",
+                [String(existing.rows[0].id)]
+              );
+              if (!existingNotif.rows.length) {
+                const chefName = req.user.name || 'A Chef';
+                await pool.query(
+                  'INSERT INTO notifications (user_id, type, title, subtitle, data, ref_post_id) VALUES ($1, $2, $3, $4, $5, $6)',
+                  [postAuthorRetry.rows[0].user_id, 'chef_review_received', 'New Chef Review!',
+                   `${chefName} reviewed your ${postAuthorRetry.rows[0].title}`,
+                   JSON.stringify({ postId: post_id, reactionId: existing.rows[0].id, chefName }),
+                   post_id]
+                );
+              }
+            }
             return res.status(201).json({ reaction: existing.rows[0] });
           }
         }
@@ -352,7 +381,6 @@ router.post('/reviews', authenticateToken, requireChef, async (req, res) => {
     }
 
     if (request_id) {
-      // Also pin to post_id so a chef can't accidentally mark an unrelated claimed request completed.
       await pool.query(
         "UPDATE chef_review_requests SET status = 'completed', updated_at = now() WHERE id = $1 AND claimed_by = $2 AND post_id = $3",
         [request_id, chef_id, post_id]
@@ -362,18 +390,17 @@ router.post('/reviews', authenticateToken, requireChef, async (req, res) => {
     const postAuthorQuery = await pool.query('SELECT user_id, title FROM posts WHERE id = $1', [post_id]);
     if (postAuthorQuery.rows.length) {
       const { user_id: authorId, title: postTitle } = postAuthorQuery.rows[0];
-      const chefName = req.user.name || 'A Chef';
-
-      await pool.query(
-        'INSERT INTO notifications (user_id, type, title, subtitle, data) VALUES ($1, $2, $3, $4, $5)',
-        [
-          authorId, 
-          'chef_review_received', 
-          'New Chef Review!', 
-          `${chefName} reviewed your ${postTitle}`,
-          JSON.stringify({ postId: post_id, reactionId: reaction.id, chefName })
-        ]
-      );
+      // Bug 8: skip self-notification if the post author is the chef
+      if (authorId !== chef_id) {
+        const chefName = req.user.name || 'A Chef';
+        await pool.query(
+          'INSERT INTO notifications (user_id, type, title, subtitle, data, ref_post_id) VALUES ($1, $2, $3, $4, $5, $6)',
+          [authorId, 'chef_review_received', 'New Chef Review!',
+           `${chefName} reviewed your ${postTitle}`,
+           JSON.stringify({ postId: post_id, reactionId: reaction.id, chefName }),
+           post_id]
+        );
+      }
     }
 
     res.status(201).json({ reaction });
@@ -505,12 +532,17 @@ router.post('/:id/comments', commentsBurstLimiter, commentsWriteLimiter, authent
 
     const chefId = rxCheck.rows[0].chef_id;
     if (chefId !== req.user.id) {
-      await pool.query(
-        'INSERT INTO notifications (user_id, type, title, subtitle, data) VALUES ($1, $2, $3, $4, $5)',
-        [chefId, 'comment_on_post', 'New Comment',
-         `${commenterName} commented on your review`,
-         JSON.stringify({ chefReactionId: reactionId, commentId: row.id, commenterId: req.user.id, commenterName, commentText: text })]
-      );
+      const commentCount = await pool.query('SELECT COUNT(*) AS count FROM comments WHERE chef_reaction_id = $1', [reactionId]);
+      const count = parseInt(commentCount.rows[0].count, 10);
+      if (await shouldNotify(chefId, 'comment_on_post', pool, count)) {
+        await pool.query(
+          'INSERT INTO notifications (user_id, type, title, subtitle, data, ref_chef_reaction_id) VALUES ($1, $2, $3, $4, $5, $6)',
+          [chefId, 'comment_on_post', 'New Comment',
+           `${commenterName} commented on your review`,
+           JSON.stringify({ chefReactionId: reactionId, commentId: row.id, commenterId: req.user.id, commenterName, commentText: text }),
+           reactionId]
+        );
+      }
     }
 
     res.status(201).json({

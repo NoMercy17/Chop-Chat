@@ -1,5 +1,5 @@
 import { Text, View, StyleSheet, Pressable, ActivityIndicator, Alert } from 'react-native';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
@@ -18,16 +18,22 @@ export default function Header({ navigation }) {
     
     const { theme } = useTheme();
     const { refreshFeed } = useChefFeed();
-    const { 
-        notifications, 
-        unreadCount, 
+    const {
+        notifications,
+        unreadCount,
         currentUser,
-        markAsRead, 
+        markAsRead,
         deleteNotification,
         claimReviewRequest,
         submitChefReview,
         cancelReviewClaim,
+        bellTrigger,
     } = useNotifications();
+
+    // Open notification panel when toast is tapped
+    useEffect(() => {
+        if (bellTrigger > 0) setModalVisible(true);
+    }, [bellTrigger]);
 
     const handleNotificationPress = useCallback((notification) => {
         markAsRead(notification.id);

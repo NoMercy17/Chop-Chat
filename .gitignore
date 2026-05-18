@@ -23,10 +23,18 @@ chop_and_chat/ios/build/
 # Conductor (Gemini)
 conductor/
 
+
 # Claude Code (all Claude-specific files - local only)
+.agents
 .claude/
 CLAUDE.md
 .claudeignore
+# Impeccable skill
+.impeccable
+DESIGN.md
+PRODUCT.md
+skills-lock.json
+
 
 # Misc
 .DS_Store

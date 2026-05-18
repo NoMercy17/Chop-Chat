@@ -125,6 +125,12 @@ export function PostsProvider({ children }) {
         }
     }, [token, updateCommentCount]);
 
+    const updateAuthorPhoto = useCallback((userId, newPhotoUrl) => {
+        setPosts(curr => curr.map(p =>
+            p.authorId === userId ? { ...p, authorPhoto: newPhotoUrl } : p
+        ));
+    }, []);
+
     const value = useMemo(() => ({
         posts,
         loading,
@@ -133,8 +139,9 @@ export function PostsProvider({ children }) {
         markUnsaved,
         updateCommentCount,
         addComment,
-        refreshPosts: fetchPosts
-    }), [posts, loading, handleLike, handleSave, markUnsaved, updateCommentCount, addComment, fetchPosts]);
+        refreshPosts: fetchPosts,
+        updateAuthorPhoto,
+    }), [posts, loading, handleLike, handleSave, markUnsaved, updateCommentCount, addComment, fetchPosts, updateAuthorPhoto]);
 
     return (
         <PostsContext.Provider value={value}>

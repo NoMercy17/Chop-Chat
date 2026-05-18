@@ -4,6 +4,9 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const pool = require('../db');
 const { authenticateToken } = require('../middleware');
+const { shouldNotify } = require('../utils/notificationPrefs');
+const cloudinary = require('../services/cloudinary');
+const { getPublicIdFromUrl } = require('../utils/helpers');
 
 const profileReadLimiter    = rateLimit({ windowMs: 15 * 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false });
 const profileWriteLimiter   = rateLimit({ windowMs: 15 * 60 * 1000, max: 20,  standardHeaders: true, legacyHeaders: false });
@@ -14,12 +17,15 @@ const followMutationLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 60,  st
 router.get('/me', profileReadLimiter, authenticateToken, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT id, email, name, role, profile_photo, bio, created_at FROM users WHERE id = $1',
+      `SELECT u.id, u.email, u.name, u.role, u.profile_photo, u.bio, u.created_at,
+        (SELECT COUNT(*) FROM posts WHERE user_id = u.id AND is_global = false) AS post_count
+       FROM users u WHERE u.id = $1`,
       [req.user.id]
     );
-    
+
     if (!rows.length) return res.status(404).json({ error: 'user not found' });
-    res.json({ user: rows[0] });
+    const row = rows[0];
+    res.json({ user: { ...row, postCount: parseInt(row.post_count, 10) } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'server error' });
@@ -31,13 +37,28 @@ router.patch('/profile-photo', profileWriteLimiter, authenticateToken, async (re
   try {
     const { photo_url } = req.body;
     if (!photo_url) return res.status(400).json({ error: 'photo_url is required' });
-    
+
+    // Fetch the current photo URL before overwriting so we can delete the old asset
+    const existing = await pool.query('SELECT profile_photo FROM users WHERE id = $1', [req.user.id]);
+    const oldUrl = existing.rows[0]?.profile_photo;
+
     const { rows } = await pool.query(
       'UPDATE users SET profile_photo = $1 WHERE id = $2 RETURNING id, email, name, role, profile_photo, created_at',
       [photo_url, req.user.id]
     );
-    
+
     if (!rows.length) return res.status(404).json({ error: 'user not found' });
+
+    // Delete the old Cloudinary asset after the DB update succeeds
+    if (oldUrl) {
+      const publicId = getPublicIdFromUrl(oldUrl);
+      if (publicId && publicId.startsWith('profile_photos/')) {
+        cloudinary.uploader.destroy(publicId).catch(err =>
+          console.error('[PATCH /users/profile-photo] Failed to delete old Cloudinary asset:', err.message)
+        );
+      }
+    }
+
     res.json({ user: rows[0] });
   } catch (err) {
     console.error(err);
@@ -78,6 +99,23 @@ router.get('/', profileReadLimiter, authenticateToken, async (req, res) => {
       'SELECT id, email, name, role, profile_photo, created_at FROM users ORDER BY id DESC LIMIT 100'
     );
     res.json({ users: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// Get a single user's public profile (name, photo, bio, role)
+router.get('/:id/profile', profileReadLimiter, authenticateToken, async (req, res) => {
+  try {
+    const targetId = parseInt(req.params.id, 10);
+    if (Number.isNaN(targetId)) return res.status(400).json({ error: 'invalid user id' });
+    const { rows } = await pool.query(
+      'SELECT id, name, profile_photo, bio, role FROM users WHERE id = $1',
+      [targetId]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'user not found' });
+    res.json({ user: rows[0] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'server error' });
@@ -142,14 +180,25 @@ router.post('/:id/follow', followMutationLimiter, authenticateToken, async (req,
       'INSERT INTO follows (follower_id, following_id) VALUES ($1, $2) RETURNING id, follower_id, following_id, created_at',
       [req.user.id, targetId]
     );
-    // Notify the followed user
-    const followerName = req.user.name || 'Someone';
+    // Remove any stale new_follower notification from the same follower (re-follow dedup)
     await pool.query(
-      'INSERT INTO notifications (user_id, type, title, subtitle, data) VALUES ($1, $2, $3, $4, $5)',
-      [targetId, 'new_follower', 'New Follower',
-       `${followerName} started following you`,
-       JSON.stringify({ followerId: req.user.id, followerName })]
+      "DELETE FROM notifications WHERE user_id = $1 AND type = 'new_follower' AND data->>'followerId' = $2",
+      [targetId, String(req.user.id)]
     );
+    const followerCountResult = await pool.query(
+      'SELECT COUNT(*) AS count FROM follows WHERE following_id = $1',
+      [targetId]
+    );
+    const followerCount = parseInt(followerCountResult.rows[0].count, 10);
+    const followerName = req.user.name || 'Someone';
+    if (await shouldNotify(targetId, 'new_follower', pool, followerCount)) {
+      await pool.query(
+        'INSERT INTO notifications (user_id, type, title, subtitle, data) VALUES ($1, $2, $3, $4, $5)',
+        [targetId, 'new_follower', 'New Follower',
+         `${followerName} started following you`,
+         JSON.stringify({ followerId: req.user.id, followerName })]
+      );
+    }
     res.status(201).json({ follow: rows[0] });
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'already following' });

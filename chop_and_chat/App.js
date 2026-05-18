@@ -1,4 +1,5 @@
 import React, { useContext } from 'react';
+import { View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -17,6 +18,7 @@ import { ChefFeedProvider } from './context/ChefFeedContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { NotificationsProvider } from './context/NotificationsContext';
 import { FollowProvider } from './context/FollowContext';
+import NotificationToast from './components/home/notifications/NotificationToast';
 
 
 const MainStack = createNativeStackNavigator();
@@ -33,26 +35,29 @@ function AppContent() {
       <FollowProvider>
         <PostsProvider>
           <ChefFeedProvider>
-            <NavigationContainer ref={navigationRef}>
-              {user ? (
-              <MainStack.Navigator
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: theme.background },
-                }}
-              >
-                <MainStack.Screen name="Home" component={HomeScreen} />
-                <MainStack.Screen name="Profile" component={ProfileScreen} />
-                <MainStack.Screen name="OtherUserProfile" component={OtherUserProfileScreen} />
-                <MainStack.Screen name="MyRecipes" component={MyRecipes} />
-                <MainStack.Screen name="FavoriteRecipes" component={FavoriteRecipes} />
-                <MainStack.Screen name="AllChefReviews" component={AllChefReviews} />
-                <MainStack.Screen name="AllCommunityPosts" component={AllCommunityPosts} />
-              </MainStack.Navigator>
-              ) : (
-                <AuthStack />
-              )}
-            </NavigationContainer>
+            <View style={{ flex: 1 }}>
+              <NavigationContainer ref={navigationRef}>
+                {user ? (
+                <MainStack.Navigator
+                  screenOptions={{
+                    headerShown: false,
+                    contentStyle: { backgroundColor: theme.background },
+                  }}
+                >
+                  <MainStack.Screen name="Home" component={HomeScreen} />
+                  <MainStack.Screen name="Profile" component={ProfileScreen} />
+                  <MainStack.Screen name="OtherUserProfile" component={OtherUserProfileScreen} />
+                  <MainStack.Screen name="MyRecipes" component={MyRecipes} />
+                  <MainStack.Screen name="FavoriteRecipes" component={FavoriteRecipes} />
+                  <MainStack.Screen name="AllChefReviews" component={AllChefReviews} />
+                  <MainStack.Screen name="AllCommunityPosts" component={AllCommunityPosts} />
+                </MainStack.Navigator>
+                ) : (
+                  <AuthStack />
+                )}
+              </NavigationContainer>
+              <NotificationToast />
+            </View>
           </ChefFeedProvider>
         </PostsProvider>
       </FollowProvider>

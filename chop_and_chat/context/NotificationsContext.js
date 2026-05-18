@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useCallback, useMemo, useEffect } from 'react';
+import React, { createContext, useState, useContext, useCallback, useMemo, useEffect, useRef } from 'react';
 import { AuthContext } from './AuthContext';
 import { api } from '../services/api';
 import { ChefService } from '../services/ChefService';
@@ -14,24 +14,38 @@ export const NOTIFICATION_TYPES = {
   COMMENT_ON_POST: 'comment_on_post',
 };
 
+function formatTime(timestamp) {
+  const now = new Date();
+  const then = new Date(timestamp);
+  const diffInSeconds = Math.floor((now - then) / 1000);
+
+  if (diffInSeconds < 60) return 'Just now';
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+  return `${Math.floor(diffInSeconds / 86400)}d ago`;
+}
+
 export function NotificationsProvider({ children }) {
   const { user, token } = useContext(AuthContext);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [toastQueue, setToastQueue] = useState([]);
+  const [bellTrigger, setBellTrigger] = useState(0);
+
+  // Tracks IDs seen during this session so we only toast truly new arrivals
+  const knownIds = useRef(new Set());
+  const initialLoadDone = useRef(false);
 
   // Derive if current user is chef from AuthContext
   const isChef = user?.isChef || false;
 
-  const formatTime = (timestamp) => {
-    const now = new Date();
-    const then = new Date(timestamp);
-    const diffInSeconds = Math.floor((now - then) / 1000);
-
-    if (diffInSeconds < 60) return 'Just now';
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-    return `${Math.floor(diffInSeconds / 86400)}d ago`;
-  };
+  // Reset toast state when the logged-in user changes
+  useEffect(() => {
+    knownIds.current = new Set();
+    initialLoadDone.current = false;
+    setToastQueue([]);
+    setBellTrigger(0);
+  }, [token]);
 
   const refreshNotifications = useCallback(async () => {
     if (!token) return;
@@ -49,16 +63,29 @@ export function NotificationsProvider({ children }) {
         time: formatTime(n.created_at),
         claimedBy: n.data?.claimedBy || null,
       }));
+
+      if (!initialLoadDone.current) {
+        // First load: seed known IDs — don't toast for notifications that already existed
+        backendNotifs.forEach(n => knownIds.current.add(n.id));
+        initialLoadDone.current = true;
+      } else {
+        const newOnes = backendNotifs.filter(n => !knownIds.current.has(n.id));
+        if (newOnes.length > 0) {
+          newOnes.forEach(n => knownIds.current.add(n.id));
+          setToastQueue(prev => [...prev, ...newOnes]);
+        }
+      }
+
       setNotifications(backendNotifs);
     } catch (error) {
       console.error('[NotificationsContext:refreshNotifications] Failed:', error.message);
     }
   }, [token]);
 
-  // Initial load and polling
+  // Initial load and polling every 5s for new notifications
   useEffect(() => {
     refreshNotifications();
-    const interval = setInterval(refreshNotifications, 30000); // Poll every 30s
+    const interval = setInterval(refreshNotifications, 5000);
     return () => clearInterval(interval);
   }, [refreshNotifications]);
 
@@ -85,11 +112,12 @@ export function NotificationsProvider({ children }) {
     if (!token) return;
     try {
       setNotifications(prev => prev.filter(n => n.id !== notificationId));
-      // Optionally add DELETE /notifications/:id to backend
+      await api.delete(`/notifications/${notificationId}`, token);
     } catch (error) {
       console.error(`[NotificationsContext:deleteNotification] Failed:`, error.message);
+      refreshNotifications();
     }
-  }, [token]);
+  }, [token, refreshNotifications]);
 
   // Claim a review request (for chefs)
   const claimReviewRequest = useCallback(async (notificationId, requestId) => {
@@ -130,11 +158,11 @@ export function NotificationsProvider({ children }) {
         request_id: requestId
       }, token);
 
-      // 2. Mark notification as read (if not already)
-      setNotifications(prev => prev.filter(n => n.id !== notificationId));
-      
-      // 3. Optional: Mark read in backend if it wasn't
+      // 2. Mark read in backend
       await api.patch(`/notifications/${notificationId}/read`, {}, token);
+
+      // 3. Remove from local state only after both backend calls succeed
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
     } catch (error) {
       console.error(`[NotificationsContext:submitChefReview] Failed:`, error.message);
       refreshNotifications();
@@ -144,10 +172,18 @@ export function NotificationsProvider({ children }) {
 
   // Cancel a claim (for Chefs who claimed but haven't reviewed yet)
   const cancelReviewClaim = useCallback(async (notificationId) => {
-    // For now, this just refreshes notifications to sync with backend
-    // A more advanced version would call an unclaim endpoint
+    if (!token) return;
     refreshNotifications();
-  }, [refreshNotifications]);
+  }, [token, refreshNotifications]);
+
+  const dismissToast = useCallback((toastId) => {
+    setToastQueue(prev => prev.filter(t => t.id !== toastId));
+  }, []);
+
+  // Signals the Header bell to open the notification list (used by toast on tap)
+  const openNotificationPanel = useCallback(() => {
+    setBellTrigger(prev => prev + 1);
+  }, []);
 
   const value = useMemo(() => ({
     notifications,
@@ -159,17 +195,25 @@ export function NotificationsProvider({ children }) {
     submitChefReview,
     cancelReviewClaim,
     refreshNotifications,
+    toastQueue,
+    dismissToast,
+    openNotificationPanel,
+    bellTrigger,
     NOTIFICATION_TYPES,
   }), [
-    notifications, 
-    unreadCount, 
+    notifications,
+    unreadCount,
     user,
-    markAsRead, 
-    deleteNotification, 
-    claimReviewRequest, 
+    markAsRead,
+    deleteNotification,
+    claimReviewRequest,
     submitChefReview,
     cancelReviewClaim,
-    refreshNotifications
+    refreshNotifications,
+    toastQueue,
+    dismissToast,
+    openNotificationPanel,
+    bellTrigger,
   ]);
 
   return (

@@ -1,5 +1,6 @@
 import { useMemo, useState, useContext, useCallback } from 'react';
 import { Text, View, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { getCloudinaryUrl } from '../../utils/cloudinaryUrl';
 import { useNavigation } from '@react-navigation/native';
 import { wp, hp, fp, SPACING } from '../../utils/responsive';
@@ -111,7 +112,20 @@ export default function FeaturedChef() {
                     setChefPostDetailVisible(true);
                 }}
             >
-                <View style={[styles.cardHeader, { backgroundColor: theme.chefCardHeaderBg }]}>
+                <View style={[styles.cardHeader, !item.chef.photo && { backgroundColor: theme.chefCardHeaderBg }]}>
+                    {item.chef.photo && (
+                        <Image
+                            source={{ uri: getCloudinaryUrl(item.chef.photo, { width: 560, height: 160, crop: 'fill', gravity: 'face' }) }}
+                            style={styles.cardHeaderBg}
+                            blurRadius={8}
+                        />
+                    )}
+                    {item.chef.photo && (
+                        <LinearGradient
+                            colors={['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.65)']}
+                            style={StyleSheet.absoluteFill}
+                        />
+                    )}
                     <View style={[styles.chefAvatar, { backgroundColor: theme.primary }]}>
                         {item.chef.photo ? (
                             <Image
@@ -123,9 +137,15 @@ export default function FeaturedChef() {
                         )}
                     </View>
                     <View style={styles.headerInfo}>
-                        <Text style={[styles.reviewTitle, { color: theme.textPrimary }]} numberOfLines={1}>{displayTitle}</Text>
+                        <Text
+                            style={[styles.reviewTitle, { color: item.chef.photo ? theme.textInverse : theme.textPrimary }]}
+                            numberOfLines={1}
+                        >{displayTitle}</Text>
                         {isReaction && (
-                            <Text style={[styles.reactionTarget, { color: theme.textSecondary }]} numberOfLines={1}>
+                            <Text
+                                style={[styles.reactionTarget, { color: item.chef.photo ? 'rgba(255,255,255,0.75)' : theme.textSecondary }]}
+                                numberOfLines={1}
+                            >
                                 on @{item.reaction.targetAuthor?.name || 'User'}'s post
                             </Text>
                         )}
@@ -140,7 +160,7 @@ export default function FeaturedChef() {
                         <Pressable
                             onPress={(e) => {
                                 e.stopPropagation();
-                                navigateToProfile(navigation, item.chef.id, item.chef.name, user?.id);
+                                navigateToProfile(navigation, item.chef.id, item.chef.name, user?.id, item.chef.photo);
                             }}
                             style={({pressed}) => pressed && {opacity: 0.7}}
                         >
@@ -172,15 +192,21 @@ export default function FeaturedChef() {
                 </Pressable>
             </View>
             
-            <ScrollView 
-                horizontal 
+            <ScrollView
+                horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContainer}
+                decelerationRate="fast"
+                snapToInterval={wp(280) + SPACING.itemGap}
+                snapToAlignment="start"
             >
                 {quickItems.length > 0 ? (
                     quickItems.map((item) => renderQuickCard(item))
                 ) : (
-                    <Text style={{ color: theme.textTertiary, marginLeft: wp(20) }}>No recent chef reviews</Text>
+                    <View style={[styles.emptySpotlight, { backgroundColor: theme.cardBackground }]}>
+                        <Ionicons name="ribbon-outline" size={fp(32)} color={theme.textTertiary} />
+                        <Text style={[styles.emptySpotlightText, { color: theme.textTertiary }]}>No chef reviews yet</Text>
+                    </View>
                 )}
                 
                 <Pressable 
@@ -190,9 +216,9 @@ export default function FeaturedChef() {
                     ]}
                     onPress={() => navigation.navigate('AllChefReviews')}
                 >
-                    <View style={styles.glassBackground}>
+                    <View style={[styles.glassBackground, { backgroundColor: theme.primary }]}>
                         <View style={styles.moreCardContent}>
-                            <Text style={styles.moreCardText}>More</Text>
+                            <Text style={[styles.moreCardText, { color: theme.textInverse }]}>More</Text>
                         </View>
                     </View>
                 </Pressable>
@@ -293,7 +319,6 @@ const styles = StyleSheet.create({
     },
     reviewCard: {
         width: wp(280),
-        backgroundColor: '#FFFFFF',
         borderRadius: wp(16),
         overflow: 'hidden',
         shadowColor: '#000',
@@ -308,16 +333,19 @@ const styles = StyleSheet.create({
         transform: [{ scale: 0.98 }],
     },
     cardHeader: {
-        backgroundColor: '#F9FAFB',
         padding: wp(16),
         flexDirection: 'row',
         alignItems: 'center',
         gap: wp(12),
+        overflow: 'hidden',
+    },
+    cardHeaderBg: {
+        ...StyleSheet.absoluteFillObject,
+        resizeMode: 'cover',
     },
     chefAvatar: {
         width: wp(48),
         height: wp(48),
-        backgroundColor: '#3B82F6',
         borderRadius: wp(24),
         justifyContent: 'center',
         alignItems: 'center',
@@ -330,7 +358,6 @@ const styles = StyleSheet.create({
     chefInitial: {
         fontSize: fp(18),
         fontWeight: '700',
-        color: '#FFFFFF',
     },
     headerInfo: {
         flex: 1,
@@ -338,28 +365,23 @@ const styles = StyleSheet.create({
     reviewTitle: {
         fontSize: fp(14),
         fontWeight: '700',
-        color: '#111827',
     },
     reactionTarget: {
         fontSize: fp(11),
-        color: '#9CA3AF',
         marginTop: hp(2),
     },
     divider: {
         height: 1,
-        backgroundColor: '#E5E7EB',
         marginHorizontal: wp(16),
     },
     reviewContent: {
         padding: wp(12),
-        backgroundColor: '#FFFFFF',
         height: hp(100),
         justifyContent: 'space-between',
     },
     reviewText: {
         fontSize: fp(14),
         fontWeight: '500',
-        color: '#374151',
         lineHeight: hp(20),
     },
     cardFooter: {
@@ -369,7 +391,18 @@ const styles = StyleSheet.create({
     },
     reviewChef: {
         fontSize: fp(13),
-        color: '#6B7280',
+        fontWeight: '500',
+    },
+    emptySpotlight: {
+        width: wp(280),
+        borderRadius: wp(16),
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: hp(32),
+        gap: hp(8),
+    },
+    emptySpotlightText: {
+        fontSize: fp(13),
         fontWeight: '500',
     },
     moreCard: {
@@ -384,9 +417,6 @@ const styles = StyleSheet.create({
         transform: [{ scale: 0.96 }],
     },
     glassBackground: {
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        borderWidth: 1,
-        borderColor: 'rgba(59, 130, 246, 0.3)',
         borderRadius: wp(25),
     },
     moreCardContent: {
@@ -399,7 +429,6 @@ const styles = StyleSheet.create({
     moreCardText: {
         fontSize: fp(14),
         fontWeight: '600',
-        color: '#3B82F6',
         letterSpacing: 0.3,
     },
 });

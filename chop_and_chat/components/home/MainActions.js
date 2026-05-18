@@ -557,7 +557,7 @@ const styles = StyleSheet.create({
     actionBox: {
         flex: 1,
         padding: wp(20),
-        borderRadius: wp(24),
+        borderRadius: wp(20),
         shadowColor: '#000',
         shadowOffset: { width: 0, height: hp(4) },
         shadowOpacity: 0.1,
@@ -565,8 +565,8 @@ const styles = StyleSheet.create({
         elevation: 4,
     },
     actionBoxPressed: {
-        opacity: 0.9,
-        transform: [{ scale: 0.98 }],
+        opacity: 0.88,
+        transform: [{ scale: 0.96 }],
     },
     iconContainer: {
         width: wp(48),

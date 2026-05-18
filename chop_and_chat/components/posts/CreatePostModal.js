@@ -105,8 +105,8 @@ export default function CreatePostModal({ visible, onClose, onBack, imageUri, on
             onPress={handleSubmit}
             style={({ pressed }) => [
                 styles.submitButton,
-                { backgroundColor: isValid ? theme.primary : theme.border },
-                pressed && { opacity: 0.7 },
+                { backgroundColor: isValid ? theme.primaryDark : theme.border },
+                pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] },
             ]}
             disabled={!isValid}
         >
@@ -120,7 +120,8 @@ export default function CreatePostModal({ visible, onClose, onBack, imageUri, on
         <BottomSheetModal
             visible={visible}
             onClose={handleClose}
-            title="Create Post"
+            title="Your Dish"
+            subtitle={destination === 'chef' ? 'Step 1 of 2' : undefined}
             leftIcon={onBack ? 'arrow-back' : 'close'}
             onLeftPress={onBack ? handleBackPress : handleClose}
             rightComponent={rightComponent}

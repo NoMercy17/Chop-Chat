@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useContext } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { getCloudinaryUrl } from '../utils/cloudinaryUrl';
 import { wp, hp, fp } from '../utils/responsive';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,7 +24,7 @@ function relativeTime(date) {
     const m = Math.floor(s / 60);
     if (m < 60) return `${m}m ago`;
     const h = Math.floor(m / 60);
-    if (h < 24) return `${h}h ago`;
+    if (h < 24) return `${h}h ago`; 
     return `${Math.floor(h / 24)}d ago`;
 }
 
@@ -124,7 +125,20 @@ export default function AllChefReviews({ navigation }) {
 
         return (
             <View key={item.id} style={[styles.feedCard, { backgroundColor: theme.chefCardBackground }]}>
-                <View style={[styles.cardHeader, { borderBottomColor: theme.border }]}>
+                <View style={[styles.cardHeader, { borderBottomColor: item.chef.photo ? 'transparent' : theme.border }]}>
+                    {item.chef.photo && (
+                        <Image
+                            source={{ uri: getCloudinaryUrl(item.chef.photo, { width: 800, height: 160, crop: 'fill', gravity: 'face' }) }}
+                            style={styles.cardHeaderBg}
+                            blurRadius={8}
+                        />
+                    )}
+                    {item.chef.photo && (
+                        <LinearGradient
+                            colors={['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.65)']}
+                            style={StyleSheet.absoluteFill}
+                        />
+                    )}
                     <Pressable
                         style={styles.headerLeft}
                         onPress={() => navigateToProfile(navigation, item.chef.id, item.chef.name, user?.id)}
@@ -136,12 +150,12 @@ export default function AllChefReviews({ navigation }) {
                                     style={styles.chefAvatarImg}
                                 />
                             ) : (
-                                <Text style={styles.chefInitial}>{item.chef.avatar}</Text>
+                                <Text style={[styles.chefInitial, { color: theme.textInverse }]}>{item.chef.avatar}</Text>
                             )}
                         </View>
                         <View>
-                            <Text style={[styles.chefName, { color: theme.textPrimary }]}>{item.chef.name}</Text>
-                            <Text style={[styles.timestamp, { color: theme.textSecondary }]}>{relativeTime(item.createdAt)}</Text>
+                            <Text style={[styles.chefName, { color: item.chef.photo ? theme.textInverse : theme.textPrimary }]}>{item.chef.name}</Text>
+                            <Text style={[styles.timestamp, { color: item.chef.photo ? 'rgba(255,255,255,0.75)' : theme.textSecondary }]}>{relativeTime(item.createdAt)}</Text>
                         </View>
                     </Pressable>
                 </View>
@@ -198,9 +212,9 @@ export default function AllChefReviews({ navigation }) {
             <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.content}>
                 {filteredItems.length > 0 ? filteredItems.map(renderFeedCard) : (
                     <View style={styles.emptyState}>
-                        <Ionicons name="people-outline" size={fp(48)} color="#9CA3AF" />
-                        <Text style={styles.emptyStateTitle}>No posts from followed chefs</Text>
-                        <Text style={styles.emptyStateSubtitle}>Follow some chefs to see their content here!</Text>
+                        <Ionicons name="people-outline" size={fp(48)} color={theme.textTertiary} />
+                        <Text style={[styles.emptyStateTitle, { color: theme.textPrimary }]}>No posts from followed chefs</Text>
+                        <Text style={[styles.emptyStateSubtitle, { color: theme.textSecondary }]}>Follow some chefs to see their content here!</Text>
                     </View>
                 )}
             </ScrollView>
@@ -234,12 +248,13 @@ const styles = StyleSheet.create({
     container: { flex: 1 },
     scrollContainer: { flex: 1 },
     content: { padding: wp(16), paddingBottom: hp(40) },
-    feedCard: { borderRadius: wp(16), marginBottom: hp(20), overflow: 'hidden', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
-    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: wp(12), borderBottomWidth: 1 },
+    feedCard: { borderRadius: wp(16), marginBottom: hp(20), overflow: 'hidden', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: hp(2) }, shadowOpacity: 0.1, shadowRadius: wp(4) },
+    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: wp(12), borderBottomWidth: 1, overflow: 'hidden' },
+    cardHeaderBg: { ...StyleSheet.absoluteFillObject, resizeMode: 'cover' },
     headerLeft: { flexDirection: 'row', alignItems: 'center', gap: wp(10) },
-    chefAvatar: { width: wp(40), height: wp(40), borderRadius: wp(20), justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+    chefAvatar: { width: wp(44), height: wp(44), borderRadius: wp(22), justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
     chefAvatarImg: { width: '100%', height: '100%' },
-    chefInitial: { color: '#FFF', fontSize: fp(18), fontWeight: '700' },
+    chefInitial: { fontSize: fp(18), fontWeight: '700' },
     chefName: { fontSize: fp(16), fontWeight: '700' },
     timestamp: { fontSize: fp(12) },
     cardContent: { padding: wp(16) },
@@ -248,13 +263,13 @@ const styles = StyleSheet.create({
     targetAuthor: { fontSize: fp(13), fontWeight: '600' },
     titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: hp(8) },
     contentTitle: { fontSize: fp(18), fontWeight: '700', flex: 1 },
-    contentText: { fontSize: fp(14), lineHeight: fp(20) },
+    contentText: { fontSize: fp(14), lineHeight: hp(20) },
     engagementBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: wp(12), borderTopWidth: 1 },
     leftStats: { flexDirection: 'row', gap: wp(16) },
     statButton: { flexDirection: 'row', alignItems: 'center', gap: wp(4) },
     statText: { fontSize: fp(14), fontWeight: '600' },
     saveButton: { padding: wp(4) },
-    emptyState: { alignItems: 'center', justifyContent: 'center', marginTop: hp(100), paddingHorizontal: wp(40) },
-    emptyStateTitle: { fontSize: fp(18), fontWeight: '700', color: '#4B5563', marginTop: hp(16) },
-    emptyStateSubtitle: { fontSize: fp(14), color: '#6B7280', textAlign: 'center', marginTop: hp(8) }
+    emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: hp(100), paddingHorizontal: wp(40) },
+    emptyStateTitle: { fontSize: fp(18), fontWeight: '700', marginTop: hp(16) },
+    emptyStateSubtitle: { fontSize: fp(14), textAlign: 'center', marginTop: hp(8) }
 });

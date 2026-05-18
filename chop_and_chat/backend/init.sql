@@ -10,6 +10,9 @@ CREATE TABLE IF NOT EXISTS users (
   role TEXT DEFAULT 'user' CHECK (role IN ('user', 'chef')),
   profile_photo TEXT,
   bio TEXT,
+  email_verified BOOLEAN DEFAULT FALSE,
+  verification_token VARCHAR(64),
+  verification_token_expires_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -17,6 +20,12 @@ CREATE TABLE IF NOT EXISTS users (
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user' CHECK (role IN ('user', 'chef'));
 ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_photo TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT;
+-- Email verification columns (link-based flow)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token VARCHAR(64);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_expires_at TIMESTAMPTZ;
+-- Backfill: existing users signed up via OTP — treat them as already verified
+UPDATE users SET email_verified = TRUE WHERE email_verified = FALSE AND verification_token IS NULL;
 
 
 -- Stores user-created recipe posts
@@ -282,3 +291,38 @@ LEFT JOIN posts p ON u.id = p.user_id
 LEFT JOIN follows f1 ON u.id = f1.following_id
 LEFT JOIN follows f2 ON u.id = f2.follower_id
 GROUP BY u.id;
+
+
+-- Per-user opt-out preferences for in-app notifications.
+-- Absence of a row means fully enabled (opt-out model — preserves existing behavior).
+-- type is restricted to the three user-configurable categories; chef_review_request
+-- and chef_review_received are always sent and cannot be muted here.
+-- threshold controls batching: notify only when the event count is divisible by threshold
+-- (e.g. threshold=5 → notify on 5th, 10th, 15th like).
+CREATE TABLE IF NOT EXISTS notification_preferences (
+  user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type      TEXT    NOT NULL CHECK (type IN ('new_follower', 'post_likes', 'comment_on_post')),
+  enabled   BOOLEAN NOT NULL DEFAULT true,
+  threshold INTEGER NOT NULL DEFAULT 1   CHECK (threshold IN (1, 5, 10)),
+  PRIMARY KEY (user_id, type)
+);
+
+-- Nullable FK columns so notifications are auto-deleted when the referenced post or
+-- chef reaction is removed (fixes ghost notifications after content deletion).
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS ref_post_id          INTEGER REFERENCES posts(id)          ON DELETE CASCADE;
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS ref_chef_reaction_id INTEGER REFERENCES chef_reactions(id) ON DELETE CASCADE;
+
+-- Temporary staging area for sign-up OTP verification.
+-- Holds form data until the user confirms their code. Records are deleted on
+-- successful verification or after expiry — the user does not exist until then.
+CREATE TABLE IF NOT EXISTS pending_verifications (
+  id         SERIAL PRIMARY KEY,
+  email      TEXT NOT NULL UNIQUE,
+  name       TEXT NOT NULL,
+  password   TEXT NOT NULL,
+  role       TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'chef')),
+  code       CHAR(6) NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  attempts   INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);

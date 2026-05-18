@@ -112,30 +112,39 @@ export default function AllCommunityPosts({ navigation }) {
                     
                     <View style={[styles.postContent, { backgroundColor: theme.postContentBackground }]}>
                         <Text style={[styles.postTitle, { color: theme.textPrimary }]}>{post.title}</Text>
-                        <Text style={[styles.postDescription, { color: theme.textPrimary }]}>{post.description}</Text>
+                        <Text style={[styles.postDescription, { color: theme.textSecondary }]}>{post.description}</Text>
                         
-                        <View style={[styles.postMeta, { backgroundColor: theme.postMetaBackground }]}>
+                        <View style={[styles.postMeta, { borderTopColor: theme.borderLight }]}>
                             <Pressable
                                 onPress={(e) => {
                                     e.stopPropagation();
-                                    navigateToProfile(navigation, post.authorId || post.id, post.author, user?.id);
+                                    navigateToProfile(navigation, post.authorId || post.id, post.author, user?.id, post.authorPhoto);
                                 }}
-                                style={({pressed}) => pressed && {opacity: 0.7}}
+                                style={({ pressed }) => [styles.authorRow, pressed && { opacity: 0.7 }]}
                             >
-                                <Text style={[styles.postAuthor, { color: theme.primary }]}>by {post.author}</Text>
+                                {post.authorPhoto ? (
+                                    <Image source={{ uri: post.authorPhoto }} style={styles.authorAvatar} />
+                                ) : (
+                                    <View style={[styles.authorAvatarPlaceholder, { backgroundColor: theme.primary }]}>
+                                        <Text style={[styles.authorInitial, { color: theme.textInverse }]}>
+                                            {post.author ? post.author[0].toUpperCase() : '?'}
+                                        </Text>
+                                    </View>
+                                )}
+                                <Text style={[styles.postAuthor, { color: theme.primary }]}>{post.author}</Text>
                             </Pressable>
                                 <View style={styles.postStats}>
-                                    <Pressable style={styles.statButton} onPress={() => handleLike(post.id)}>
+                                    <Pressable style={({ pressed }) => [styles.statButton, pressed && styles.statButtonPressed]} onPress={() => handleLike(post.id)}>
                                         <Ionicons name={post.liked ? "heart" : "heart-outline"} size={fp(16)} color={post.liked ? theme.likeColor : theme.textSecondary} />
                                         <Text style={[styles.statText, { color: theme.textSecondary }, post.liked && { color: theme.likeColor }]}>{post.likes}</Text>
                                     </Pressable>
-                        
-                                    <Pressable style={styles.statButton} onPress={() => handleComment(post)}>
+
+                                    <Pressable style={({ pressed }) => [styles.statButton, pressed && styles.statButtonPressed]} onPress={() => handleComment(post)}>
                                         <Ionicons name="chatbubble-outline" size={fp(15)} color={theme.textSecondary} />
                                         <Text style={[styles.statText, { color: theme.textSecondary }]}>{post.comments}</Text>
                                     </Pressable>
-                                    
-                                    <Pressable style={styles.statButton} onPress={() => handleSave(post.id)}>
+
+                                    <Pressable style={({ pressed }) => [styles.statButton, pressed && styles.statButtonPressed]} onPress={() => handleSave(post.id)}>
                                         <Ionicons name={post.saved ? "bookmark" : "bookmark-outline"} size={fp(16)} color={post.saved ? theme.saveColor : theme.textSecondary} />
                                     </Pressable>
                                 </View>
@@ -180,20 +189,25 @@ const styles = StyleSheet.create({
     container: { flex: 1 },
     scrollContainer: { flex: 1 },
     content: { padding: wp(16), paddingBottom: hp(40) },
-    postCard: { borderRadius: wp(16), marginBottom: hp(20), overflow: 'hidden', elevation: 3 },
-    postCardPressed: { opacity: 0.95 },
+    postCard: { borderRadius: wp(16), marginBottom: hp(20), overflow: 'hidden', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: hp(2) }, shadowOpacity: 0.08, shadowRadius: wp(12) },
+    postCardPressed: { opacity: 0.92, transform: [{ scale: 0.98 }] },
     postImage: { width: '100%', height: hp(200), resizeMode: 'cover' },
     imageplaceholder: { width: '100%', height: hp(200), justifyContent: 'center', alignItems: 'center' },
     imagePlaceholderText: { fontWeight: '700', fontSize: fp(14) },
     postContent: { padding: wp(16) },
     postTitle: { fontSize: fp(18), fontWeight: '700', marginBottom: hp(4) },
     postDescription: { fontSize: fp(14), marginBottom: hp(12), lineHeight: fp(20) },
-    postMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: wp(10), borderRadius: wp(12) },
+    postMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: hp(8), paddingTop: hp(8), borderTopWidth: 1 },
+    authorRow: { flexDirection: 'row', alignItems: 'center', gap: wp(6) },
+    authorAvatar: { width: wp(24), height: wp(24), borderRadius: wp(12) },
+    authorAvatarPlaceholder: { width: wp(24), height: wp(24), borderRadius: wp(12), justifyContent: 'center', alignItems: 'center' },
+    authorInitial: { fontSize: fp(11), fontWeight: '700' },
     postAuthor: { fontSize: fp(14), fontWeight: '600' },
     postStats: { flexDirection: 'row', gap: wp(12) },
     statButton: { flexDirection: 'row', alignItems: 'center', gap: wp(4) },
+    statButtonPressed: { opacity: 0.6, transform: [{ scale: 0.85 }] },
     statText: { fontSize: fp(13), fontWeight: '600' },
-    emptyState: { alignItems: 'center', justifyContent: 'center', marginTop: hp(100), paddingHorizontal: wp(40) },
+    emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: hp(100), paddingHorizontal: wp(40) },
     emptyStateTitle: { fontSize: fp(18), fontWeight: '700', marginTop: hp(16) },
     emptyStateSubtitle: { fontSize: fp(14), textAlign: 'center', marginTop: hp(8) }
 });
