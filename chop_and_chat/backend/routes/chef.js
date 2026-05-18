@@ -14,6 +14,7 @@ const feedLimiter          = rateLimit({ windowMs: 15 * 60 * 1000, max: 120, sta
 const commentsReadLimiter  = rateLimit({ windowMs: 15 * 60 * 1000, max: 180, standardHeaders: true, legacyHeaders: false });
 const commentsWriteLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 60,  standardHeaders: true, legacyHeaders: false, message: { error: 'too_many_requests', message: 'You\'re posting too many comments. Please slow down.' } });
 const commentsBurstLimiter = rateLimit({ windowMs: 2000,            max: 1,   standardHeaders: true, legacyHeaders: false, message: { error: 'too_many_requests', message: 'Please wait a moment before posting another comment.' } });
+const balanceLimiter       = rateLimit({ windowMs: 15 * 60 * 1000, max: 60,  standardHeaders: true, legacyHeaders: false });
 
 // Pre-payment image validation — called before the payment sheet opens so the user
 // is never charged for a non-food photo. Deletes the Cloudinary image if invalid.
@@ -568,7 +569,7 @@ router.post('/:id/comments', commentsBurstLimiter, commentsWriteLimiter, authent
 });
 
 // GET /chef/balance — returns the authenticated chef's current earnings balance
-router.get('/balance', authenticateToken, requireChef, async (req, res) => {
+router.get('/balance', balanceLimiter, authenticateToken, requireChef, async (req, res) => {
   try {
     const { rows } = await pool.query(
       'SELECT earnings_balance FROM users WHERE id = $1',

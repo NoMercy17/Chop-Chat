@@ -3,11 +3,28 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const rateLimit = require('express-rate-limit');
 const pool = require('../db');
 const { JWT_SECRET } = require('../middleware');
 const { sendVerificationLinkEmail } = require('../services/emailService');
 
 const BACKEND_URL = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 4000}`;
+
+const verifyEmailLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many verification attempts from this IP, please try again later.',
+});
+
+const resendVerificationLimiter = rateLimit({
+  windowMs: 2 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please try again shortly.' },
+});
 
 // POST /register
 // Creates user with email_verified=false, sends a verification link. No JWT issued yet.
@@ -66,7 +83,7 @@ router.post('/register', async (req, res) => {
 
 // GET /verify-email?token=<token>
 // Opened in browser — validates the token and returns an HTML response.
-router.get('/verify-email', async (req, res) => {
+router.get('/verify-email', verifyEmailLimiter, async (req, res) => {
   try {
     const { token } = req.query;
     if (!token) {
@@ -153,7 +170,7 @@ router.post('/login', async (req, res) => {
 
 // POST /resend-verification
 // Generates a new verification link. Rate-limited: one resend per 2 minutes.
-router.post('/resend-verification', async (req, res) => {
+router.post('/resend-verification', resendVerificationLimiter, async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) {
