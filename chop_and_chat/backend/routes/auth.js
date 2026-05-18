@@ -111,7 +111,7 @@ router.post('/login', async (req, res) => {
 
     const lower = email.toLowerCase();
     const { rows } = await pool.query(
-      'SELECT id, email, password, name, role, profile_photo, email_verified FROM users WHERE email = $1',
+      'SELECT id, email, password, name, role, profile_photo, email_verified, earnings_balance FROM users WHERE email = $1',
       [lower]
     );
     const user = rows[0];
@@ -142,6 +142,7 @@ router.post('/login', async (req, res) => {
         role: user.role,
         profile_photo: user.profile_photo,
         email_verified: true,
+        ...(user.role === 'chef' && { earnings_balance: parseFloat(user.earnings_balance || 0) }),
       },
     });
   } catch (err) {

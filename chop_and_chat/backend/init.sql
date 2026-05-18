@@ -26,6 +26,8 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token VARCHAR(64);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_expires_at TIMESTAMPTZ;
 -- Backfill: existing users signed up via OTP — treat them as already verified
 UPDATE users SET email_verified = TRUE WHERE email_verified = FALSE AND verification_token IS NULL;
+-- Chef earnings balance (accumulated from completed reviews, paid out via withdrawal)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS earnings_balance DECIMAL(10,2) DEFAULT 0.00;
 
 
 -- Stores user-created recipe posts
@@ -325,4 +327,12 @@ CREATE TABLE IF NOT EXISTS pending_verifications (
   expires_at TIMESTAMPTZ NOT NULL,
   attempts   INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now()
+);
+-- Chef withdrawal records — one row per successful payout to a chef
+CREATE TABLE IF NOT EXISTS chef_withdrawals (
+  id                SERIAL PRIMARY KEY,
+  chef_id           INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount            DECIMAL(10,2) NOT NULL,
+  stripe_transfer_id TEXT,
+  created_at        TIMESTAMPTZ DEFAULT NOW()
 );

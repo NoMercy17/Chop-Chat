@@ -73,6 +73,7 @@ export default function ChefQuizModal({ visible, onPass, onClose, theme }) {
       sheetSlide.setValue(hp(60));
       sheetFade.setValue(0);
       Animated.parallel([
+
         
         Animated.timing(sheetSlide, {
           toValue: 0,

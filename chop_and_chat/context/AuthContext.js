@@ -18,10 +18,12 @@ export function AuthProvider({ children }) {
    */
   const normalizeUser = (userData) => {
     if (!userData) return null;
+    const isChef = userData.isChef || userData.role === 'chef';
     return {
       ...userData,
-      isChef: userData.isChef || userData.role === 'chef',
+      isChef,
       email_verified: userData.email_verified ?? true,
+      ...(isChef && { earnings_balance: userData.earnings_balance ?? 0 }),
     };
   };
 

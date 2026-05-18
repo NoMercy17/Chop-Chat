@@ -19,6 +19,8 @@ import SettingsModal from "../components/profile/SettingsModal";
 import UserListModal from "../components/profile/UserListModal";
 import ProfileHeader from "../components/profile/ProfileHeader";
 import ProfileStats from "../components/profile/ProfileStats";
+import ChefEarningsCard from "../components/profile/ChefEarningsCard";
+import ChefWithdrawSheet from "../components/profile/ChefWithdrawSheet";
 
 export default function ProfileScreen({ navigation }) {
   const { user, token, signOut } = useContext(AuthContext);
@@ -45,6 +47,9 @@ export default function ProfileScreen({ navigation }) {
   });
   const [isUploading, setIsUploading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [balance, setBalance] = useState(0);
+  const [balanceLoading, setBalanceLoading] = useState(false);
+  const [withdrawSheetVisible, setWithdrawSheetVisible] = useState(false);
 
   // Load profile data
   const loadUserProfile = useCallback(async () => {
@@ -83,6 +88,32 @@ export default function ProfileScreen({ navigation }) {
     }
   }, [user?.id, token]);
 
+  const loadBalance = useCallback(async () => {
+    if (!user?.isChef || !token) return;
+    setBalanceLoading(true);
+    try {
+      const data = await api.get('/chef/balance', token);
+      setBalance(data.balance);
+    } catch (error) {
+      console.error('[ProfileScreen] loadBalance:', error.message);
+    } finally {
+      setBalanceLoading(false);
+    }
+  }, [user?.isChef, token]);
+
+  const handleWithdraw = useCallback(async (amount) => {
+    const prevBalance = balance;
+    setBalance(prev => Math.max(0, parseFloat((prev - amount).toFixed(2))));
+    try {
+      const data = await api.post('/chef/withdraw', { amount }, token);
+      setBalance(data.new_balance);
+      return { success: true };
+    } catch (error) {
+      setBalance(prevBalance);
+      return { success: false, message: error.data?.message || error.message };
+    }
+  }, [balance, token]);
+
   // Pull the real follower count for the signed-in user; new accounts come back as 0.
   const loadFollowerStats = useCallback(async () => {
     if (!user?.id) return;
@@ -93,12 +124,12 @@ export default function ProfileScreen({ navigation }) {
 
   const onRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    await Promise.all([loadUserProfile(), loadFollowerStats()]);
+    await Promise.all([loadUserProfile(), loadFollowerStats(), loadBalance()]);
     setIsRefreshing(false);
-  }, [loadUserProfile, loadFollowerStats]);
+  }, [loadUserProfile, loadFollowerStats, loadBalance]);
 
-  useEffect(() => { loadUserProfile(); loadFollowerStats(); }, [loadUserProfile, loadFollowerStats]);
-  useFocusEffect(useCallback(() => { loadUserProfile(); loadFollowerStats(); }, [loadUserProfile, loadFollowerStats]));
+  useEffect(() => { loadUserProfile(); loadFollowerStats(); loadBalance(); }, [loadUserProfile, loadFollowerStats, loadBalance]);
+  useFocusEffect(useCallback(() => { loadUserProfile(); loadFollowerStats(); loadBalance(); }, [loadUserProfile, loadFollowerStats, loadBalance]));
 
   // Photo Handlers
   const handleAccessGallery = async () => {
@@ -180,6 +211,15 @@ export default function ProfileScreen({ navigation }) {
         onFollowingPress={() => openUserList('following')}
       />
 
+      {user?.isChef && (
+        <ChefEarningsCard
+          balance={balance}
+          loading={balanceLoading}
+          onWithdraw={() => setWithdrawSheetVisible(true)}
+          theme={theme}
+        />
+      )}
+
       {/* Primary navigation tiles — content areas get visual weight, settings stays quiet */}
       <View style={styles.navRow}>
         <Pressable
@@ -224,6 +264,16 @@ export default function ProfileScreen({ navigation }) {
         toggleTheme={toggleTheme}
         onSignOut={signOut}
       />
+
+      {user?.isChef && (
+        <ChefWithdrawSheet
+          visible={withdrawSheetVisible}
+          balance={balance}
+          onClose={() => setWithdrawSheetVisible(false)}
+          onWithdraw={handleWithdraw}
+          theme={theme}
+        />
+      )}
 
       <UserListModal
         visible={userListVisible}

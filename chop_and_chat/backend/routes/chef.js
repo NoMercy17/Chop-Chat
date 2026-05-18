@@ -381,10 +381,16 @@ router.post('/reviews', authenticateToken, requireChef, async (req, res) => {
     }
 
     if (request_id) {
-      await pool.query(
-        "UPDATE chef_review_requests SET status = 'completed', updated_at = now() WHERE id = $1 AND claimed_by = $2 AND post_id = $3",
+      const { rowCount } = await pool.query(
+        "UPDATE chef_review_requests SET status = 'completed', updated_at = now() WHERE id = $1 AND claimed_by = $2 AND post_id = $3 AND status != 'completed'",
         [request_id, chef_id, post_id]
       );
+      if (rowCount > 0) {
+        await pool.query(
+          'UPDATE users SET earnings_balance = earnings_balance + 0.10 WHERE id = $1',
+          [chef_id]
+        );
+      }
     }
 
     const postAuthorQuery = await pool.query('SELECT user_id, title FROM posts WHERE id = $1', [post_id]);
@@ -558,6 +564,91 @@ router.post('/:id/comments', commentsBurstLimiter, commentsWriteLimiter, authent
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'server error' });
+  }
+});
+
+// GET /chef/balance — returns the authenticated chef's current earnings balance
+router.get('/balance', authenticateToken, requireChef, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT earnings_balance FROM users WHERE id = $1',
+      [req.user.id]
+    );
+    res.json({ balance: parseFloat(rows[0].earnings_balance || 0) });
+  } catch (err) {
+    console.error('[GET /chef/balance]', err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+const withdrawLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 5, standardHeaders: true, legacyHeaders: false });
+
+// POST /chef/withdraw — withdraw available earnings via Stripe payout
+router.post('/withdraw', withdrawLimiter, authenticateToken, requireChef, async (req, res) => {
+  const withdrawAmount = parseFloat(req.body.amount);
+  if (isNaN(withdrawAmount) || withdrawAmount < 1.00) {
+    return res.status(400).json({ error: 'INSUFFICIENT_AMOUNT', message: 'Minimum withdrawal is $1.00.' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows } = await client.query(
+      'SELECT earnings_balance FROM users WHERE id = $1 FOR UPDATE',
+      [req.user.id]
+    );
+    const currentBalance = parseFloat(rows[0].earnings_balance || 0);
+
+    if (currentBalance < 1.00) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'INSUFFICIENT_BALANCE', message: 'Minimum withdrawal is $1.00.' });
+    }
+    if (withdrawAmount > currentBalance) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'INSUFFICIENT_BALANCE', message: 'Withdrawal amount exceeds available balance.' });
+    }
+
+    // Process payout via Stripe (test mode). Requires a bank account configured
+    // on the Stripe test account dashboard to complete successfully.
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    let stripeTransferId = null;
+    try {
+      const payout = await stripe.payouts.create({
+        amount: Math.round(withdrawAmount * 100),
+        currency: 'usd',
+        metadata: {
+          chef_id: req.user.id.toString(),
+          type: 'chef_earnings_withdrawal',
+        },
+      });
+      stripeTransferId = payout.id;
+    } catch (stripeErr) {
+      await client.query('ROLLBACK');
+      console.error('[POST /chef/withdraw] Stripe error:', stripeErr.message);
+      return res.status(502).json({ error: 'STRIPE_ERROR', message: 'Payout could not be processed. Please try again.' });
+    }
+
+    const newBalance = parseFloat(
+      (await client.query(
+        'UPDATE users SET earnings_balance = GREATEST(0, earnings_balance - $1) WHERE id = $2 RETURNING earnings_balance',
+        [withdrawAmount, req.user.id]
+      )).rows[0].earnings_balance
+    );
+
+    await client.query(
+      'INSERT INTO chef_withdrawals (chef_id, amount, stripe_transfer_id) VALUES ($1, $2, $3)',
+      [req.user.id, withdrawAmount, stripeTransferId]
+    );
+
+    await client.query('COMMIT');
+    res.json({ message: 'Withdrawal successful.', new_balance: newBalance });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[POST /chef/withdraw]', err);
+    res.status(500).json({ error: 'server error', message: 'Withdrawal failed. Please try again.' });
+  } finally {
+    client.release();
   }
 });
 
