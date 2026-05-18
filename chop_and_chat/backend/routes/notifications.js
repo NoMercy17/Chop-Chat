@@ -12,7 +12,7 @@ const notificationsLimiter = rateLimit({
 });
 
 // Get all notifications for current user
-router.get('/', authenticateToken, notificationsLimiter, async (req, res) => {
+router.get('/', notificationsLimiter, authenticateToken, async (req, res) => {
   try {
     const query = `
       SELECT
@@ -58,7 +58,7 @@ const PREF_TYPES = ['new_follower', 'post_likes', 'comment_on_post'];
 
 // Get notification preferences for the current user
 // Must be declared before /:id routes so Express doesn't match "preferences" as an id
-router.get('/preferences', authenticateToken, notificationsLimiter, async (req, res) => {
+router.get('/preferences', notificationsLimiter, authenticateToken, async (req, res) => {
   try {
     const { rows } = await pool.query(
       'SELECT type, enabled, threshold FROM notification_preferences WHERE user_id = $1',
@@ -78,7 +78,7 @@ router.get('/preferences', authenticateToken, notificationsLimiter, async (req, 
 
 // Upsert a single notification preference
 // Must be declared before /:id routes so Express doesn't match "preferences" as an id
-router.patch('/preferences', authenticateToken, notificationsLimiter, async (req, res) => {
+router.patch('/preferences', notificationsLimiter, authenticateToken, async (req, res) => {
   try {
     const { type, enabled, threshold } = req.body;
     if (!PREF_TYPES.includes(type)) {
@@ -105,7 +105,7 @@ router.patch('/preferences', authenticateToken, notificationsLimiter, async (req
 });
 
 // Mark notification as read
-router.patch('/:id/read', authenticateToken, notificationsLimiter, async (req, res) => {
+router.patch('/:id/read', notificationsLimiter, authenticateToken, async (req, res) => {
   const notifId = parseInt(req.params.id, 10);
   if (Number.isNaN(notifId)) return res.status(400).json({ error: 'invalid notification id' });
   try {
@@ -122,7 +122,7 @@ router.patch('/:id/read', authenticateToken, notificationsLimiter, async (req, r
 });
 
 // Delete a notification
-router.delete('/:id', authenticateToken, notificationsLimiter, async (req, res) => {
+router.delete('/:id', notificationsLimiter, authenticateToken, async (req, res) => {
   const notifId = parseInt(req.params.id, 10);
   if (Number.isNaN(notifId)) return res.status(400).json({ error: 'invalid notification id' });
   try {
