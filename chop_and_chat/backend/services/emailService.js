@@ -14,7 +14,18 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function buildVerificationLinkEmailHTML({ name, verificationUrl }) {
+  const safeName = escapeHtml(name);
+  const safeUrl = escapeHtml(verificationUrl);
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -44,14 +55,14 @@ function buildVerificationLinkEmailHTML({ name, verificationUrl }) {
               </p>
               <h1 style="margin:0 0 16px;font-size:26px;color:#1C1C1C;
                           font-weight:700;line-height:1.2;">
-                You're almost in, ${name}.
+                You're almost in, ${safeName}.
               </h1>
               <p style="margin:0 0 36px;font-size:16px;color:#6B6052;line-height:1.6;">
                 Click the button below to verify your email and start sharing
                 your recipes with the world.
               </p>
               <div style="text-align:center;margin-bottom:36px;">
-                <a href="${verificationUrl}"
+                <a href="${safeUrl}"
                    style="display:inline-block;background:#1C1C1C;color:#F5C97A;
                           font-size:16px;font-weight:700;letter-spacing:0.5px;
                           padding:16px 40px;border-radius:12px;text-decoration:none;">
@@ -63,7 +74,7 @@ function buildVerificationLinkEmailHTML({ name, verificationUrl }) {
               </p>
               <p style="margin:0;font-size:13px;color:#9E8E7A;line-height:1.6;">
                 Button not working? Copy and paste this link into your browser:<br>
-                <span style="color:#6B6052;word-break:break-all;">${verificationUrl}</span>
+                <span style="color:#6B6052;word-break:break-all;">${safeUrl}</span>
               </p>
             </td>
           </tr>

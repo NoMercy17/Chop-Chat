@@ -2,9 +2,17 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const { authenticateToken } = require('../middleware');
+const rateLimit = require('express-rate-limit');
+
+const notificationsLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Get all notifications for current user
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, notificationsLimiter, async (req, res) => {
   try {
     const query = `
       SELECT
@@ -50,7 +58,7 @@ const PREF_TYPES = ['new_follower', 'post_likes', 'comment_on_post'];
 
 // Get notification preferences for the current user
 // Must be declared before /:id routes so Express doesn't match "preferences" as an id
-router.get('/preferences', authenticateToken, async (req, res) => {
+router.get('/preferences', authenticateToken, notificationsLimiter, async (req, res) => {
   try {
     const { rows } = await pool.query(
       'SELECT type, enabled, threshold FROM notification_preferences WHERE user_id = $1',
@@ -70,7 +78,7 @@ router.get('/preferences', authenticateToken, async (req, res) => {
 
 // Upsert a single notification preference
 // Must be declared before /:id routes so Express doesn't match "preferences" as an id
-router.patch('/preferences', authenticateToken, async (req, res) => {
+router.patch('/preferences', authenticateToken, notificationsLimiter, async (req, res) => {
   try {
     const { type, enabled, threshold } = req.body;
     if (!PREF_TYPES.includes(type)) {
@@ -97,7 +105,7 @@ router.patch('/preferences', authenticateToken, async (req, res) => {
 });
 
 // Mark notification as read
-router.patch('/:id/read', authenticateToken, async (req, res) => {
+router.patch('/:id/read', authenticateToken, notificationsLimiter, async (req, res) => {
   const notifId = parseInt(req.params.id, 10);
   if (Number.isNaN(notifId)) return res.status(400).json({ error: 'invalid notification id' });
   try {
@@ -114,7 +122,7 @@ router.patch('/:id/read', authenticateToken, async (req, res) => {
 });
 
 // Delete a notification
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', authenticateToken, notificationsLimiter, async (req, res) => {
   const notifId = parseInt(req.params.id, 10);
   if (Number.isNaN(notifId)) return res.status(400).json({ error: 'invalid notification id' });
   try {

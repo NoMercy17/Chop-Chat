@@ -14,6 +14,7 @@ npm install
 cp .env.example .env
 echo " Frontend ready"
 
+
 # Backend setup
 echo " Setting up backend..."
 cd ../backend

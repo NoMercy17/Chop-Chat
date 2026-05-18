@@ -26,9 +26,17 @@ const resendVerificationLimiter = rateLimit({
   message: { error: 'Too many requests. Please try again shortly.' },
 });
 
+const registerLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many registration attempts from this IP. Please try again later.' },
+});
+
 // POST /register
 // Creates user with email_verified=false, sends a verification link. No JWT issued yet.
-router.post('/register', async (req, res) => {
+router.post('/register', registerLimiter, async (req, res) => {
   try {
     const { email, password, name, role } = req.body;
     if (!email || !password || !name) {
