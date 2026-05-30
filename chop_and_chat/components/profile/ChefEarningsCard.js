@@ -93,9 +93,10 @@ export default function ChefEarningsCard({ balance, loading, onWithdraw, onSetup
                 borderWidth: 1,
                 borderColor: canWithdraw ? theme.primary : theme.border,
               },
-              pressed && styles.withdrawButtonPressed,
+              pressed && canWithdraw && styles.withdrawButtonPressed,
             ]}
-            onPress={onWithdraw}
+            onPress={canWithdraw ? onWithdraw : undefined}
+            disabled={!canWithdraw}
           >
             <Text style={[styles.withdrawText, { color: canWithdraw ? theme.primary : theme.textTertiary }]}>
               Withdraw

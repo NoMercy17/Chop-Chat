@@ -15,7 +15,8 @@ const feedLimiter          = rateLimit({ windowMs: 15 * 60 * 1000, max: 120, sta
 const commentsReadLimiter  = rateLimit({ windowMs: 15 * 60 * 1000, max: 180, standardHeaders: true, legacyHeaders: false });
 const commentsWriteLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 60,  standardHeaders: true, legacyHeaders: false, message: { error: 'too_many_requests', message: 'You\'re posting too many comments. Please slow down.' } });
 const commentsBurstLimiter = rateLimit({ windowMs: 2000,            max: 1,   standardHeaders: true, legacyHeaders: false, message: { error: 'too_many_requests', message: 'Please wait a moment before posting another comment.' } });
-const balanceLimiter       = rateLimit({ windowMs: 15 * 60 * 1000, max: 60,  standardHeaders: true, legacyHeaders: false });
+const balanceLimiter           = rateLimit({ windowMs: 15 * 60 * 1000, max: 60,  standardHeaders: true, legacyHeaders: false });
+const stripeOnboardingLimiter  = rateLimit({ windowMs: 15 * 60 * 1000, max: 20,  standardHeaders: true, legacyHeaders: false });
 
 // Pre-payment image validation — called before the payment sheet opens so the user
 // is never charged for a non-food photo. Deletes the Cloudinary image if invalid.
@@ -630,7 +631,7 @@ router.get('/balance', balanceLimiter, authenticateToken, requireChef, async (re
 // Creates (or retrieves) a Stripe Connect Express account for the chef, then returns a
 // fresh onboarding link. Links are single-use and expire in ~5 minutes by Stripe design,
 // so they are always generated on demand — never cached.
-router.get('/stripe/onboard-link', authenticateToken, requireChef, async (req, res) => {
+router.get('/stripe/onboard-link', stripeOnboardingLimiter, authenticateToken, requireChef, async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT stripe_account_id FROM users WHERE id = $1', [req.user.id]);
     let accountId = rows[0].stripe_account_id;
@@ -662,7 +663,7 @@ router.get('/stripe/onboard-link', authenticateToken, requireChef, async (req, r
 // GET /chef/stripe/onboard-status
 // Returns whether the chef has completed Stripe Connect onboarding.
 // The frontend shows "Set up payouts" vs "Payouts enabled" based on this.
-router.get('/stripe/onboard-status', authenticateToken, requireChef, async (req, res) => {
+router.get('/stripe/onboard-status', stripeOnboardingLimiter, authenticateToken, requireChef, async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT stripe_account_id FROM users WHERE id = $1', [req.user.id]);
     const { stripe_account_id } = rows[0];
@@ -687,7 +688,7 @@ router.get('/stripe/onboard-status', authenticateToken, requireChef, async (req,
 // Stripe redirects here after the chef completes or abandons the onboarding flow.
 // The app uses deep-links for return UX; this endpoint is just the registered return_url.
 router.get('/stripe/onboard-return', (req, res) => {
-  res.json({ message: 'Onboarding complete. Return to the Chop & Chat app.' });
+  res.redirect('chopandchat://stripe-onboard-return');
 });
 
 const withdrawLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 5, standardHeaders: true, legacyHeaders: false });

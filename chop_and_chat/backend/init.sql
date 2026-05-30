@@ -340,7 +340,7 @@ CREATE TABLE IF NOT EXISTS chef_withdrawals (
 -- Stripe Connect account ID — set when the chef first starts onboarding
 ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_account_id TEXT;
 
--- Append-only ledger of chef earning events (one row per $0.10 review completion).
+-- Append-only ledger of chef earning events (one row per 0.50 RON review completion).
 -- earnings_balance on users is a write-through cache; this table is the source of truth.
 CREATE TABLE IF NOT EXISTS chef_earnings (
   id                     SERIAL PRIMARY KEY,

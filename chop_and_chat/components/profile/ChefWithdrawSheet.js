@@ -90,7 +90,7 @@ export default function ChefWithdrawSheet({ visible, balance, onClose, onWithdra
     onClose();
   }, [onClose, successOpacity, successScale, shakeAnim]);
 
-  const confirmLabel = canConfirm
+  const confirmLabel = numericAmount >= 1.00 && numericAmount <= (balance || 0)
     ? `Withdraw ${numericAmount.toFixed(2)} RON`
     : 'Confirm Withdrawal';
 
