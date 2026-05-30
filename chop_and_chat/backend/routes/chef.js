@@ -3,6 +3,7 @@ const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const pool = require('../db');
 const { authenticateToken, requireChef } = require('../middleware');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { validateFoodImage } = require('../services/gemini');
 const { moderateText } = require('../services/moderation');
 const cloudinary = require('../services/cloudinary');
@@ -70,12 +71,46 @@ router.post('/validate-image', reviewRequestLimiter, authenticateToken, async (r
 // This replaces the old two-call flow (POST /posts then POST /chef/review-request) where
 // a failure after post creation would leave an orphaned post with no review request row.
 router.post('/submit-with-review', reviewRequestLimiter, authenticateToken, async (req, res) => {
-  const { title, description, image_url, cook_time, difficulty, utensils, ingredients, instructions, context, chef_filter } = req.body;
+  const { title, description, image_url, cook_time, difficulty, utensils, ingredients, instructions, context, chef_filter, payment_intent_id } = req.body;
 
   if (!title?.trim()) return res.status(400).json({ error: 'title is required' });
   if (!image_url?.trim()) return res.status(400).json({ error: 'image_url is required' });
   if (difficulty && !['Easy', 'Medium', 'Hard'].includes(difficulty)) {
     return res.status(400).json({ error: 'difficulty must be Easy, Medium, or Hard' });
+  }
+
+  // Payment gate: verify the PaymentIntent directly with Stripe before any DB work.
+  // Gemini already ran on the frontend (via /validate-image) before the payment sheet was shown.
+  // The daily cap was already enforced in /payments/create-intent before the PI was created.
+  // This check guards against direct API callers that skip the payment sheet entirely.
+  if (!payment_intent_id) {
+    return res.status(402).json({ error: 'payment_required', message: 'A completed payment is required to submit a review request.' });
+  }
+  try {
+    const pi = await stripe.paymentIntents.retrieve(payment_intent_id);
+    if (pi.status !== 'succeeded') {
+      return res.status(402).json({ error: 'payment_not_completed', message: 'Payment has not been completed.' });
+    }
+    if (pi.metadata?.userId !== req.user.id.toString()) {
+      return res.status(403).json({ error: 'payment_mismatch', message: 'Payment does not belong to this account.' });
+    }
+    if (pi.metadata?.type !== 'chef_review') {
+      return res.status(400).json({ error: 'invalid_payment_type', message: 'Invalid payment type.' });
+    }
+    // Prevent the same PaymentIntent from funding two review requests
+    const { rows: usedRows } = await pool.query(
+      'SELECT 1 FROM chef_review_requests WHERE payment_intent_id = $1',
+      [payment_intent_id]
+    );
+    if (usedRows.length) {
+      return res.status(409).json({ error: 'payment_already_used', message: 'This payment has already been used for a review request.' });
+    }
+  } catch (err) {
+    if (err.type === 'StripeInvalidRequestError') {
+      return res.status(400).json({ error: 'invalid_payment', message: 'Payment reference is invalid.' });
+    }
+    console.error('[POST /chef/submit-with-review] Stripe verify error:', err.message);
+    return res.status(502).json({ error: 'payment_verification_failed', message: 'Could not verify payment. Please try again.' });
   }
 
   const cleanImageUrl = image_url.trim();
@@ -146,8 +181,8 @@ router.post('/submit-with-review', reviewRequestLimiter, authenticateToken, asyn
     // RETURNING id is required so we can include requestId in the notification data,
     // which the frontend needs to claim the request without a separate lookup.
     const { rows: reviewRows } = await client.query(
-      'INSERT INTO chef_review_requests (requester_id, post_id, context, chef_filter) VALUES ($1, $2, $3, $4) RETURNING id',
-      [req.user.id, post.id, context?.trim() || null, chef_filter || 'All Chefs']
+      'INSERT INTO chef_review_requests (requester_id, post_id, context, chef_filter, payment_intent_id) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+      [req.user.id, post.id, context?.trim() || null, chef_filter || 'All Chefs', payment_intent_id]
     );
     const reviewRequestId = reviewRows[0].id;
 
@@ -212,6 +247,11 @@ router.post('/submit-with-review', reviewRequestLimiter, authenticateToken, asyn
     });
   } catch (err) {
     await client.query('ROLLBACK');
+    // Race condition: two parallel requests with the same payment_intent_id both passed
+    // the pre-check but one lost the INSERT race — return 409 instead of 500.
+    if (err.code === '23505' && err.constraint?.includes('payment_intent_id')) {
+      return res.status(409).json({ error: 'payment_already_used', message: 'This payment has already been used for a review request.' });
+    }
     console.error('[POST /chef/submit-with-review]', err);
     res.status(500).json({ error: 'server error' });
   } finally {
@@ -388,8 +428,12 @@ router.post('/reviews', reviewRequestLimiter, authenticateToken, requireChef, as
       );
       if (rowCount > 0) {
         await pool.query(
-          'UPDATE users SET earnings_balance = earnings_balance + 0.10 WHERE id = $1',
+          'UPDATE users SET earnings_balance = earnings_balance + 0.50 WHERE id = $1',
           [chef_id]
+        );
+        await pool.query(
+          'INSERT INTO chef_earnings (chef_id, amount, type, ref_review_request_id) VALUES ($1, 0.50, $2, $3)',
+          [chef_id, 'review_completion', request_id]
         );
       }
     }
@@ -582,13 +626,77 @@ router.get('/balance', balanceLimiter, authenticateToken, requireChef, async (re
   }
 });
 
+// GET /chef/stripe/onboard-link
+// Creates (or retrieves) a Stripe Connect Express account for the chef, then returns a
+// fresh onboarding link. Links are single-use and expire in ~5 minutes by Stripe design,
+// so they are always generated on demand — never cached.
+router.get('/stripe/onboard-link', authenticateToken, requireChef, async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT stripe_account_id FROM users WHERE id = $1', [req.user.id]);
+    let accountId = rows[0].stripe_account_id;
+
+    if (!accountId) {
+      const account = await stripe.accounts.create({
+        type: 'express',
+        capabilities: { transfers: { requested: true } },
+        metadata: { chef_id: req.user.id.toString() },
+      });
+      accountId = account.id;
+      await pool.query('UPDATE users SET stripe_account_id = $1 WHERE id = $2', [accountId, req.user.id]);
+    }
+
+    const accountLink = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: `${process.env.BACKEND_URL}/chef/stripe/onboard-link`,
+      return_url: `${process.env.BACKEND_URL}/chef/stripe/onboard-return`,
+      type: 'account_onboarding',
+    });
+
+    res.json({ url: accountLink.url });
+  } catch (err) {
+    console.error('[GET /chef/stripe/onboard-link]', err);
+    res.status(500).json({ error: 'server error', message: 'Could not generate onboarding link.' });
+  }
+});
+
+// GET /chef/stripe/onboard-status
+// Returns whether the chef has completed Stripe Connect onboarding.
+// The frontend shows "Set up payouts" vs "Payouts enabled" based on this.
+router.get('/stripe/onboard-status', authenticateToken, requireChef, async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT stripe_account_id FROM users WHERE id = $1', [req.user.id]);
+    const { stripe_account_id } = rows[0];
+
+    if (!stripe_account_id) {
+      return res.json({ onboarded: false, chargesEnabled: false, payoutsEnabled: false });
+    }
+
+    const account = await stripe.accounts.retrieve(stripe_account_id);
+    res.json({
+      onboarded: account.details_submitted,
+      chargesEnabled: account.charges_enabled,
+      payoutsEnabled: account.payouts_enabled,
+    });
+  } catch (err) {
+    console.error('[GET /chef/stripe/onboard-status]', err);
+    res.status(500).json({ error: 'server error', message: 'Could not check onboarding status.' });
+  }
+});
+
+// GET /chef/stripe/onboard-return
+// Stripe redirects here after the chef completes or abandons the onboarding flow.
+// The app uses deep-links for return UX; this endpoint is just the registered return_url.
+router.get('/stripe/onboard-return', (req, res) => {
+  res.json({ message: 'Onboarding complete. Return to the Chop & Chat app.' });
+});
+
 const withdrawLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 5, standardHeaders: true, legacyHeaders: false });
 
-// POST /chef/withdraw — withdraw available earnings via Stripe payout
+// POST /chef/withdraw — withdraw available earnings via Stripe Transfer to connected account
 router.post('/withdraw', withdrawLimiter, authenticateToken, requireChef, async (req, res) => {
   const withdrawAmount = parseFloat(req.body.amount);
   if (isNaN(withdrawAmount) || withdrawAmount < 1.00) {
-    return res.status(400).json({ error: 'INSUFFICIENT_AMOUNT', message: 'Minimum withdrawal is $1.00.' });
+    return res.status(400).json({ error: 'INSUFFICIENT_AMOUNT', message: 'Minimum withdrawal is 1.00 RON.' });
   }
 
   const client = await pool.connect();
@@ -596,34 +704,57 @@ router.post('/withdraw', withdrawLimiter, authenticateToken, requireChef, async 
     await client.query('BEGIN');
 
     const { rows } = await client.query(
-      'SELECT earnings_balance FROM users WHERE id = $1 FOR UPDATE',
+      'SELECT earnings_balance, stripe_account_id FROM users WHERE id = $1 FOR UPDATE',
       [req.user.id]
     );
-    const currentBalance = parseFloat(rows[0].earnings_balance || 0);
+    const { earnings_balance, stripe_account_id } = rows[0];
+    const currentBalance = parseFloat(earnings_balance || 0);
 
+    if (!stripe_account_id) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'NO_STRIPE_ACCOUNT', message: 'Complete Stripe payout setup before withdrawing.' });
+    }
     if (currentBalance < 1.00) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ error: 'INSUFFICIENT_BALANCE', message: 'Minimum withdrawal is $1.00.' });
+      return res.status(400).json({ error: 'INSUFFICIENT_BALANCE', message: 'Minimum withdrawal is 1.00 RON.' });
     }
     if (withdrawAmount > currentBalance) {
       await client.query('ROLLBACK');
       return res.status(400).json({ error: 'INSUFFICIENT_BALANCE', message: 'Withdrawal amount exceeds available balance.' });
     }
 
-    // Process payout via Stripe (test mode). Requires a bank account configured
-    // on the Stripe test account dashboard to complete successfully.
-    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    // Gap 3 fix: verify the platform has sufficient available balance before attempting the
+    // transfer. Real card charges settle after ~2 business days (pending → available), so
+    // the platform balance can run dry if payouts are requested faster than charges settle.
+    try {
+      const platformBalance = await stripe.balance.retrieve();
+      const currency = (process.env.STRIPE_CURRENCY || 'usd').toLowerCase();
+      const availableEntry = platformBalance.available.find(b => b.currency === currency);
+      const availableCents = availableEntry ? availableEntry.amount : 0;
+      const withdrawCents = Math.round(withdrawAmount * 100);
+      if (availableCents < withdrawCents) {
+        await client.query('ROLLBACK');
+        return res.status(503).json({ error: 'PLATFORM_INSUFFICIENT_FUNDS', message: 'Withdrawals are temporarily unavailable. Please try again in 1-2 business days.' });
+      }
+    } catch (balanceErr) {
+      console.error('[POST /chef/withdraw] Balance check error:', balanceErr.message);
+      // Non-fatal: if we can't check, let the transfer attempt proceed and catch the error there
+    }
+
+    // Transfer funds from the platform account to the chef's connected Stripe account.
+    // Stripe handles the automatic payout to the chef's bank on their payout schedule.
     let stripeTransferId = null;
     try {
-      const payout = await stripe.payouts.create({
+      const transfer = await stripe.transfers.create({
         amount: Math.round(withdrawAmount * 100),
-        currency: 'usd',
+        currency: process.env.STRIPE_CURRENCY || 'usd',
+        destination: stripe_account_id,
         metadata: {
           chef_id: req.user.id.toString(),
           type: 'chef_earnings_withdrawal',
         },
       });
-      stripeTransferId = payout.id;
+      stripeTransferId = transfer.id;
     } catch (stripeErr) {
       await client.query('ROLLBACK');
       console.error('[POST /chef/withdraw] Stripe error:', stripeErr.message);

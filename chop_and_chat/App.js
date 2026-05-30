@@ -88,7 +88,7 @@ function AppContent() {
                       Welcome to Chop & Chat, Chef
                     </Text>
                     <Text style={[welcomeStyles.body, { color: theme.textSecondary }]}>
-                      For every review you complete, you earn $0.10.
+                      For every review you complete, you earn 0.50 RON.
                     </Text>
                     <Pressable
                       style={({ pressed }) => [

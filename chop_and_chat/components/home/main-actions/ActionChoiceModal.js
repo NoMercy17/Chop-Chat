@@ -73,7 +73,7 @@ export default function ActionChoiceModal({
                                         <Text style={[styles.paidBadgeText, { color: theme.textInverse }]}>PAID</Text>
                                     </View>
                                 </View>
-                                <Text style={[styles.buttonSubtitle, { color: theme.textSecondary }]}>Get feedback from real chefs · $0.50</Text>
+                                <Text style={[styles.buttonSubtitle, { color: theme.textSecondary }]}>Get feedback from real chefs · 2.00 RON</Text>
                             </View>
                             <Text style={[styles.arrow, { color: theme.textTertiary }]}>→</Text>
                         </Pressable>

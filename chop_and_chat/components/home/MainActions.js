@@ -61,6 +61,9 @@ export default function MainActions() {
     // Holds the Cloudinary URL uploaded during the chef review pre-payment validation step.
     // Reused by handleChefReviewSubmit so the image isn't uploaded twice.
     const chefReviewUploadedUrlRef = useRef(null);
+    // After a successful payment, stores the PaymentIntent ID so a submission retry
+    // reuses the same payment instead of opening a new payment sheet (double-charge bug).
+    const paidIntentIdRef = useRef(null);
 
     const transitionRef = useRef(null);
     // Stores the 500ms image→CreatePost transition timer so resetUploadState can cancel it.
@@ -96,6 +99,7 @@ export default function MainActions() {
         aiUploadedImageUrlRef.current = null;
         aiUploadedPublicIdRef.current = null;
         chefReviewUploadedUrlRef.current = null;
+        paidIntentIdRef.current = null;
         setActiveModal(MODAL.NONE);
         setSelectedImage(null);
         setSelectedDestination(null);
@@ -294,7 +298,7 @@ export default function MainActions() {
 
     // Called after successful payment. Reuses the already-uploaded + validated Cloudinary URL
     // stored in chefReviewUploadedUrlRef — no second upload, no second Gemini call.
-    const handleChefReviewSubmit = useCallback(async ({ feedbackContext, chefFilter }) => {
+    const handleChefReviewSubmit = useCallback(async ({ feedbackContext, chefFilter }, paymentIntentId) => {
         if (!pendingPostData || !chefReviewUploadedUrlRef.current) return;
 
         setIsSubmitting(true);
@@ -312,6 +316,7 @@ export default function MainActions() {
                 instructions: pendingPostData.instructions,
                 context: feedbackContext,
                 chef_filter: chefFilter || 'All Chefs',
+                payment_intent_id: paymentIntentId,
             }, token);
 
             if (isMountedRef.current) {
@@ -377,7 +382,15 @@ export default function MainActions() {
             }
         }
 
-        // Phase 3: set up and present payment sheet
+        // Phase 3: payment — skip entirely if a previous attempt already paid.
+        // This prevents a double-charge when submit-with-review fails after payment succeeds
+        // and the user taps confirm again to retry.
+        if (paidIntentIdRef.current) {
+            if (isMountedRef.current) { setIsSubmitting(false); setUploadStatus(null); }
+            handleChefReviewSubmit(pendingChefReviewData, paidIntentIdRef.current);
+            return;
+        }
+
         setUploadStatus('Setting up payment…');
 
         let clientSecret;
@@ -385,7 +398,8 @@ export default function MainActions() {
             const result = await api.post('/payments/create-intent', {}, token);
             clientSecret = result.clientSecret;
         } catch (err) {
-            Alert.alert('Payment Error', err.message || 'Could not initialize payment. Please try again.');
+            const title = err.status === 429 ? 'Daily Limit Reached' : 'Payment Error';
+            Alert.alert(title, err.data?.message || err.message || 'Could not initialize payment. Please try again.');
             if (isMountedRef.current) { setIsSubmitting(false); setUploadStatus(null); }
             return;
         }
@@ -393,6 +407,7 @@ export default function MainActions() {
         const { error: initError } = await initPaymentSheet({
             merchantDisplayName: 'Chop & Chat',
             paymentIntentClientSecret: clientSecret,
+            returnURL: 'chopandchat://stripe-redirect',
             style: 'alwaysDark',
         });
 
@@ -410,12 +425,15 @@ export default function MainActions() {
             if (paymentError.code !== 'Canceled') {
                 Alert.alert('Payment Failed', paymentError.message || 'Your payment could not be processed. Please try again.');
             }
-            // Image is already uploaded and validated — keep chefReviewUploadedUrlRef so
-            // a retry skips the upload+validate steps and goes straight to payment.
+            // Upload + validate already done — keep refs so a retry goes straight to payment.
             return;
         }
 
-        handleChefReviewSubmit(pendingChefReviewData);
+        // Store the paid intent ID before submitting — if submit fails, a retry reuses this
+        // payment instead of opening a new sheet and charging the user again.
+        const paymentIntentId = clientSecret.split('_secret_')[0];
+        paidIntentIdRef.current = paymentIntentId;
+        handleChefReviewSubmit(pendingChefReviewData, paymentIntentId);
     }, [pendingChefReviewData, selectedImage, handleChefReviewSubmit, token, initPaymentSheet, presentPaymentSheet, switchModal, resetUploadState]);
 
     const handleCancelChefReviewConfirm = useCallback(() => {

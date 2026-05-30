@@ -78,14 +78,14 @@ export function NotificationsProvider({ children }) {
 
       setNotifications(backendNotifs);
     } catch (error) {
-      console.error('[NotificationsContext:refreshNotifications] Failed:', error.message);
+      console.warn('[NotificationsContext:refreshNotifications] Failed:', error.message);
     }
   }, [token]);
 
-  // Initial load and polling every 5s for new notifications
+  // Initial load and polling every 30s for new notifications
   useEffect(() => {
     refreshNotifications();
-    const interval = setInterval(refreshNotifications, 5000);
+    const interval = setInterval(refreshNotifications, 30000);
     return () => clearInterval(interval);
   }, [refreshNotifications]);
 

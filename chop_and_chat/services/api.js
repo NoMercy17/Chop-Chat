@@ -31,7 +31,7 @@ export const api = {
             method: 'GET',
             headers: getHeaders(token),
         });
-        return handleResponse(response);
+        return handleResponse(response, !!token);
     },
 
     post: async (endpoint, data, token = null) => {
@@ -40,7 +40,7 @@ export const api = {
             headers: getHeaders(token),
             body: JSON.stringify(data),
         });
-        return handleResponse(response);
+        return handleResponse(response, !!token);
     },
 
     put: async (endpoint, data, token = null) => {
@@ -49,7 +49,7 @@ export const api = {
             headers: getHeaders(token),
             body: JSON.stringify(data),
         });
-        return handleResponse(response);
+        return handleResponse(response, !!token);
     },
 
     patch: async (endpoint, data, token = null) => {
@@ -58,7 +58,7 @@ export const api = {
             headers: getHeaders(token),
             body: JSON.stringify(data),
         });
-        return handleResponse(response);
+        return handleResponse(response, !!token);
     },
 
     delete: async (endpoint, token = null) => {
@@ -66,7 +66,7 @@ export const api = {
             method: 'DELETE',
             headers: getHeaders(token),
         });
-        return handleResponse(response);
+        return handleResponse(response, !!token);
     },
 
     // For uploading formData (if we ever need to send files directly to backend and not to Cloudinary)
@@ -76,12 +76,12 @@ export const api = {
             headers: getHeaders(token, true),
             body: formData,
         });
-        return handleResponse(response);
+        return handleResponse(response, !!token);
     }
 };
 
 // Centralized response handling
-async function handleResponse(response) {
+async function handleResponse(response, wasAuthenticated = false) {
     const contentType = response.headers.get("content-type");
     let data;
     
@@ -92,7 +92,7 @@ async function handleResponse(response) {
     }
 
     if (!response.ok) {
-        if (response.status === 401) {
+        if (response.status === 401 && wasAuthenticated) {
             console.warn('[api.js] 401 received. Clearing session.');
             await AsyncStorage.removeItem('session_user');
             DeviceEventEmitter.emit('auth_error_logout');

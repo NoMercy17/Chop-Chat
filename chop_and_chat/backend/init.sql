@@ -336,3 +336,34 @@ CREATE TABLE IF NOT EXISTS chef_withdrawals (
   stripe_transfer_id TEXT,
   created_at        TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Stripe Connect account ID — set when the chef first starts onboarding
+ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_account_id TEXT;
+
+-- Append-only ledger of chef earning events (one row per $0.10 review completion).
+-- earnings_balance on users is a write-through cache; this table is the source of truth.
+CREATE TABLE IF NOT EXISTS chef_earnings (
+  id                     SERIAL PRIMARY KEY,
+  chef_id                INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount                 DECIMAL(10,2) NOT NULL,
+  type                   TEXT NOT NULL CHECK (type IN ('review_completion', 'adjustment')),
+  ref_review_request_id  INTEGER REFERENCES chef_review_requests(id) ON DELETE SET NULL,
+  created_at             TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_chef_earnings_chef_id ON chef_earnings(chef_id);
+
+-- Records each Stripe PaymentIntent that reaches succeeded state.
+-- Allows the webhook to confirm payment without coupling to the review request creation.
+CREATE TABLE IF NOT EXISTS payment_transactions (
+  id                 SERIAL PRIMARY KEY,
+  payment_intent_id  TEXT UNIQUE NOT NULL,
+  user_id            INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  amount_cents       INTEGER NOT NULL,
+  currency           TEXT NOT NULL DEFAULT 'usd',
+  status             TEXT NOT NULL DEFAULT 'pending',
+  created_at         TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Gap 1 fix: links each review request to the PaymentIntent that paid for it.
+-- UNIQUE prevents the same payment being used for two review requests.
+ALTER TABLE chef_review_requests ADD COLUMN IF NOT EXISTS payment_intent_id TEXT UNIQUE;

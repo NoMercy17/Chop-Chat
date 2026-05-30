@@ -1,8 +1,9 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, Pressable, StyleSheet, ActivityIndicator, Animated, Easing } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { wp, hp, fp } from '../../utils/responsive';
 
-export default function ChefEarningsCard({ balance, loading, onWithdraw, theme }) {
+export default function ChefEarningsCard({ balance, loading, onWithdraw, onSetupPayouts, stripeOnboarded, onboardLoading, theme }) {
   const cardOpacity = useRef(new Animated.Value(0)).current;
   const cardSlide = useRef(new Animated.Value(8)).current;
   const balanceScale = useRef(new Animated.Value(1)).current;
@@ -34,7 +35,8 @@ export default function ChefEarningsCard({ balance, loading, onWithdraw, theme }
     ]).start();
   }, [balance, loading]);
 
-  const canWithdraw = typeof balance === 'number' && balance >= 1.00 && !loading;
+  const notOnboarded = stripeOnboarded === false;
+  const canWithdraw = typeof balance === 'number' && balance >= 1.00 && !loading && !notOnboarded;
 
   return (
     <Animated.View
@@ -56,28 +58,60 @@ export default function ChefEarningsCard({ balance, loading, onWithdraw, theme }
               { transform: [{ scale: balanceScale }] },
             ]}
           >
-            ${(balance || 0).toFixed(2)}
+            {(balance || 0).toFixed(2)} RON
           </Animated.Text>
         )}
-        <Pressable
-          style={({ pressed }) => [
-            styles.withdrawButton,
-            { backgroundColor: canWithdraw ? theme.primaryLighter : theme.borderLight },
-            pressed && canWithdraw && styles.withdrawButtonPressed,
-          ]}
-          onPress={canWithdraw ? onWithdraw : undefined}
-          disabled={!canWithdraw}
-        >
-          <Text style={[styles.withdrawText, { color: canWithdraw ? theme.primary : theme.textTertiary }]}>
-            Withdraw
-          </Text>
-        </Pressable>
+        {notOnboarded ? (
+          <Pressable
+            style={({ pressed }) => [
+              styles.withdrawButton,
+              {
+                backgroundColor: theme.primaryLighter,
+                borderWidth: 1,
+                borderColor: theme.primary,
+              },
+              pressed && styles.withdrawButtonPressed,
+            ]}
+            onPress={onSetupPayouts}
+            disabled={onboardLoading}
+          >
+            {onboardLoading ? (
+              <ActivityIndicator size="small" color={theme.primary} />
+            ) : (
+              <View style={styles.setupRow}>
+                <Text style={[styles.withdrawText, { color: theme.primary }]}>Set up Payouts</Text>
+                <Ionicons name="chevron-forward" size={fp(13)} color={theme.primary} />
+              </View>
+            )}
+          </Pressable>
+        ) : (
+          <Pressable
+            style={({ pressed }) => [
+              styles.withdrawButton,
+              {
+                backgroundColor: canWithdraw ? theme.primaryLighter : theme.borderLight,
+                borderWidth: 1,
+                borderColor: canWithdraw ? theme.primary : theme.border,
+              },
+              pressed && styles.withdrawButtonPressed,
+            ]}
+            onPress={onWithdraw}
+          >
+            <Text style={[styles.withdrawText, { color: canWithdraw ? theme.primary : theme.textTertiary }]}>
+              Withdraw
+            </Text>
+          </Pressable>
+        )}
       </View>
-      {!loading && balance < 1.00 && balance > 0 && (
+      {notOnboarded ? (
         <Text style={[styles.hint, { color: theme.textTertiary }]}>
-          Withdraw unlocks at $1.00
+          Connect Stripe to withdraw your earnings
         </Text>
-      )}
+      ) : !loading && balance < 1.00 ? (
+        <Text style={[styles.hint, { color: theme.textTertiary }]}>
+          {balance === 0 ? 'Earn from roasts to withdraw' : 'Withdraw unlocks at 1.00 RON'}
+        </Text>
+      ) : null}
     </Animated.View>
   );
 }
@@ -127,6 +161,11 @@ const styles = StyleSheet.create({
   withdrawText: {
     fontSize: fp(14),
     fontWeight: '600',
+  },
+  setupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2),
   },
   hint: {
     fontSize: fp(11),

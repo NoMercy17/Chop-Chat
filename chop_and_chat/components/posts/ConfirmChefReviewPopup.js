@@ -20,8 +20,8 @@ export default function ConfirmChefReviewPopup({ visible, onConfirm, onCancel, o
             iconColor={theme.paid}
             iconBgColor={theme.paidLight}
             title="Ready to pay & submit?"
-            subtitle={`Your request will be sent to ${audienceLabel}. Tapping below opens a secure $0.50 payment — once paid, the review request is submitted.`}
-            confirmText="Pay $0.50 & Submit"
+            subtitle={`Your request will be sent to ${audienceLabel}. Tapping below opens a secure 2.00 RON payment — once paid, the review request is submitted.`}
+            confirmText="Pay 2.00 RON & Submit"
             confirmIcon="card-outline"
             confirmColor={theme.paid}
         />

@@ -1,5 +1,5 @@
 import React, { useContext, useState, useEffect, useCallback } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet, Modal, ActivityIndicator, Alert, RefreshControl } from "react-native";
+import { View, Text, ScrollView, Pressable, StyleSheet, Modal, ActivityIndicator, Alert, RefreshControl, Linking } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -50,6 +50,8 @@ export default function ProfileScreen({ navigation }) {
   const [balance, setBalance] = useState(0);
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [withdrawSheetVisible, setWithdrawSheetVisible] = useState(false);
+  const [stripeOnboarded, setStripeOnboarded] = useState(null); // null = not yet fetched
+  const [onboardLoading, setOnboardLoading] = useState(false);
 
   // Load profile data
   const loadUserProfile = useCallback(async () => {
@@ -101,6 +103,28 @@ export default function ProfileScreen({ navigation }) {
     }
   }, [user?.isChef, token]);
 
+  const loadOnboardStatus = useCallback(async () => {
+    if (!user?.isChef || !token) return;
+    try {
+      const data = await api.get('/chef/stripe/onboard-status', token);
+      setStripeOnboarded(data.onboarded);
+    } catch (error) {
+      console.error('[ProfileScreen] loadOnboardStatus:', error.message);
+    }
+  }, [user?.isChef, token]);
+
+  const handleSetupPayouts = useCallback(async () => {
+    setOnboardLoading(true);
+    try {
+      const data = await api.get('/chef/stripe/onboard-link', token);
+      await Linking.openURL(data.url);
+    } catch (error) {
+      Alert.alert('Setup Error', 'Could not open payout setup. Please try again.');
+    } finally {
+      setOnboardLoading(false);
+    }
+  }, [token]);
+
   const handleWithdraw = useCallback(async (amount) => {
     const prevBalance = balance;
     setBalance(prev => Math.max(0, parseFloat((prev - amount).toFixed(2))));
@@ -124,12 +148,12 @@ export default function ProfileScreen({ navigation }) {
 
   const onRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    await Promise.all([loadUserProfile(), loadFollowerStats(), loadBalance()]);
+    await Promise.all([loadUserProfile(), loadFollowerStats(), loadBalance(), loadOnboardStatus()]);
     setIsRefreshing(false);
-  }, [loadUserProfile, loadFollowerStats, loadBalance]);
+  }, [loadUserProfile, loadFollowerStats, loadBalance, loadOnboardStatus]);
 
-  useEffect(() => { loadUserProfile(); loadFollowerStats(); loadBalance(); }, [loadUserProfile, loadFollowerStats, loadBalance]);
-  useFocusEffect(useCallback(() => { loadUserProfile(); loadFollowerStats(); loadBalance(); }, [loadUserProfile, loadFollowerStats, loadBalance]));
+  useEffect(() => { loadUserProfile(); loadFollowerStats(); loadBalance(); loadOnboardStatus(); }, [loadUserProfile, loadFollowerStats, loadBalance, loadOnboardStatus]);
+  useFocusEffect(useCallback(() => { loadUserProfile(); loadFollowerStats(); loadBalance(); loadOnboardStatus(); }, [loadUserProfile, loadFollowerStats, loadBalance, loadOnboardStatus]));
 
   // Photo Handlers
   const handleAccessGallery = async () => {
@@ -216,6 +240,9 @@ export default function ProfileScreen({ navigation }) {
           balance={balance}
           loading={balanceLoading}
           onWithdraw={() => setWithdrawSheetVisible(true)}
+          onSetupPayouts={handleSetupPayouts}
+          stripeOnboarded={stripeOnboarded}
+          onboardLoading={onboardLoading}
           theme={theme}
         />
       )}

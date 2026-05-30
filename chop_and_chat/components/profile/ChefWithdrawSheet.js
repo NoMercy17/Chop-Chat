@@ -9,6 +9,7 @@ import {
   Easing,
   ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { wp, hp, fp } from '../../utils/responsive';
 import BottomSheetModal from '../common/BottomSheetModal';
 
@@ -24,6 +25,13 @@ export default function ChefWithdrawSheet({ visible, balance, onClose, onWithdra
 
   const numericAmount = parseFloat(amount) || 0;
   const canConfirm = numericAmount >= 1.00 && numericAmount <= (balance || 0) && !loading;
+  const remaining = canConfirm
+    ? Math.max(0, parseFloat(((balance || 0) - numericAmount).toFixed(2)))
+    : null;
+
+  const inputBorderColor = numericAmount === 0
+    ? theme.border
+    : canConfirm ? theme.primary : theme.danger;
 
   const handleFillAll = useCallback(() => {
     setAmount((balance || 0).toFixed(2));
@@ -82,8 +90,8 @@ export default function ChefWithdrawSheet({ visible, balance, onClose, onWithdra
     onClose();
   }, [onClose, successOpacity, successScale, shakeAnim]);
 
-  const confirmLabel = numericAmount >= 1.00
-    ? `Confirm withdrawal of $${numericAmount.toFixed(2)}`
+  const confirmLabel = canConfirm
+    ? `Withdraw ${numericAmount.toFixed(2)} RON`
     : 'Confirm Withdrawal';
 
   return (
@@ -91,7 +99,7 @@ export default function ChefWithdrawSheet({ visible, balance, onClose, onWithdra
       visible={visible}
       onClose={handleClose}
       title="Withdraw Earnings"
-      subtitle={`Available: $${(balance || 0).toFixed(2)}`}
+      subtitle={`Available: ${(balance || 0).toFixed(2)} RON`}
       leftIcon="close-outline"
       keyboardAvoidMaxHeight="80%"
     >
@@ -104,13 +112,13 @@ export default function ChefWithdrawSheet({ visible, balance, onClose, onWithdra
             ]}
           >
             <View style={[styles.successIconWrap, { backgroundColor: theme.successLighter }]}>
-              <Text style={[styles.successIcon, { color: theme.success }]}>$</Text>
+              <Ionicons name="checkmark" size={fp(30)} color={theme.success} />
             </View>
             <Text style={[styles.successTitle, { color: theme.success }]}>
-              Withdrawal submitted
+              On its way
             </Text>
             <Text style={[styles.successBody, { color: theme.textSecondary }]}>
-              ${numericAmount.toFixed(2)} has been sent to your account.
+              {numericAmount.toFixed(2)} RON withdrawal submitted. Funds arrive in 1-3 business days.
             </Text>
           </Animated.View>
         ) : (
@@ -122,6 +130,7 @@ export default function ChefWithdrawSheet({ visible, balance, onClose, onWithdra
                   { backgroundColor: theme.dangerLighter, transform: [{ translateX: shakeAnim }] },
                 ]}
               >
+                <Ionicons name="alert-circle-outline" size={fp(16)} color={theme.danger} style={styles.errorIcon} />
                 <Text style={[styles.errorText, { color: theme.danger }]}>{errorMessage}</Text>
               </Animated.View>
             )}
@@ -134,7 +143,7 @@ export default function ChefWithdrawSheet({ visible, balance, onClose, onWithdra
                   {
                     backgroundColor: theme.inputBackground,
                     color: theme.textPrimary,
-                    borderColor: theme.border,
+                    borderColor: inputBorderColor,
                   },
                 ]}
                 value={amount}
@@ -148,7 +157,11 @@ export default function ChefWithdrawSheet({ visible, balance, onClose, onWithdra
               <Pressable
                 style={({ pressed }) => [
                   styles.allButton,
-                  { backgroundColor: theme.primaryLighter },
+                  {
+                    backgroundColor: theme.primaryLighter,
+                    borderWidth: 1,
+                    borderColor: theme.primary,
+                  },
                   pressed && { opacity: 0.72 },
                 ]}
                 onPress={handleFillAll}
@@ -159,13 +172,20 @@ export default function ChefWithdrawSheet({ visible, balance, onClose, onWithdra
 
             {numericAmount > 0 && numericAmount < 1.00 && (
               <Text style={[styles.hintText, { color: theme.warning }]}>
-                Minimum withdrawal is $1.00
+                Minimum withdrawal is 1.00 RON
               </Text>
             )}
             {numericAmount > (balance || 0) && numericAmount > 0 && (
               <Text style={[styles.hintText, { color: theme.danger }]}>
                 Amount exceeds available balance
               </Text>
+            )}
+
+            {remaining !== null && (
+              <View style={[styles.summaryRow, { borderTopColor: theme.border }]}>
+                <Text style={[styles.summaryLabel, { color: theme.textTertiary }]}>Balance after</Text>
+                <Text style={[styles.summaryValue, { color: theme.textSecondary }]}>{remaining.toFixed(2)} RON</Text>
+              </View>
             )}
 
             <Pressable
@@ -245,7 +265,7 @@ const styles = StyleSheet.create({
     height: hp(54),
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: hp(8),
+    marginTop: hp(20),
   },
   confirmButtonPressed: {
     opacity: 0.88,
@@ -256,13 +276,36 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderRadius: wp(10),
     padding: wp(14),
+    gap: wp(8),
     marginBottom: hp(16),
   },
+  errorIcon: {
+    flexShrink: 0,
+  },
   errorText: {
+    flex: 1,
     fontSize: fp(14),
     fontWeight: '500',
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    marginTop: hp(12),
+    paddingTop: hp(12),
+  },
+  summaryLabel: {
+    fontSize: fp(13),
+    fontWeight: '500',
+  },
+  summaryValue: {
+    fontSize: fp(13),
+    fontWeight: '600',
   },
   successBlock: {
     alignItems: 'center',
@@ -276,10 +319,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: hp(16),
   },
-  successIcon: {
-    fontSize: fp(28),
-    fontWeight: '700',
-  },
   successTitle: {
     fontSize: fp(20),
     fontWeight: '700',
@@ -288,6 +327,7 @@ const styles = StyleSheet.create({
   successBody: {
     fontSize: fp(15),
     textAlign: 'center',
-    lineHeight: fp(15) * 1.5,
+    lineHeight: fp(15) * 1.55,
+    maxWidth: wp(260),
   },
 });

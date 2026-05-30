@@ -5,7 +5,7 @@ const REQUIRED_ENV = [
   'JWT_SECRET', 'DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME',
   'GEMINI_API_KEY',
   'CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET',
-  'STRIPE_SECRET_KEY',
+  'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_CURRENCY',
 ];
 const missing = REQUIRED_ENV.filter(k => !process.env[k]);
 if (missing.length) {
@@ -28,10 +28,16 @@ const chefRoutes = require('./routes/chef');
 const postRoutes = require('./routes/posts');
 const aiRoutes = require('./routes/ai');
 const paymentRoutes = require('./routes/payments');
+const webhookRoutes = require('./routes/webhooks');
 
 const app = express();
 app.use(helmet());
 app.use(cors());
+
+// Webhook must be mounted BEFORE express.json() — Stripe signature verification
+// requires the raw, unparsed request body buffer.
+app.use('/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
+
 app.use(express.json());
 
 // Throttle auth endpoints to slow down brute-force / credential-stuffing.

@@ -19,7 +19,7 @@ export default function ChefReviewPaidWarning({ visible, onConfirm, onCancel }) 
             iconBgColor={theme.cardBackgroundAlt}
             title="Expert Chef Review"
             subtitle="A professional chef will personally review your dish and provide detailed feedback on presentation, technique, and flavor."
-            confirmText="Pay $0.50 & Submit"
+            confirmText="Pay 2.00 RON & Submit"
             confirmIcon="card-outline"
             confirmColor={theme.primary}
         >
