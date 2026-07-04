@@ -1,0 +1,307 @@
+const express = require('express');
+const rateLimit = require('express-rate-limit');
+const router = express.Router();
+const bcrypt = require('bcrypt');
+const pool = require('../db');
+const { authenticateToken } = require('../middleware');
+const { shouldNotify } = require('../utils/notificationPrefs');
+const cloudinary = require('../services/cloudinary');
+const { getPublicIdFromUrl } = require('../utils/helpers');
+
+const profileReadLimiter    = rateLimit({ windowMs: 15 * 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false });
+const profileWriteLimiter   = rateLimit({ windowMs: 15 * 60 * 1000, max: 20,  standardHeaders: true, legacyHeaders: false });
+const followReadLimiter     = rateLimit({ windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false });
+const followMutationLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 60,  standardHeaders: true, legacyHeaders: false });
+
+// Get current user info 
+router.get('/me', profileReadLimiter, authenticateToken, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT u.id, u.email, u.name, u.role, u.profile_photo, u.bio, u.created_at,
+        (SELECT COUNT(*) FROM posts WHERE user_id = u.id AND is_global = false) AS post_count
+       FROM users u WHERE u.id = $1`,
+      [req.user.id]
+    );
+
+    if (!rows.length) return res.status(404).json({ error: 'user not found' });
+    const row = rows[0];
+    res.json({ user: { ...row, postCount: parseInt(row.post_count, 10) } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// Update profile photo
+router.patch('/profile-photo', profileWriteLimiter, authenticateToken, async (req, res) => {
+  try {
+    const { photo_url } = req.body;
+    if (!photo_url) return res.status(400).json({ error: 'photo_url is required' });
+
+    // Fetch the current photo URL before overwriting so we can delete the old asset
+    const existing = await pool.query('SELECT profile_photo FROM users WHERE id = $1', [req.user.id]);
+    const oldUrl = existing.rows[0]?.profile_photo;
+
+    const { rows } = await pool.query(
+      'UPDATE users SET profile_photo = $1 WHERE id = $2 RETURNING id, email, name, role, profile_photo, created_at',
+      [photo_url, req.user.id]
+    );
+
+    if (!rows.length) return res.status(404).json({ error: 'user not found' });
+
+    // Delete the old Cloudinary asset after the DB update succeeds
+    if (oldUrl) {
+      const publicId = getPublicIdFromUrl(oldUrl);
+      if (publicId && publicId.startsWith('profile_photos/')) {
+        cloudinary.uploader.destroy(publicId).catch(err =>
+          console.error('[PATCH /users/profile-photo] Failed to delete old Cloudinary asset:', err.message)
+        );
+      }
+    }
+
+    res.json({ user: rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// Change password (verifies current password, then hashes and stores the new one)
+router.patch('/password', profileWriteLimiter, authenticateToken, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'currentPassword and newPassword are required' });
+    }
+
+    const { rows } = await pool.query(
+      'SELECT id, password FROM users WHERE id = $1',
+      [req.user.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'user not found' });
+
+    const ok = await bcrypt.compare(currentPassword, rows[0].password);
+    if (!ok) return res.status(401).json({ error: 'current password is incorrect' });
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashed, req.user.id]);
+    res.json({ message: 'password changed successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// List users
+router.get('/', profileReadLimiter, authenticateToken, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT id, email, name, role, profile_photo, created_at FROM users ORDER BY id DESC LIMIT 100'
+    );
+    res.json({ users: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// Get a single user's public profile (name, photo, bio, role)
+router.get('/:id/profile', profileReadLimiter, authenticateToken, async (req, res) => {
+  try {
+    const targetId = parseInt(req.params.id, 10);
+    if (Number.isNaN(targetId)) return res.status(400).json({ error: 'invalid user id' });
+    const { rows } = await pool.query(
+      'SELECT id, name, profile_photo, bio, role FROM users WHERE id = $1',
+      [targetId]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'user not found' });
+    res.json({ user: rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// Get posts by a specific user (excluding global/seeded posts)
+router.get('/:id/posts', profileReadLimiter, authenticateToken, async (req, res) => {
+  try {
+    const targetId = parseInt(req.params.id, 10);
+    if (Number.isNaN(targetId)) return res.status(400).json({ error: 'invalid user id' });
+
+    const { rows } = await pool.query(
+      `SELECT p.id, p.title, p.description, p.image_url, p.cook_time, p.difficulty,
+              p.utensils, p.ingredients, p.instructions, p.created_at,
+              u.name as author, u.id as author_id,
+              (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id AND chef_reaction_id IS NULL) as likes,
+              (SELECT COUNT(*) FROM comments WHERE post_id = p.id AND chef_reaction_id IS NULL) as comments,
+              EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = $2 AND chef_reaction_id IS NULL) as liked,
+              EXISTS(SELECT 1 FROM saved_posts WHERE post_id = p.id AND user_id = $2) as saved
+       FROM posts p
+       JOIN users u ON p.user_id = u.id
+       WHERE p.user_id = $1 AND p.is_global = false
+       ORDER BY p.created_at DESC`,
+      [targetId, req.user.id]
+    );
+
+    const posts = rows.map(r => ({
+      id: r.id,
+      title: r.title,
+      description: r.description,
+      image: r.image_url,
+      cookTime: r.cook_time,
+      difficulty: r.difficulty,
+      utensils: r.utensils,
+      ingredients: r.ingredients,
+      instructions: r.instructions,
+      author: r.author,
+      authorId: r.author_id,
+      likes: parseInt(r.likes),
+      comments: parseInt(r.comments),
+      liked: r.liked,
+      saved: r.saved,
+      createdAt: r.created_at,
+    }));
+
+    res.json({ posts });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// Follow a user
+router.post('/:id/follow', followMutationLimiter, authenticateToken, async (req, res) => {
+  try {
+    const targetId = parseInt(req.params.id, 10);
+    if (Number.isNaN(targetId)) return res.status(400).json({ error: 'invalid user id' });
+    if (targetId === req.user.id) return res.status(400).json({ error: 'cannot follow yourself' });
+
+    const { rows } = await pool.query(
+      'INSERT INTO follows (follower_id, following_id) VALUES ($1, $2) RETURNING id, follower_id, following_id, created_at',
+      [req.user.id, targetId]
+    );
+    // Remove any stale new_follower notification from the same follower (re-follow dedup)
+    await pool.query(
+      "DELETE FROM notifications WHERE user_id = $1 AND type = 'new_follower' AND data->>'followerId' = $2",
+      [targetId, String(req.user.id)]
+    );
+    const followerCountResult = await pool.query(
+      'SELECT COUNT(*) AS count FROM follows WHERE following_id = $1',
+      [targetId]
+    );
+    const followerCount = parseInt(followerCountResult.rows[0].count, 10);
+    const followerName = req.user.name || 'Someone';
+    if (await shouldNotify(targetId, 'new_follower', pool, followerCount)) {
+      await pool.query(
+        'INSERT INTO notifications (user_id, type, title, subtitle, data) VALUES ($1, $2, $3, $4, $5)',
+        [targetId, 'new_follower', 'New Follower',
+         `${followerName} started following you`,
+         JSON.stringify({ followerId: req.user.id, followerName })]
+      );
+    }
+    res.status(201).json({ follow: rows[0] });
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'already following' });
+    if (err.code === '23514') return res.status(400).json({ error: 'cannot follow yourself' });
+    if (err.code === '23503') return res.status(404).json({ error: 'user not found' });
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// Unfollow a user
+router.delete('/:id/follow', followMutationLimiter, authenticateToken, async (req, res) => {
+  try {
+    const targetId = parseInt(req.params.id, 10);
+    if (Number.isNaN(targetId)) return res.status(400).json({ error: 'invalid user id' });
+
+    const { rowCount } = await pool.query(
+      'DELETE FROM follows WHERE follower_id = $1 AND following_id = $2',
+      [req.user.id, targetId]
+    );
+    if (!rowCount) return res.status(404).json({ error: 'not following' });
+    res.status(204).send();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// Remove a follower (the authenticated user removes :id from their followers)
+router.delete('/:id/follower', followMutationLimiter, authenticateToken, async (req, res) => {
+  try {
+    const followerId = parseInt(req.params.id, 10);
+    if (Number.isNaN(followerId)) return res.status(400).json({ error: 'invalid user id' });
+
+    const { rowCount } = await pool.query(
+      'DELETE FROM follows WHERE follower_id = $1 AND following_id = $2',
+      [followerId, req.user.id]
+    );
+    if (!rowCount) return res.status(404).json({ error: 'not a follower' });
+    res.status(204).send();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// Followers (people who follow :id)
+router.get('/:id/followers', followReadLimiter, authenticateToken, async (req, res) => {
+  try {
+    const targetId = parseInt(req.params.id, 10);
+    if (Number.isNaN(targetId)) return res.status(400).json({ error: 'invalid user id' });
+
+    const { rows } = await pool.query(
+      `SELECT u.id, u.name, u.profile_photo, u.role
+       FROM users u
+       JOIN follows f ON u.id = f.follower_id
+       WHERE f.following_id = $1
+       ORDER BY f.created_at DESC`,
+      [targetId]
+    );
+    res.json({ followers: rows, count: rows.length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// Following (people :id follows)
+router.get('/:id/following', followReadLimiter, authenticateToken, async (req, res) => {
+  try {
+    const targetId = parseInt(req.params.id, 10);
+    if (Number.isNaN(targetId)) return res.status(400).json({ error: 'invalid user id' });
+
+    const { rows } = await pool.query(
+      `SELECT u.id, u.name, u.profile_photo, u.role
+       FROM users u
+       JOIN follows f ON u.id = f.following_id
+       WHERE f.follower_id = $1
+       ORDER BY f.created_at DESC`,
+      [targetId]
+    );
+    res.json({ following: rows, count: rows.length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// Does the current user follow :id?
+router.get('/:id/is-following', followReadLimiter, authenticateToken, async (req, res) => {
+  try {
+    const targetId = parseInt(req.params.id, 10);
+    if (Number.isNaN(targetId)) return res.status(400).json({ error: 'invalid user id' });
+
+    const { rows } = await pool.query(
+      'SELECT 1 FROM follows WHERE follower_id = $1 AND following_id = $2',
+      [req.user.id, targetId]
+    );
+    res.json({ isFollowing: rows.length > 0 });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+module.exports = router;

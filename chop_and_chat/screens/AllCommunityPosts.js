@@ -1,0 +1,213 @@
+import { useState, useContext } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
+import { wp, hp, fp } from '../utils/responsive';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../context/ThemeContext';
+import { usePosts } from '../context/PostsContext';
+import { useFollow } from '../context/FollowContext';
+import { AuthContext } from '../context/AuthContext';
+import { api } from '../services/api';
+import { navigateToProfile } from '../utils/navigation';
+import DishDetailModal from '../components/posts/DishDetailModal';
+import CategoryHeader from '../components/home/CategoryHeader';
+import CommentsModal from '../components/posts/CommentsModal';
+
+const CATEGORIES = ['Following', 'All'];
+
+export default function AllCommunityPosts({ navigation }) {
+    const { theme } = useTheme();
+    const insets = useSafeAreaInsets();
+    const { token, user } = useContext(AuthContext);
+    const { posts, handleLike, handleSave, addComment } = usePosts();
+    const { followedUsers } = useFollow();
+
+    const [selectedCategory, setSelectedCategory] = useState('All');
+    const [commentsModalVisible, setCommentsModalVisible] = useState(false);
+    const [selectedPost, setSelectedPost] = useState(null);
+    const [comments, setComments] = useState([]);
+    const [commentsLoading, setCommentsLoading] = useState(false);
+    const [dishDetailModalVisible, setDishDetailModalVisible] = useState(false);
+    const [selectedDish, setSelectedDish] = useState(null);
+    const [newComment, setNewComment] = useState('');
+    const [commentError, setCommentError] = useState(null);
+    
+    const filteredPosts = selectedCategory === 'All'
+        ? posts
+        : posts.filter(post => followedUsers.has(post.authorId));
+    
+    const handleComment = async (post) => {
+        setSelectedPost(post);
+        setComments([]);
+        setCommentsLoading(true);
+        setCommentsModalVisible(true);
+        try {
+            const data = await api.get(`/posts/${post.id}/comments`, token);
+            setComments(data?.comments || []);
+        } catch (error) {
+            console.error('[AllCommunityPosts] fetchComments:', error.message);
+        } finally {
+            setCommentsLoading(false);
+        }
+    };
+
+    const handleAddComment = async () => {
+        const text = newComment.trim();
+        if (!text || !selectedPost) return;
+
+        const tempId = `temp-${Date.now()}`;
+        setComments(curr => [...curr, {
+            id: tempId, authorId: user?.id,
+            author: user?.name || 'You',
+            initials: (user?.name || 'YO').substring(0, 2).toUpperCase(),
+            text, timestamp: 'just now',
+        }]);
+        setNewComment('');
+
+        const result = await addComment(selectedPost.id, text);
+        if (result?.blocked) {
+            setComments(curr => curr.filter(c => c.id !== tempId));
+            setNewComment(text);
+            setCommentError(result.message);
+        } else if (result) {
+            setComments(curr => curr.map(c => c.id === tempId ? result : c));
+            setCommentError(null);
+        } else {
+            setComments(curr => curr.filter(c => c.id !== tempId));
+            setNewComment(text);
+        }
+    };
+
+    return (
+        <View style={[styles.container, { backgroundColor: theme.screenBackground, paddingTop: insets.top }]}>
+            <CategoryHeader 
+                categories={CATEGORIES}
+                selectedCategory={selectedCategory}
+                onSelectCategory={setSelectedCategory}
+                onBack={() => navigation.goBack()}
+                theme={theme}
+            />
+
+            <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.content}>
+                {filteredPosts.length > 0 ? filteredPosts.map((post) => (
+                <Pressable
+                    key={post.id}
+                    style={({ pressed }) => [
+                        styles.postCard,
+                        { backgroundColor: theme.postCardBackground },
+                        pressed && styles.postCardPressed
+                    ]}
+                    onPress={() => {
+                        setSelectedDish(post);
+                        setDishDetailModalVisible(true);
+                    }}
+                >
+                    {post.image ? (
+                        <Image source={{ uri: post.image }} style={styles.postImage} />
+                    ) : (
+                        <View style={[styles.imageplaceholder, { backgroundColor: theme.imageBackground }]}>
+                            <Text style={[styles.imagePlaceholderText, { color: theme.textTertiary }]}>IMAGE</Text>
+                        </View>
+                    )}
+                    
+                    <View style={[styles.postContent, { backgroundColor: theme.postContentBackground }]}>
+                        <Text style={[styles.postTitle, { color: theme.textPrimary }]}>{post.title}</Text>
+                        <Text style={[styles.postDescription, { color: theme.textSecondary }]}>{post.description}</Text>
+                        
+                        <View style={[styles.postMeta, { borderTopColor: theme.borderLight }]}>
+                            <Pressable
+                                onPress={(e) => {
+                                    e.stopPropagation();
+                                    navigateToProfile(navigation, post.authorId || post.id, post.author, user?.id, post.authorPhoto);
+                                }}
+                                style={({ pressed }) => [styles.authorRow, pressed && { opacity: 0.7 }]}
+                            >
+                                {post.authorPhoto ? (
+                                    <Image source={{ uri: post.authorPhoto }} style={styles.authorAvatar} />
+                                ) : (
+                                    <View style={[styles.authorAvatarPlaceholder, { backgroundColor: theme.primary }]}>
+                                        <Text style={[styles.authorInitial, { color: theme.textInverse }]}>
+                                            {post.author ? post.author[0].toUpperCase() : '?'}
+                                        </Text>
+                                    </View>
+                                )}
+                                <Text style={[styles.postAuthor, { color: theme.primary }]}>{post.author}</Text>
+                            </Pressable>
+                                <View style={styles.postStats}>
+                                    <Pressable style={({ pressed }) => [styles.statButton, pressed && styles.statButtonPressed]} onPress={() => handleLike(post.id)}>
+                                        <Ionicons name={post.liked ? "heart" : "heart-outline"} size={fp(16)} color={post.liked ? theme.likeColor : theme.textSecondary} />
+                                        <Text style={[styles.statText, { color: theme.textSecondary }, post.liked && { color: theme.likeColor }]}>{post.likes}</Text>
+                                    </Pressable>
+
+                                    <Pressable style={({ pressed }) => [styles.statButton, pressed && styles.statButtonPressed]} onPress={() => handleComment(post)}>
+                                        <Ionicons name="chatbubble-outline" size={fp(15)} color={theme.textSecondary} />
+                                        <Text style={[styles.statText, { color: theme.textSecondary }]}>{post.comments}</Text>
+                                    </Pressable>
+
+                                    <Pressable style={({ pressed }) => [styles.statButton, pressed && styles.statButtonPressed]} onPress={() => handleSave(post.id)}>
+                                        <Ionicons name={post.saved ? "bookmark" : "bookmark-outline"} size={fp(16)} color={post.saved ? theme.saveColor : theme.textSecondary} />
+                                    </Pressable>
+                                </View>
+                        </View>
+                    </View>
+                </Pressable>
+            )) : (
+                <View style={styles.emptyState}>
+                    <Ionicons name="people-outline" size={fp(48)} color={theme.textTertiary} />
+                    <Text style={[styles.emptyStateTitle, { color: theme.textPrimary }]}>No posts from followed users</Text>
+                    <Text style={[styles.emptyStateSubtitle, { color: theme.textSecondary }]}>Follow some chefs to see their posts here!</Text>
+                </View>
+            )}
+            </ScrollView>
+
+            <CommentsModal
+                visible={commentsModalVisible}
+                onClose={() => { setCommentsModalVisible(false); setComments([]); }}
+                comments={comments}
+                loading={commentsLoading}
+                newComment={newComment}
+                onCommentChange={(t) => { setNewComment(t); setCommentError(null); }}
+                onAddComment={handleAddComment}
+                errorMessage={commentError}
+                onAuthorPress={(comment) => {
+                    setCommentsModalVisible(false);
+                    navigateToProfile(navigation, comment.authorId, comment.author, user?.id);
+                }}
+                theme={theme}
+            />
+
+            <DishDetailModal
+                visible={dishDetailModalVisible}
+                onClose={() => { setDishDetailModalVisible(false); setSelectedDish(null); }}
+                dish={selectedDish}
+            />
+        </View>
+    );
+}
+
+const styles = StyleSheet.create({
+    container: { flex: 1 },
+    scrollContainer: { flex: 1 },
+    content: { padding: wp(16), paddingBottom: hp(40) },
+    postCard: { borderRadius: wp(16), marginBottom: hp(20), overflow: 'hidden', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: hp(2) }, shadowOpacity: 0.08, shadowRadius: wp(12) },
+    postCardPressed: { opacity: 0.92, transform: [{ scale: 0.98 }] },
+    postImage: { width: '100%', height: hp(200), resizeMode: 'cover' },
+    imageplaceholder: { width: '100%', height: hp(200), justifyContent: 'center', alignItems: 'center' },
+    imagePlaceholderText: { fontWeight: '700', fontSize: fp(14) },
+    postContent: { padding: wp(16) },
+    postTitle: { fontSize: fp(18), fontWeight: '700', marginBottom: hp(4) },
+    postDescription: { fontSize: fp(14), marginBottom: hp(12), lineHeight: fp(20) },
+    postMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: hp(8), paddingTop: hp(8), borderTopWidth: 1 },
+    authorRow: { flexDirection: 'row', alignItems: 'center', gap: wp(6) },
+    authorAvatar: { width: wp(24), height: wp(24), borderRadius: wp(12) },
+    authorAvatarPlaceholder: { width: wp(24), height: wp(24), borderRadius: wp(12), justifyContent: 'center', alignItems: 'center' },
+    authorInitial: { fontSize: fp(11), fontWeight: '700' },
+    postAuthor: { fontSize: fp(14), fontWeight: '600' },
+    postStats: { flexDirection: 'row', gap: wp(12) },
+    statButton: { flexDirection: 'row', alignItems: 'center', gap: wp(4) },
+    statButtonPressed: { opacity: 0.6, transform: [{ scale: 0.85 }] },
+    statText: { fontSize: fp(13), fontWeight: '600' },
+    emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: hp(100), paddingHorizontal: wp(40) },
+    emptyStateTitle: { fontSize: fp(18), fontWeight: '700', marginTop: hp(16) },
+    emptyStateSubtitle: { fontSize: fp(14), textAlign: 'center', marginTop: hp(8) }
+});
